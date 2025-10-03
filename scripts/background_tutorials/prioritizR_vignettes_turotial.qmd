@@ -1,0 +1,188 @@
+---
+title: "Getting started with prioritizR"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+This tutorial provides a short introduction to the `prioritizr` R package, sourced from <https://prioritizr.net/articles/prioritizr.html#introduction> 
+
+## Load packages
+
+```{r}
+library(prioritizrdata)
+library(prioritizr)
+library(sf)
+library(terra)
+library(vegan)
+library(cluster)
+```
+
+## Load data
+
+```{r}
+# set seed for reproducibility
+set.seed(500)
+
+# load planning unit data
+tas_pu <- prioritizrdata::get_tas_pu()
+
+# load feature data
+tas_features <- prioritizrdata::get_tas_features()
+```
+
+## Data exploration and processing
+
+```{r}
+# print planning unit data
+print(tas_pu)
+
+# set costs for existing protected areas to 0
+tas_pu$cost <- tas_pu$cost * !tas_pu$locked_in
+
+# plot map of planning unit costs
+plot(st_as_sf(tas_pu[, "cost"]), main = "Planning unit costs")
+
+# plot map of planning unit coverage by protected areas 
+plot(st_as_sf(tas_pu[, "locked_in"]), main = "Protected area coverage")
+```
+
+```{r}
+# print the conservation feature data 
+print(tas_features)
+
+# plot a map of the first four vegetation types
+plot(tas_features[[1:4]])
+```
+
+## Problem formulation
+
+```{r}
+# build problem
+p1 <-
+  problem(tas_pu, tas_features, cost_column = "cost") %>%
+  add_min_set_objective() %>%
+  add_boundary_penalties(penalty = 0.005) %>%
+  add_relative_targets(0.17) %>%
+  add_locked_in_constraints("locked_in") %>%
+  add_binary_decisions() %>% 
+  add_gurobi_solver()
+
+# print problem
+print(p1)
+```
+
+## Prioritization
+
+```{r}
+# solve problem
+s1 <- solve(p1)
+```
+
+```{r}
+# plot map of prioritization
+plot(
+  st_as_sf(s1[, "solution_1"]), main = "Prioritization",
+  pal = c("grey90", "darkgreen")
+)
+```
+
+## Feature representation
+
+Let’s examine how well the vegetation communities are represented by existing protected areas and the prioritization
+
+```{r}
+# create column with existing protected areas
+tas_pu$pa <- round(tas_pu$locked_in)
+
+# calculate feature representation statistics based on existing protected areas
+tc_pa <- eval_target_coverage_summary(p1, tas_pu[, "pa"])
+print(tc_pa)
+```
+
+```{r}
+# calculate  feature representation statistics based on the prioritization
+tc_s1 <- eval_target_coverage_summary(p1, s1[, "solution_1"])
+print(tc_s1)
+```
+
+```{r}
+# explore representation by existing protected areas
+## calculate number of features adequately represented by existing protected
+## areas
+sum(tc_pa$met)
+```
+
+```{r}
+## summarize representation (values show percent coverage)
+summary(tc_pa$relative_held * 100)
+```
+
+```{r}
+## visualize representation  (values show percent coverage)
+hist(tc_pa$relative_held * 100,
+     main = "Feature representation by existing protected areas",
+     xlim = c(0, 100),
+     xlab = "Percent coverage of features (%)")
+```
+
+```{r}
+# explore representation by prioritization
+## summarize representation (values show percent coverage)
+summary(tc_s1$relative_held * 100)
+```
+
+```{r}
+## calculate number of features adequately represented by the prioritization
+sum(tc_s1$met)
+```
+
+```{r}
+## visualize representation  (values show percent coverage)
+hist(
+  tc_s1$relative_held * 100,
+  main = "Feature representation by prioritization",
+  xlim = c(0, 100),
+  xlab = "Percent coverage of features (%)"
+)
+```
+
+## Evaluating importance
+
+```{r}
+# calculate relative importance
+imp_s1 <- eval_rank_importance(p1, s1["solution_1"], n = 10)
+print(imp_s1)
+
+# manually set locked in planning units to -1 to help with visualization,
+# this way we can easily see the importance scores for the priority areas
+imp_s1$rs[tas_pu$locked_in] <- -1
+```
+
+```{r}
+# plot map of importance scores
+plot(st_as_sf(imp_s1[, "rs"]), main = "Overall importance")
+```
+
+## Portfolios
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
