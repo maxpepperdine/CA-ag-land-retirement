@@ -131,7 +131,7 @@ annualCross <- enframe(COMMap, name = NULL, value = "COMM") %>%
 
 
 #Read in revenue table - TO DO ************
-revenueRaw <- read_csv(here::here("data/intermediate/final_revenue_mb.csv"))
+revenueRaw <- read_csv(here::here("data/intermediate/final_revenue_e.csv"))
 
 revenue <- revenueRaw %>%
   dplyr::select(crop, price_per_acre) %>% 
