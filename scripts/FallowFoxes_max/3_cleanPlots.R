@@ -121,7 +121,7 @@ kern2021 <- kern_clean_final %>%
   st_join(kernGeo, join = st_equals) 
 
 
-matching <- read_csv(here("data/raw/matchingSheet.csv")) 
+matching <- read_csv(here("data/intermediate/0_input/matchingSheet.csv")) 
 
 kern2021 <- kern2021 %>% 
   left_join(matching, by = c("croptyp" = "Code")) |> 
