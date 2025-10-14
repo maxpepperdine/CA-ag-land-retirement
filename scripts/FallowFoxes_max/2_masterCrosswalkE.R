@@ -131,7 +131,7 @@ annualCross <- enframe(COMMap, name = NULL, value = "COMM") %>%
 
 
 #Read in revenue table - TO DO ************
-revenueRaw <- read_csv(here::here("data/intermediate/final_revenue_e.csv"))
+revenueRaw <- read_csv(here::here("data/intermediate/1_cropRevenueCrosswalkE/final_revenue_e.csv"))
 
 revenue <- revenueRaw %>%
   dplyr::select(crop, price_per_acre) %>% 
@@ -152,7 +152,7 @@ revenue <- revenueRaw %>%
 # 
 # 
 #Read in water use data
-waterRaw <- read_xlsx(here::here("data/intermediate/wateruse.xlsx"))
+waterRaw <- read_xlsx(here::here("data/intermediate/0_input/wateruse.xlsx"))
 
 
 water <- waterRaw %>%
@@ -177,7 +177,7 @@ masterPre <- irisCross %>%
 
 # Load in the estimated csv 
 
-estimated <-read_csv(here::here("data/intermediate/estimated_updated.csv"))
+estimated <-read_csv(here::here("data/intermediate/0_input/estimated_updated.csv"))
 
 
 # Stack the two dfs 
