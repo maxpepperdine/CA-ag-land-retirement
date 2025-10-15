@@ -1,3 +1,6 @@
+# clear environment
+rm(list = ls())
+
 # Load Packages -----------------------------------------------------------
 
 library(lubridate)
@@ -134,7 +137,7 @@ st_crs(kern2021)
 kern2021_2D <- st_zm(kern2021)
 
 # Write to shapefile
-write_sf(kern2021_2D, here("data/intermediate/kernID/kernID.shp"))
+write_sf(kern2021_2D, here("data/intermediate/3_cleanPlots/kernID/kernID.shp"))
 
 
 ############################# TEST the map files to see what was deleted ##########################################
