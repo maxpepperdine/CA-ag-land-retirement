@@ -6,6 +6,8 @@ rm(list=ls())
 library(lubridate)
 library(tidyverse)
 library(readxl)
+library(janitor)
+library(here)
 
 # Full list of Crop types for 2021 (including non permitted) --------------
 
@@ -192,27 +194,23 @@ masterPre <- irisCross %>%
   clean_names() 
 
 
-# # Load in the estimated csv 
-# 
-# estimated <-read_csv(here::here("data/intermediate/0_input/estimated_updated.csv"))
-# 
-# 
-# # Stack the two dfs 
-# 
-# combined_df <- bind_rows(masterPre, estimated) |> 
-#   filter(!is.na(price_per_acre) | comm %in% c("Idle – Short Term", "Idle – Long Term", "Unclassified Fallow")) |> 
-#   distinct()
-# 
-# write_csv(combined_df, here::here("data/intermediate/2_masterCrosswalkR/masterCrosswalkE.csv"))
-
-
 # Load in the estimated csv
+estimated <- read_csv(here("data/intermediate/2_1_revenueEstimation/nass_cropRevenueEstimates_2021.csv"))
 
 
+# join the estimated dataframe to the master crosswalk
+masterFinal <- masterPre %>% 
+  left_join(estimated %>% select(crop, price_per_acre),
+            by = c("nass" = "crop")) %>%
+  mutate(price_per_acre = if_else(
+    is.na(price_per_acre.x) & !is.na(price_per_acre.y),
+    price_per_acre.y,
+    price_per_acre.x)) %>%
+  select(-price_per_acre.x, -price_per_acre.y)
 
-# join the estimated dataframe to the 
 
-
+# save
+write_csv(masterFinal, here("data/intermediate/2_masterCrosswalkE/masterCrosswalkE.csv"))
 
 
 

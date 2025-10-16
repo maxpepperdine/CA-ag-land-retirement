@@ -22,8 +22,7 @@ final_rev_e <- kernrev_clean_2021[, c("crop", "year", "harvested_acres", "produc
                                       "value", "value_1", "prod_per_acre", 
                                       "price_per_unit", "price_per_acre")] 
 
-write_csv(final_rev_e, here::here("data/intermediate/1_cropRevenueCrosswalkE/final_revenue_e.csv"), 
-          append = FALSE)
+write_csv(final_rev_e, here::here("data/intermediate/1_cropRevenueCrosswalkE/final_revenue_e.csv"))
 
 
 
