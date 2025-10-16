@@ -1,3 +1,6 @@
+# clear environment
+rm(list=ls())
+
 # Load Packages -----------------------------------------------------------
 
 library(lubridate)
@@ -79,14 +82,27 @@ commR <- c("Citrus", "Eucalyptus", "Dates", "Avocados", "Olives", "Miscellaneous
 
 
 
-# Adjusted CAC Crops
-cropR <- c("Oranges, All", "Forest Products, Unspecified", "Dates", "Avocados, All", "Olives", "Grapefruit", "Stone Fruits, All", "Forest Products, Unspecified", 
-           "Almonds, Nuts", "Walnuts", "Pistachios", "Pomegrantates", "Horticulture, Fruit/Vine/Nut Plants", "Stone Fruits, All", "Cherries",  
-           "Stone Fruits, All", "Stone Fruits, All", "Cotton, Lint, All", "Beans, All", "Hay, Grain, Misc", "Silage, All", "Safflower", "Wheat, Grain", 
-           "Hay, Grain, Misc", NA, NA, "Alfalfa, Hay", "Pasture, All", "Pasture, All", "Horticulute, Sod/Turf", 
-           "Onions, Dry", "Potatoes", "Potatoes", "Horticulture, Woody Ornamentals", "Vegetables, Misc", "Berries, Blueberries",
-           "Berries, All", "Peppers, Bell", "Horticulture, All", "Horticulture, All", "Tomatoes, Processing", "Vegetables, Misc", "Vegetables, Misc", 
-           "Horticulture, Fruit/Vine/Nut Plants", "Grapes, All", NA, "Horticulure, All")
+# # Adjusted CAC Crops
+# cropR <- c("Oranges, All", "Forest Products, Unspecified", "Dates", "Avocados, All", "Olives", "Grapefruit", "Stone Fruits, All", "Forest Products, Unspecified", 
+#            "Almonds, Nuts", "Walnuts", "Pistachios", "Pomegrantates", "Horticulture, Fruit/Vine/Nut Plants", "Stone Fruits, All", "Cherries",  
+#            "Stone Fruits, All", "Stone Fruits, All", "Cotton, Lint, All", "Beans, All", "Hay, Grain, Misc", "Silage, All", "Safflower", "Wheat, Grain", 
+#            "Hay, Grain, Misc", NA, NA, "Alfalfa, Hay", "Pasture, All", "Pasture, All", "Horticulute, Sod/Turf", 
+#            "Onions, Dry", "Potatoes", "Potatoes", "Horticulture, Woody Ornamentals", "Vegetables, Misc", "Berries, Blueberries",
+#            "Berries, All", "Peppers, Bell", "Horticulture, All", "Horticulture, All", "Tomatoes, Processing", "Vegetables, Misc", "Vegetables, Misc", 
+#            "Horticulture, Fruit/Vine/Nut Plants", "Grapes, All", NA, "Horticulure, All")
+
+
+# Adjusted CAC Crops (v2) (using all USDA NASS current crop names, not legacy)
+cropR <- c("Oranges, All", "Forest Products, Misc", "Dates", "Avocados", "Olives", 
+           "Grapefruit", "Apples", "Forest Products, Misc", "Almonds, Nuts", 
+           "Walnuts", "Pistachios", "Pomegranates", "Pecans", "Apricots", 
+           "Cherries", "Peaches, All", "Plums", "Cotton, Lint, All", "Beans, All", 
+           "Hay, Grain, Misc", "Corn, Silage", "Safflower", "Wheat, Grain", 
+           "Hay, Grain, Misc", NA, NA, "Alfalfa, Hay", "Pasture, All", "Ryegrass", 
+           "Horticulture, Sod/Turf", "Onions, Dry", "Potatoes", "Potatoes", 
+           "Horticulture, All", "Vegetables, Misc", "Berries, Blueberries", "Berries, Strawberries, All", 
+           "Peppers, Bell", "Horticulture, All", "Lettuce, Head", "Tomatoes, Processing", 
+           "Brussels Sprouts", "Carrots", "Cucumbers", "Grapes, All", NA, "Ryegrass")
 
 
 # Enframe to data frame
@@ -151,7 +167,8 @@ revenue <- revenueRaw %>%
 # #field crop categories
 # 
 # 
-#Read in water use data
+# Read in water use data
+# units are acre-ft/acre
 waterRaw <- read_xlsx(here::here("data/intermediate/0_input/wateruse.xlsx"))
 
 
@@ -175,23 +192,25 @@ masterPre <- irisCross %>%
   clean_names() 
 
 
-# Load in the estimated csv 
-
-estimated <-read_csv(here::here("data/intermediate/0_input/estimated_updated.csv"))
-
-
-# Stack the two dfs 
-
-combined_df <- bind_rows(masterPre, estimated) |> 
-  filter(!is.na(price_per_acre) | comm %in% c("Idle – Short Term", "Idle – Long Term", "Unclassified Fallow")) |> 
-  distinct()
-
-write_csv(combined_df, here::here("data/intermediate/masterCrosswalkE.csv"))
-
-
+# # Load in the estimated csv 
+# 
+# estimated <-read_csv(here::here("data/intermediate/0_input/estimated_updated.csv"))
+# 
+# 
+# # Stack the two dfs 
+# 
+# combined_df <- bind_rows(masterPre, estimated) |> 
+#   filter(!is.na(price_per_acre) | comm %in% c("Idle – Short Term", "Idle – Long Term", "Unclassified Fallow")) |> 
+#   distinct()
+# 
+# write_csv(combined_df, here::here("data/intermediate/2_masterCrosswalkR/masterCrosswalkE.csv"))
 
 
+# Load in the estimated csv
 
+
+
+# join the estimated dataframe to the 
 
 
 
