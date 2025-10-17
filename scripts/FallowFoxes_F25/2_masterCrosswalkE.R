@@ -84,19 +84,19 @@ commR <- c("Citrus", "Eucalyptus", "Dates", "Avocados", "Olives", "Miscellaneous
 
 
 
-# Adjusted CAC Crops
-cropR <- c("Oranges, All", "Forest Products, Unspecified", "Dates", "Avocados, All", 
-           "Olives", "Grapefruit", "Stone Fruits, All", "Forest Products, Unspecified",
-           "Almonds, Nuts", "Walnuts", "Pistachios", "Pomegrantates", "Horticulture, 
-           Fruit/Vine/Nut Plants", "Stone Fruits, All", "Cherries",
-           "Stone Fruits, All", "Stone Fruits, All", "Cotton, Lint, All", 
-           "Beans, All", "Hay, Grain, Misc", "Silage, All", "Safflower", "Wheat, Grain",
-           "Hay, Grain, Misc", NA, NA, "Alfalfa, Hay", "Pasture, All", "Pasture, All", 
-           "Horticulute, Sod/Turf", "Onions, Dry", "Potatoes", "Potatoes", 
-           "Horticulture, Woody Ornamentals", "Vegetables, Misc", "Berries, Blueberries",
-           "Berries, All", "Peppers, Bell", "Horticulture, All", "Horticulture, All", 
-           "Tomatoes, Processing", "Vegetables, Misc", "Vegetables, Misc",
-           "Horticulture, Fruit/Vine/Nut Plants", "Grapes, All", NA, "Horticulure, All")
+# # Adjusted CAC Crops
+# cropR <- c("Oranges, All", "Forest Products, Unspecified", "Dates", "Avocados, All", 
+#            "Olives", "Grapefruit", "Stone Fruits, All", "Forest Products, Unspecified",
+#            "Almonds, Nuts", "Walnuts", "Pistachios", "Pomegrantates", "Horticulture, 
+#            Fruit/Vine/Nut Plants", "Stone Fruits, All", "Cherries",
+#            "Stone Fruits, All", "Stone Fruits, All", "Cotton, Lint, All", 
+#            "Beans, All", "Hay, Grain, Misc", "Silage, All", "Safflower", "Wheat, Grain",
+#            "Hay, Grain, Misc", NA, NA, "Alfalfa, Hay", "Pasture, All", "Pasture, All", 
+#            "Horticulute, Sod/Turf", "Onions, Dry", "Potatoes", "Potatoes", 
+#            "Horticulture, Woody Ornamentals", "Vegetables, Misc", "Berries, Blueberries",
+#            "Berries, All", "Peppers, Bell", "Horticulture, All", "Horticulture, All", 
+#            "Tomatoes, Processing", "Vegetables, Misc", "Vegetables, Misc",
+#            "Horticulture, Fruit/Vine/Nut Plants", "Grapes, All", NA, "Horticulure, All")
 
 
 # Adjusted CAC Crops (v2) (using all USDA NASS current crop names, not legacy)
