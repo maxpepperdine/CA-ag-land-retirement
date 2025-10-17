@@ -19,28 +19,48 @@ library(here)
 
 
 #Visualization
-tmap_mode("view")
-tmap_options(check.and.fix = TRUE)
+# tmap_mode("view")
+# tmap_options(check.and.fix = TRUE)
 
 # Metrics Function --------------------------------------------------------
 
 source(here("scripts/FallowFoxes_max/0_startup/functions.R"))
 
 
-# read in the df just created in cleanPlots 
-kern <- read_sf(here("data/intermediate/kernID/kernID.shp")) |> 
+# read in the .shp just created in cleanPlots 
+kern <- read_sf(here("data/intermediate/3_cleanPlots/kernID/kernID.shp")) |> 
   rename(comm = crp_ty_)
 
 
 # read in MB masterCrosswalk
-## ask stella if this should be MB or E crosswalk
-masterCrosswalk <- read_csv(here("data/intermediate/masterCrosswalkE.csv"))  
+masterCrosswalk <- read_csv(here("data/intermediate/2_masterCrosswalkE/masterCrosswalkE.csv"))  
 
 
 # Join Year and Crosswalk -------------------------------------------------
 
 kernPrice <- kern %>% 
   left_join(masterCrosswalk, by = "comm")
+
+################################################################################
+
+######## quick check to see how much area is lost with misc truck crops ########
+
+# calculate the total area of misc truck crops in kernPrice as a percentage of total area
+
+# first, calc total area of the "acres" column in kernPrice
+totalArea <- sum(kernPrice$area, na.rm = TRUE)
+# next, filter for misc truck crops and calc total area of those crops
+totalAreaTruck <- kernPrice %>% 
+  filter(comm == "Miscellaneous Truck Crops") %>% 
+  summarize(totalAreaTruck = sum(area, na.rm = TRUE)) %>% 
+  pull(totalAreaTruck)
+
+# calc percentage of total area that is misc truck crops
+percentTruck <- (totalAreaTruck / totalArea) * 100
+
+
+################################################################################
+
 
 
 # Filter plots present at the end of the water year, arrange by the most valuable 
