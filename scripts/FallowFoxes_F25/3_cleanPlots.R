@@ -24,8 +24,6 @@ library(janitor)
 # Kern Plots for 2021
 #CV2021Raw <- read_sf(here("data", "Redownload_2021"))
 CV2021Raw <- read_sf(here("data/raw/LandIQ/i15_Crop_Mapping_2021_SHP")) 
-# Per conversation had with ashley 8/11 filter these out **
-# filter(COMM != "PASTURELAND" & COMM != "RANGELAND")
 
 kern_clean_2021 <- CV2021Raw |> 
   clean_names() |> 
@@ -131,6 +129,7 @@ kern2021 <- kern2021 %>%
   clean_names()
 
 
+# check CRS -- should be EPSG 3310
 st_crs(kern2021)
 
 # Drop Z values

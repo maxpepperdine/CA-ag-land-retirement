@@ -28,18 +28,19 @@ library(here)
 
 # Metrics Function --------------------------------------------------------
 
-source(here("scripts/FallowFoxes_max/0_startup/functions.R"))
+source(here("scripts/FallowFoxes_F25/0_startup/functions.R"))
 
 
 # Load Kern ---------------------------------------------------------------
 
-kern <- read_sf(here("data/intermediate/kernID/kernID.shp")) %>%
+kern <- read_sf(here("data/intermediate/3_cleanPlots/kernID/kernID.shp")) %>%
   select(geo_grp) %>% 
+  # remove duplicate geo_grps
   filter(duplicated(geo_grp) == FALSE)
 
 # Get FID data ------------------------------------------------------------
 
-kern2 <- read_sf(here("data/intermediate/kernYearRotation/kernYearRotation.shp")) |> 
+kern2 <- read_sf(here("data/intermediate/4_cropRotationE/kernYearRotation/kernYearRotation.shp")) |> 
   select(geometry, comm_cd) |>
   st_transform(crs = 3310) |>         # Transform to a projected CRS in meters (CA Albers)
   mutate(area_m2 = st_area(geometry)) |> 
@@ -108,7 +109,7 @@ most_common_neighbor <- neighbor_df |>
 
 
 # Plots Iris Created with geometry
-irisShp <- read_sf(here("data/intermediate/0_input/Iris_w_Fid/testProjn.shp")) %>% 
+irisShp <- read_sf(here("data/intermediate/0_input/Iris_w_Fid/testProjn.shp")) %>%
   st_transform(crs(kern))
 
 
@@ -120,7 +121,7 @@ splitFields <- splitFieldsRaw %>%
   filter(year == 2021)
 
 #SJV Shapefile
-sjv <- read_sf(here("data/intermediate/0_input/pp1766_cvhm_texture_regions/cvhm_texture_regions.shp")) %>% 
+sjv <- read_sf(here("data/intermediate/0_input/pp1766_cvhm_texture_regions/cvhm_texture_regions.shp")) %>%
   st_transform(crs(irisShp))
 
 
@@ -137,7 +138,7 @@ setdiff(fid, fid2)
 
 # Keep fid For join
 iris <- irisShp %>%
-  select(fid) %>% 
+  select(fid) %>%
   st_filter(y = sjv, .predicate = st_intersects)
 
 

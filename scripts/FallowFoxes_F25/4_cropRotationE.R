@@ -24,7 +24,7 @@ library(here)
 
 # Metrics Function --------------------------------------------------------
 
-source(here("scripts/FallowFoxes_max/0_startup/functions.R"))
+source(here("scripts/FallowFoxes_F25/0_startup/functions.R"))
 
 
 # read in the .shp just created in cleanPlots 
@@ -41,25 +41,34 @@ masterCrosswalk <- read_csv(here("data/intermediate/2_masterCrosswalkE/masterCro
 kernPrice <- kern %>% 
   left_join(masterCrosswalk, by = "comm")
 
+
+
+
 ################################################################################
 
-######## quick check to see how much area is lost with misc truck crops ########
+######## quick check to see how much area is lost with crops missing NASS data ########
 
-# calculate the total area of misc truck crops in kernPrice as a percentage of total area
+# calculate the total area of missing NASS crops in kernPrice as a percentage of total area
+# eucalyptus, misc deciduous, mixed pasture, turf farms, flowers/nursey/christ tree, misc truck, greenhous
 
-# first, calc total area of the "acres" column in kernPrice
+# first, calc total area of the "area" column in kernPrice
 totalArea <- sum(kernPrice$area, na.rm = TRUE)
 # next, filter for misc truck crops and calc total area of those crops
-totalAreaTruck <- kernPrice %>% 
-  filter(comm == "Miscellaneous Truck Crops") %>% 
-  summarize(totalAreaTruck = sum(area, na.rm = TRUE)) %>% 
-  pull(totalAreaTruck)
-
+totalAreaMissingNASS <- kernPrice %>% 
+  filter(comm %in% c("Eucalyptus", "Miscellaneous Deciduous", "Mixed Pasture", "Turf Farms", 
+                   "Flowers, Nursery and Christmas Tree Farms", "Miscellaneous Truck Crops", 
+                   "Greenhouse")) %>% 
+  summarize(totalAreaMissingNASS = sum(area, na.rm = TRUE)) %>% 
+  pull(totalAreaMissingNASS)
+         
 # calc percentage of total area that is misc truck crops
-percentTruck <- (totalAreaTruck / totalArea) * 100
+percentMissingNASS <- (totalAreaMissingNASS / totalArea) * 100
 
+
+# combined, these missing NASS crops account for about 1.45% of the total area in kernPrice
 
 ################################################################################
+
 
 
 
@@ -123,8 +132,8 @@ doubleCult <- kern2021Group %>%
   pull(comm) %>% 
   unique() %>% 
   sort() %>% 
-  str_subset("lettuce") %>% 
-  c("potato", "carrot", "broccoli")
+  str_subset("Lettuce/Leafy Greens") %>% 
+  c("Potatoes", "Carrots", "Broccoli")
 
 
 
@@ -197,7 +206,7 @@ revenueRotationKey <- masterCrosswalk %>%
   select(-c(meanRev, meanWater))
 
 # Export 
-write_csv(revenueRotationKey, here("data/intermediate/annualKey_e.csv"))
+write_csv(revenueRotationKey, here("data/intermediate/4_cropRotationE/annualKey_e.csv"))
 
 
 # Join Crop rotation table and clean --------------------------------------
@@ -264,7 +273,7 @@ metrics(cropRotation$waterPerAcre)
 
 # Export
 write_sf(cropRotation, 
-         here("data/intermediate/kernYearRotation/kernYearRotation.shp"))
+         here("data/intermediate/4_cropRotationE/kernYearRotation/kernYearRotation.shp"))
 
 
 
