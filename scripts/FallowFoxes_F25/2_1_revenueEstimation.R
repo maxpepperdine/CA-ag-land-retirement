@@ -43,16 +43,18 @@ usda_2021_filter <- usda_2021_clean %>%
                                  "Peaches, Clingstone", "Plums", "Corn, Silage", 
                                  "Safflower", "Ryegrass, Perennial, All", 
                                  "Lettuce, Head", "Brussels Sprouts", "Carrots, Unspecified", 
-                                 "Cucumbers", "Ryegrass, Perennial, All") 
+                                 "Cucumbers", "Ryegrass, Perennial, All", "Potatoes, Sweet") 
          | crop == "Berries, Strawberries, All")
 
 # for all observations where crop == "Berries, Strawberries, All", assign the "legacy_item_name" values as "Berries, Strawberries, Fresh Market"
+# we only need an extra step for this crop type because the NASS data changed the naming convention
 usda_2021_filter <- usda_2021_filter %>%
   mutate(legacy_item_name = if_else(crop == "Berries, Strawberries, All", 
                                     "Berries, Strawberries, Fresh Market", 
                                     legacy_item_name))
 
-# QC: count number of distinct obsv in legacy item name (should be 17)
+# QC: count number of distinct obsv in legacy item name 
+# should be the # of crops you want to estimate revenue for (i.e., 18 crops here)
 n_distinct(usda_2021_filter$legacy_item_name)
 
 # replace all NAs in harvested_acres, production, value with 0
@@ -77,6 +79,8 @@ sum_others_2021 <- usda_2021_filter %>%
 usda_2021_adjusted <- usda_2021_filter %>%
   left_join(sum_others_2021, by = "legacy_item_name") %>%
   mutate(
+    # if county is "State Total", subtract the "Sum of Others" values
+    # otherwise, keep the original value
     harvested_acres = if_else(county == "State Total",
                               harvested_acres - coalesce(sum_others_acres, 0),
                               harvested_acres),
@@ -141,12 +145,6 @@ usda_2021_averages <- crop_averages_2021 %>%
          avg_value, 
          price_per_unit_stateTotal)
 
-  
-## calculations
-# value_1 = production * value (value is $)
-# prod_per_acre = production / harvested_acres
-# price_per_acre = prod_per_acre * price_per_unit (price_per_unit is $ / unit)
-
 
 ################################################################################
 
@@ -171,7 +169,7 @@ usda_2020_filter <- usda_2020_clean %>%
                                  "Peaches, Clingstone", "Plums", 
                                  "Corn, Silage", "Safflower", "Ryegrass, Perennial, All", 
                                  "Lettuce, Head", "Brussels Sprouts", "Carrots, Unspecified", 
-                                 "Cucumbers", "Ryegrass, Perennial, All") 
+                                 "Cucumbers", "Ryegrass, Perennial, All", "Potatoes, Sweet") 
          | crop == "Berries, Strawberries, All")
 
 # for all observations where crop == "Berries, Strawberries, All", assign the "legacy_item_name" values as "Berries, Strawberries, Fresh Market"
@@ -180,7 +178,7 @@ usda_2020_filter <- usda_2020_filter %>%
                                     "Berries, Strawberries, Fresh Market", 
                                     legacy_item_name))
 
-# QC: count number of distinct obsv in legacy item name (should be 17)
+# QC: count number of distinct obsv in legacy item name (should be 18)
 n_distinct(usda_2020_filter$legacy_item_name)
 
 # replace all NAs in harvested_acres, production, value with 0
@@ -259,9 +257,9 @@ usda_2019_filter <- usda_2019_clean %>%
                                  "Corn, Silage", "Safflower", "Ryegrass, Perennial, All", 
                                  "Berries, Strawberries, Fresh Market", "Lettuce, Head", 
                                  "Brussels Sprouts", "Carrots, Unspecified", 
-                                 "Cucumbers", "Ryegrass, Perennial, All"))
+                                 "Cucumbers", "Ryegrass, Perennial, All", "Potatoes, Sweet"))
 
-# QC: count number of distinct obsv in legacy item name (should be 17)
+# QC: count number of distinct obsv in legacy item name (should be 18)
 n_distinct(usda_2019_filter$legacy_item_name)
 
 # replace all NAs in harvested_acres, production, value with 0
@@ -372,9 +370,9 @@ usda_2018_filter <- usda_2018_clean %>%
                                  "Corn, Silage", "Safflower", "Ryegrass, Perennial, All", 
                                  "Berries, Strawberries, Fresh Market", "Lettuce, Head", 
                                  "Brussels Sprouts", "Carrots, Unspecified", 
-                                 "Cucumbers"))
+                                 "Cucumbers", "Potatoes, Sweet"))
 
-# QC: count number of distinct obsv in legacy item name (should be 17)
+# QC: count number of distinct obsv in legacy item name (should be 18)
 n_distinct(usda_2018_filter$legacy_item_name)
 
 # replace all NAs in harvested_acres, production, value with 0

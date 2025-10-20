@@ -53,7 +53,7 @@ commW <- c("Citrus", "Eucalyptus", "Dates", "Avocados", "Olives", "Miscellaneous
            "Young Perennials") 
 
 # CADWR Crops
-cropW <- c("Citrus and Subtropical", "Truck Crops", "Other Deciduous", "Citrus and Subtropical", "Citrus and Subtropical", "Citrus and Subtropical", 
+cropW <- c("Citrus & Subtropical", "Truck Crops", "Other Deciduous", "Citrus & Subtropical", "Citrus & Subtropical", "Citrus & Subtropical", 
            "Other Deciduous", "Other Deciduous", "Almonds & Pistachios", "Other Deciduous", "Almonds & Pistachios", "Other Deciduous", 
            "Other Deciduous", "Other Deciduous", "Other Deciduous", "Other Deciduous", "Other Deciduous", "Cotton", "Dry Beans", 
            "Other Field Crops", "Corn", "Safflower", "Grain", "Grain", NA, NA, "Alfalfa", "Pasture", "Other Field Crops", 
@@ -106,7 +106,7 @@ cropR <- c("Oranges, All", "Forest Products, Misc", "Dates", "Avocados", "Olives
            "Cherries", "Peaches, All", "Plums", "Cotton, Lint, All", "Beans, All", 
            "Hay, Grain, Misc", "Corn, Silage", "Safflower", "Wheat, Grain", 
            "Hay, Grain, Misc", NA, NA, "Alfalfa, Hay", "Pasture, All", "Ryegrass", 
-           "Horticulture, Sod/Turf", "Onions, Dry", "Potatoes", "Potatoes", 
+           "Horticulture, Sod/Turf", "Onions, Dry", "Potatoes", "Sweet Potatoes", 
            "Horticulture, All", "Vegetables, Misc", "Berries, Blueberries", "Berries, Strawberries, All", 
            "Peppers, Bell", "Horticulture, All", "Lettuce, Head", "Tomatoes, Processing", 
            "Brussels Sprouts", "Carrots", "Cucumbers", "Grapes, All", NA, "Ryegrass")
