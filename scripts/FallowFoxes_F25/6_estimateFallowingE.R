@@ -1,3 +1,6 @@
+# clear environment
+rm(list = ls())
+
 
 # Load Packages -----------------------------------------------------------
 
@@ -20,7 +23,7 @@ library(here)
 
 # Metrics Function --------------------------------------------------------
 
-source(here("scripts/FallowFoxes_max/0_startup/functions.R"))
+source(here("scripts/FallowFoxes_F25/0_startup/functions.R"))
 
 
 
@@ -32,16 +35,17 @@ kern <- read_sf(here("data/intermediate/4_cropRotationE/kernYearRotation/kernYea
 # Updated Annual Tables
 annualRate <- read_csv(here("data/intermediate/4_cropRotationE/annualKey_e.csv"))
 
-# FID to GEO key
 
-fidGeoKey <- read_csv(here("data/intermediate/5_geoGroupFIDKeyE/geoGroupFIDKey.csv"))
-
-# Iris Fields
-fid <- read_sf(here("data/intermediate/5_geoGroupFIDKeyE/irisFieldsYear/irisFieldsYear.shp")) 
-
-
-fidRetired <-  fid %>% 
-  filter(YrsFllw > 3)
+# # FID to GEO key
+# 
+# fidGeoKey <- read_csv(here("data/intermediate/5_geoGroupFIDKeyE/geoGroupFIDKey.csv"))
+# 
+# # Iris Fields
+# fid <- read_sf(here("data/intermediate/5_geoGroupFIDKeyE/irisFieldsYear/irisFieldsYear.shp")) 
+# 
+# 
+# fidRetired <-  fid %>% 
+#   filter(YrsFllw > 3)
 
 
 
@@ -78,44 +82,40 @@ cutoff <- kernAP %>%
   {{max(.$ap)}}
 
 
-# Filter Fid by ap value
-apFid <- fid %>% 
-  filter(duplicated(fidIris) == FALSE) %>% 
+## Filter LandIQ fields by ap value
+apLandIQ <- kernPA %>% 
+  filter(duplicated(geo_grp) == FALSE) %>% 
   mutate(
-    perim = st_perimeter(.),
-    area = st_area(.),
-    ap = (area / perim ) %>% as.vector()
-  ) 
+    ap = as.vector(ap)
+  )
 
-
-fidFilter <- apFid %>% 
+# remove slivers (fields with ap less than cutoff)
+LandIQFilter <- apLandIQ %>% 
   filter(ap > cutoff)
 
 
-fidLost <- apFid %>% 
+LandIQLost <- apLandIQ %>% 
   filter(ap <= cutoff)
 
-fidLost %>% 
+LandIQLost %>% 
   mutate(
     area = area %>% as.numeric() / 10000
   ) %>% 
   {{sum(.$area)}}
 
-noFilter77 <- apFid %>%
-  filter(cmmcdFl == 77000)
-
-filter77 <- fidFilter %>% 
-  filter(cmmcdFl == 77000)
+# noFilter77 <- apFid %>%
+#   filter(cmmcdFl == 77000)
+# 
+# filter77 <- fidFilter %>% 
+#   filter(cmmcdFl == 77000)
 
 
 
 # Split Kern into fallow not fallow ---------------------------------------
 
-# NOTE: changed some variable names in kern df to match the clean_names() format
-# NOTE: removed some variables that were not needed for job analysis (hrs, jobsPer100Acre, jobs)
 
 kernNoFallow <- kern %>% 
-  filter(fallow == 0) %>% 
+  filter(fallow == FALSE) %>% 
   mutate(
     geoGroup = geo_grp,
     pricePerAcre = rvPrAcr,
@@ -129,14 +129,10 @@ kernNoFallow <- kern %>%
   )
 
 kernFallow <- kern %>% 
-  filter(fallow == 1) 
+  filter(fallow == TRUE) 
 
 # view all unique comm types in kernNoFallow
 unique(kernNoFallow$comm)
-
-# NOTE: no UNCULTIVATED AG in kernNoFallow, assuming this is outdated or part of a different check since the variable isn't being saved/assigned to a new variable
-kernNoFallow %>% 
-  filter(comm == "UNCULTIVATED AG")
 
 
 # Get List of 77000 fields that don't intersect Kern Data -----------------
@@ -146,41 +142,40 @@ noPermitFallow <- filter77
 
 # Join 77000 and 66000 ----------------------------------------------------
 
-fallowMid <- kernFallow %>% 
-  mutate(
-    geo_grp = geo_grp,
-    .keep = "unused"
-  ) %>% 
-  left_join(fidGeoKey, by = "geo_grp") %>%  
-  left_join(annualRate, by = c("comm.y" = "comm")) %>% 
-  #select(geoGroup, acres, geometry:annual.y) %>% 
-  #select(-fidIris) %>% 
-  mutate(
-    #COMM.x = COMM,
-    comm = comm.y,
-    #annual = annual.y,
-    # hrsAcre = hrsAcre.y,
-    .keep = "unused"
-   ) # %>% 
-  # select(-hrsAcre.x)
+# fallowMid <- kernFallow %>% 
+#   mutate(
+#     geo_grp = geo_grp,
+#     .keep = "unused"
+#   ) %>% 
+#   left_join(fidGeoKey, by = "geo_grp") %>%  
+#   left_join(annualRate, by = c("comm.y" = "comm")) %>% 
+#   #select(geoGroup, acres, geometry:annual.y) %>% 
+#   #select(-fidIris) %>% 
+#   mutate(
+#     #COMM.x = COMM,
+#     comm = comm.y,
+#     #annual = annual.y,
+#     # hrsAcre = hrsAcre.y,
+#     .keep = "unused"
+#    ) # %>% 
+#   # select(-hrsAcre.x)
 
 
-# Assign last cultivated crop to non permitted fields
-noPermitMid <- noPermitFallow %>% 
-  left_join(annualRate, by = c("cmmcdLA" = "comm_code")) %>% 
-  arrange(fidIris, desc(pricePerAcre)) %>% 
-  filter(duplicated(fidIris) == FALSE)  %>% 
-  mutate(
-    acres = st_area(.) %>% as.numeric() / 4047,
-    fallow = 1,
-    nonPermit = 1
-  ) 
+# # Assign last cultivated crop to non permitted fields
+# noPermitMid <- noPermitFallow %>% 
+#   left_join(annualRate, by = c("cmmcdLA" = "comm_code")) %>% 
+#   arrange(fidIris, desc(pricePerAcre)) %>% 
+#   filter(duplicated(fidIris) == FALSE)  %>% 
+#   mutate(
+#     acres = st_area(.) %>% as.numeric() / 4047,
+#     fallow = 1,
+#     nonPermit = 1
+#   ) 
 
 
-# NOTE: these comm types aren't present; again, assuming this is outdated or part of a different check since the variable isn't being saved/assigned to a new variable 
-noPermitMid %>% 
-  select(COMM, everything()) %>% 
-  filter(COMM == "PASTURELAND" | COMM == "RANGELAND")
+# noPermitMid %>% 
+#   select(COMM, everything()) %>% 
+#   filter(COMM == "PASTURELAND" | COMM == "RANGELAND")
 
 
 

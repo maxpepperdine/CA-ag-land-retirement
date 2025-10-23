@@ -205,8 +205,13 @@ revenueRotationKey <- masterCrosswalk %>%
   ) %>% 
   select(-c(meanRev, meanWater))
 
+# drop eucalyptus, misc deciduous, mixed pasture, turf farms, flowers/nursey/christ tree, misc truck, greenhouse from revenueRotationKey
+revenueRotationKeyFinal <- revenueRotationKey %>% 
+  filter(!comm %in% c("Eucalyptus", "Miscellaneous Deciduous", "Mixed Pasture", "Turf Farms", 
+                      "Flowers, Nursery and Christmas Tree Farms", "Miscellaneous Truck Crops", 
+                      "Greenhouse"))
 # Export 
-write_csv(revenueRotationKey, here("data/intermediate/4_cropRotationE/annualKey_e.csv"))
+write_csv(revenueRotationKeyFinal, here("data/intermediate/4_cropRotationE/annualKey_e.csv"))
 
 
 # Join Crop rotation table and clean --------------------------------------
@@ -221,11 +226,18 @@ cropRotationRaw <- endDate %>%
     revPart = if_else(is.na(meanRev), price_per_acre * acres, meanRev * acres),
     waterPart = if_else(is.na(meanWater), water_use * acres, meanWater * acres),
     #add fallow marker for estimating fallowed field values
-    fallow = if_else(comm == "Unclassified Fallow", TRUE, FALSE),
+    fallow = if_else(comm %in% c("Unclassified Fallow", "Idle ? Long Term"), TRUE, FALSE),
   ) %>% 
   select(-c(price_per_acre, meanRev, water_use, meanWater, area.x, area.y)) %>% 
   select(comm, acres, geo_grp:fallow) %>% 
-  group_by(geo_grp) 
+  group_by(geo_grp)
+
+
+# drop eucalyptus, misc deciduous, mixed pasture, turf farms, flowers/nursey/christ tree, misc truck, greenhouse from cropRotationRaw
+cropRotationRaw <- cropRotationRaw %>% 
+  filter(!comm %in% c("Eucalyptus", "Miscellaneous Deciduous", "Mixed Pasture", "Turf Farms", 
+                      "Flowers, Nursery and Christmas Tree Farms", "Miscellaneous Truck Crops", 
+                      "Greenhouse"))
 
 
 
@@ -234,6 +246,9 @@ cropRotationRaw <- endDate %>%
 # Kern Geometry with ID
 
 kernGeo <- kern %>% 
+  filter(!comm %in% c("Eucalyptus", "Miscellaneous Deciduous", "Mixed Pasture", "Turf Farms", 
+                      "Flowers, Nursery and Christmas Tree Farms", "Miscellaneous Truck Crops", 
+                      "Greenhouse")) %>% 
   select(geo_grp) %>% 
   filter(duplicated(geo_grp) == FALSE)
 
