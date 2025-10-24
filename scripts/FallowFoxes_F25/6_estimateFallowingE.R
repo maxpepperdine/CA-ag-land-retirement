@@ -11,6 +11,7 @@ library(terra)
 library(tmap)    # for static and interactive maps
 library(lwgeom)
 library(here)
+library(nngeo)
 
 
 #Visualization
@@ -32,6 +33,9 @@ source(here("scripts/FallowFoxes_F25/0_startup/functions.R"))
 # Kern Year Data
 kern <- read_sf(here("data/intermediate/4_cropRotationE/kernYearRotation/kernYearRotation.shp"))
 
+# ensure CRS is CA Albers (EPSG:3310)
+st_crs(kern)
+
 # Updated Annual Tables
 annualRate <- read_csv(here("data/intermediate/4_cropRotationE/annualKey_e.csv"))
 
@@ -52,10 +56,10 @@ annualRate <- read_csv(here("data/intermediate/4_cropRotationE/annualKey_e.csv")
 # Remove Slivers ----------------------------------------------------------
 
 
-# Find perimeter and area of fields
+# Find perimeter and area of LandIQ fields
 kernPA <- kern %>% 
   mutate(
-    perim = st_perimeter(.),
+    perim = sf::st_perimeter(.),
     area = st_area(.),
     ap = area / perim
   )
@@ -82,18 +86,18 @@ cutoff <- kernAP %>%
   {{max(.$ap)}}
 
 
-## Filter LandIQ fields by ap value
+## Filter LandIQ (kern) fields by ap value
 apLandIQ <- kernPA %>% 
   filter(duplicated(geo_grp) == FALSE) %>% 
   mutate(
     ap = as.vector(ap)
   )
 
-# remove slivers (fields with ap less than cutoff)
+# remove slivers from LandIQ fields (fields with ap less than cutoff)
 LandIQFilter <- apLandIQ %>% 
   filter(ap > cutoff)
 
-
+# See how much land is lost due to filtering
 LandIQLost <- apLandIQ %>% 
   filter(ap <= cutoff)
 
@@ -103,16 +107,8 @@ LandIQLost %>%
   ) %>% 
   {{sum(.$area)}}
 
-# noFilter77 <- apFid %>%
-#   filter(cmmcdFl == 77000)
-# 
-# filter77 <- fidFilter %>% 
-#   filter(cmmcdFl == 77000)
-
-
 
 # Split Kern into fallow not fallow ---------------------------------------
-
 
 kernNoFallow <- kern %>% 
   filter(fallow == FALSE) %>% 
@@ -129,175 +125,83 @@ kernNoFallow <- kern %>%
   )
 
 kernFallow <- kern %>% 
-  filter(fallow == TRUE) 
-
-# view all unique comm types in kernNoFallow
-unique(kernNoFallow$comm)
-
-
-# Get List of 77000 fields that don't intersect Kern Data -----------------
-
-noPermitFallow <- filter77
-
-
-# Join 77000 and 66000 ----------------------------------------------------
-
-# fallowMid <- kernFallow %>% 
-#   mutate(
-#     geo_grp = geo_grp,
-#     .keep = "unused"
-#   ) %>% 
-#   left_join(fidGeoKey, by = "geo_grp") %>%  
-#   left_join(annualRate, by = c("comm.y" = "comm")) %>% 
-#   #select(geoGroup, acres, geometry:annual.y) %>% 
-#   #select(-fidIris) %>% 
-#   mutate(
-#     #COMM.x = COMM,
-#     comm = comm.y,
-#     #annual = annual.y,
-#     # hrsAcre = hrsAcre.y,
-#     .keep = "unused"
-#    ) # %>% 
-#   # select(-hrsAcre.x)
-
-
-# # Assign last cultivated crop to non permitted fields
-# noPermitMid <- noPermitFallow %>% 
-#   left_join(annualRate, by = c("cmmcdLA" = "comm_code")) %>% 
-#   arrange(fidIris, desc(pricePerAcre)) %>% 
-#   filter(duplicated(fidIris) == FALSE)  %>% 
-#   mutate(
-#     acres = st_area(.) %>% as.numeric() / 4047,
-#     fallow = 1,
-#     nonPermit = 1
-#   ) 
-
-
-# noPermitMid %>% 
-#   select(COMM, everything()) %>% 
-#   filter(COMM == "PASTURELAND" | COMM == "RANGELAND")
-
-
-
-
-kernFArea <- sum(kernFallow$acres)
-
-noPermitFArea <- sum(noPermitMid$acres)
-
-
-
-# Combine 2021 uncultivated with non permitted fields
-fallow <- fallowMid %>% 
-  bind_rows(noPermitMid) %>% 
+  filter(fallow == TRUE) %>% 
   mutate(
-    revenue = pricePerAcre * acres,
-    water = waterUse * acres
-    # hrs = hrsAcre * acres,
-    # jobs = jobsPer100Acre * acres
-  ) 
-
-
-
-# Summary Statistics of Fallowing and Median Value ------------------------
-
-
-
-summary(fallow$revenue)
-
-# Median value of fallowed land (may want to adjust)
-
-metrics(fallow$revenue)
-
-metrics(fallow$pricePerAcre)
-
-
-medianFallow <- median(fallow$pricePerAcre, na.rm = TRUE)
-
-
-# Median water use of fallowed land (may want to adjust)
-metrics(fallow$waterUse)
-
-metrics(fallow$water)
-
-
-medianWater <- median(fallow$waterUse, na.rm = TRUE)
-
-
-
-
-
-# Median job of fallowed land per 100 acres
-# metrics(fallow$hrsAcre)
-# metrics(fallow$hrs)
-# 
-# medianHrs <- median(fallow$hrsAcre, na.rm = TRUE)
-
-
-
-
-# Median job of fallowed land per 100 acres
-# metrics(fallow$jobsPer100Acre)
-# metrics(fallow$jobs)
-# 
-# medianJobs <- median(fallow$jobsPer100Acre, na.rm = TRUE)
-
-
-
-# Clean Fallow table ------------------------------------------------------
-
-
-fallowFinal <- fallow %>% 
-  mutate(
-    pricePerAcre = ifelse(is.na(pricePerAcre),
-                          medianFallow,
-                          pricePerAcre),
-    waterUse = ifelse(is.na(waterUse),
-                      medianWater,
-                      waterUse),
-    # hrsAcre = ifelse(is.na(hrsAcre),
-    #                  medianHrs,
-    #                  hrsAcre),
-    # jobsPer100Acre = ifelse(is.na(jobsPer100Acre),
-    #                         medianJobs,
-    #                         jobsPer100Acre),
-    revenue = pricePerAcre * acres,
-    water = waterUse * acres
-    # hrs = hrsAcre * acres,
-    # jobs = jobsPer100Acre * acres
-  ) %>% 
-  select(-c(annual))
-
-
-fallowFinal %>% 
-  filter(fallow != 1)
-
-
-
-metrics(fallowFinal$revenue)
-
-# metrics(fallowFinal$hrs)
-
-fallowArea <- fallowFinal %>% 
-  select(fallow, nonPermit, COMM) %>% 
-  mutate(
-    area = st_area(.) / 10000,
-    ha = as.numeric(area)
+    geoGroup = geo_grp,
+    pricePerAcre = rvPrAcr,
+    waterUse = wtrPrAc,
+    revenue = revYear,
+    water = waterYr,
+    .keep = "unused"
   )
 
 
 
-allArea <- sum(fallowArea$ha)
+# calculate area of fallowed and non fallowed land
+kernFArea <- sum(kernFallow$acres)
+kernNFArea <- sum(kernNoFallow$acres)
 
-pArea <- fallowArea %>% 
-  filter(is.na(nonPermit)) %>% 
-  {{sum(.$ha)}}
 
-npArea <- fallowArea %>% 
-  filter(nonPermit == 1) %>% 
-  {{sum(.$ha)}}
+# Estimate crop revenue and water use of fallowed land ------------------------
 
-npAllProp <- npArea / allArea
 
+# get the 8 nearest neighbors to each fallow plot
+knnFallow <- nngeo::st_nn(kernFallow, kernNoFallow, k = 8)
+
+# extract values from neighbors
+nn_values <- lapply(knnFallow, function(idx) kernNoFallow[idx,])
+
+fallow_est_knn <- do.call(
+  rbind,
+  lapply(seq_along(kernFallow$geometry), function(i) {
+    tibble(
+      geoGroup = kernFallow$geoGroup[i],
+      est_pricePerAcre = mean(nn_values[[i]]$pricePerAcre, na.rm = TRUE),
+      est_waterUse = mean(nn_values[[i]]$waterUse, na.rm = TRUE)
+    )
+  })
+)
+
+# assign all estimated values to fallowed lands in the allKern data frame
+kernFallowEst <- kernFallow %>%
+  left_join(fallow_est_knn, by = "geoGroup") %>%
+  mutate(
+    pricePerAcre = ifelse(pricePerAcre == 0, est_pricePerAcre, pricePerAcre),
+    waterUse     = ifelse(waterUse == 0, est_waterUse, waterUse)
+  ) %>% 
+  mutate(
+    revenue = pricePerAcre * acres,
+    water = waterUse * acres
+  ) %>% 
+  select(-c(est_pricePerAcre, est_waterUse))
+
+# bind back to non fallowed lands
+allKern <- kernFallowEst %>%
+  bind_rows(kernNoFallow) %>% 
+  # order rows by ascending geoGroup
+  arrange(geoGroup) %>% 
+  # add a new row id
+  mutate(
+    id = row_number()
+  )
+
+# next steps:
+#### figure out what to do with "Idle ? Short Term" crop types
+#### add a binary identifier to difference fallowed and retired land
+
+
+# Summary statistics for fallowed lands ------------------------------------
+
+fallowSummary <- kernFallowEst %>%
+  st_drop_geometry() %>%
+  summarise(
+    total_acres = sum(acres),
+    total_revenue = sum(revenue),
+    total_water = sum(water),
+    avg_pricePerAcre = mean(pricePerAcre),
+    avg_waterUse = mean(waterUse)
+  )
+print(fallowSummary)
 
 
 # Join Fallowed table to non fallowed table -------------------------------
