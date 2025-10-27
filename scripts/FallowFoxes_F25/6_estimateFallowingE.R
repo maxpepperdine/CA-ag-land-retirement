@@ -118,9 +118,6 @@ kernNoFallow <- kern %>%
     waterUse = wtrPrAc,
     revenue = revYear,
     water = waterYr,
-    # hrs = hrsYear,
-    # jobsPer100Acre = jbP100A,
-    # jobs = jobsYer,
     .keep = "unused"
   )
 
@@ -162,14 +159,12 @@ fallow_est_knn <- do.call(
   })
 )
 
-# assign all estimated values to fallowed lands in the allKern data frame
+## assign all estimated values to fallowed lands in the allKern data frame
 kernFallowEst <- kernFallow %>%
   left_join(fallow_est_knn, by = "geoGroup") %>%
   mutate(
     pricePerAcre = ifelse(pricePerAcre == 0, est_pricePerAcre, pricePerAcre),
-    waterUse     = ifelse(waterUse == 0, est_waterUse, waterUse)
-  ) %>% 
-  mutate(
+    waterUse     = ifelse(waterUse == 0, est_waterUse, waterUse), 
     revenue = pricePerAcre * acres,
     water = waterUse * acres
   ) %>% 
@@ -182,12 +177,13 @@ allKern <- kernFallowEst %>%
   arrange(geoGroup) %>% 
   # add a new row id
   mutate(
-    id = row_number()
-  )
-
-# next steps:
-#### figure out what to do with "Idle ? Short Term" crop types
-#### add a binary identifier to difference fallowed and retired land
+    id = row_number(), 
+    fallow = as.numeric(fallow), 
+    # indicate retired fields as those fallow for 3 or more years
+    retired = ifelse(comm == "Idle ? Long Term", 1, 0)
+  ) %>% 
+  select(id, geoGroup, acres, comm, comm_cd, annual, nass, crop, 
+         fallow, retired, pricePerAcre, waterUse, revenue, water)
 
 
 # Summary statistics for fallowed lands ------------------------------------
@@ -204,40 +200,16 @@ fallowSummary <- kernFallowEst %>%
 print(fallowSummary)
 
 
-# Join Fallowed table to non fallowed table -------------------------------
-
-
-joinFields <- fallowFinal %>% 
-  bind_rows(kernNoFallow) %>% 
-  mutate(
-    # Give new id to include non permitted fields
-    id = row_number(),
-    # Give land cover type to uncultivated
-    retired = if_else(is.na(COMM), 1, 0),
-    COMM = if_else(is.na(COMM), "UNCULTIVATED", COMM),
-    nonPermit = replace_na(nonPermit, 0)
-  ) %>%
-  select(id, geoGroup, acres, waterUse:COMM, 
-         COMM.x, revenue, water, hrs, jobs, fallow, nonPermit, retired)
-
-
-
-joinFields2 <- fallowFinal %>% 
-  bind_rows(kernNoFallow) %>% 
-  mutate(
-    # Give new id to include non permitted fields
-    id = row_number(),
-    # Give land cover type to uncultivated
-    retired = if_else(YrsFllw > 3, 1, 0),
-    COMM = if_else(is.na(COMM), "UNCULTIVATED", COMM),
-    nonPermit = replace_na(nonPermit, 0)
-  ) %>%
-  select(id, geoGroup, acres, waterUse:COMM, 
-         COMM.x, revenue, water, hrs, jobs, fallow, nonPermit, retired)
-
 # Export ------------------------------------------------------------------
 
 
 
-write_sf(joinFields2, "Data/6_estimateFallowing/kernAddFallow.shp")
+write_sf(allKern, here("data/intermediate/6_estimateFallowingE/kernAddFallow/kernAddFallow.shp"))
+
+
+
+
+
+
+
 

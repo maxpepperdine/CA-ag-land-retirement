@@ -226,7 +226,8 @@ cropRotationRaw <- endDate %>%
     revPart = if_else(is.na(meanRev), price_per_acre * acres, meanRev * acres),
     waterPart = if_else(is.na(meanWater), water_use * acres, meanWater * acres),
     #add fallow marker for estimating fallowed field values
-    fallow = if_else(comm %in% c("Unclassified Fallow", "Idle ? Long Term"), TRUE, FALSE),
+    fallow = if_else(comm %in% c("Unclassified Fallow", "Idle ? Long Term", 
+                                 "Idle ? Short Term"), TRUE, FALSE),
   ) %>% 
   select(-c(price_per_acre, meanRev, water_use, meanWater, area.x, area.y)) %>% 
   select(comm, acres, geo_grp:fallow) %>% 
@@ -272,8 +273,6 @@ cropRotation <- cropRotationRaw %>%
   ) %>%
   left_join(kernGeo, by = "geo_grp") %>%
   st_as_sf()
-
-# new_df <- cropRotation %>% select(-hrsYear, -jobsYear, hrsAcre) NA bc not in this df 
 
 
 # Check values across all plots
