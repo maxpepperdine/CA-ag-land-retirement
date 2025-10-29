@@ -6,7 +6,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-This tutorial provides a short introduction to the `prioritizr` R package, sourced from <https://prioritizr.net/articles/prioritizr.html#introduction> 
+This tutorial provides a short introduction to the `prioritizr` R package, sourced from <https://prioritizr.net/articles/prioritizr.html#introduction>
 
 ## Load packages
 
@@ -170,19 +170,3 @@ plot(st_as_sf(imp_s1[, "rs"]), main = "Overall importance")
 ```{r}
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
