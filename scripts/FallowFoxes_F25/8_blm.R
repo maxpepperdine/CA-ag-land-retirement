@@ -10,7 +10,7 @@ library(terra)
 library(rmapshaper)
 library(fasterize)
 
-source("Scripts/0_startup/0_2_functions.R")
+# source("Scripts/0_startup/0_2_functions.R")
 
 
 # tmap_mode("view")
@@ -79,5 +79,5 @@ habitatExtract2 <- habitatExtract %>%
 
 write_sf(habitatExtract2, here("data/intermediate/8_blm/cleanShapes/cleanShapes.shp"))
 
-write_sf(reVector, "data/intermediate/8_blm/blmShapes/blmShapes.shp")
+write_sf(reVector, here("data/intermediate/8_blm/blmShapes/blmShapes.shp"))
 
