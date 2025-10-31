@@ -34,6 +34,8 @@ tas_features <- prioritizrdata::get_tas_features()
 
 ## Data exploration and processing
 
+The `tas_pu` object contains planning units represented as spatial polygons (i.e., a `sf::st_sf()` object). This object has three columns that denote the following information for each planning unit: a unique identifier (`id`), unimproved land value (`cost`), and current conservation status (`locked_in`). Planning units that have at least half of their area overlapping with existing protected areas are denoted with a locked in `TRUE` value, otherwise they are denoted with a value of `FALSE`.
+
 ```{r}
 # print planning unit data
 print(tas_pu)
@@ -48,6 +50,8 @@ plot(st_as_sf(tas_pu[, "cost"]), main = "Planning unit costs")
 plot(st_as_sf(tas_pu[, "locked_in"]), main = "Protected area coverage")
 ```
 
+Now, let’s look at the conservation feature data. The `tas_features` object describes the spatial distribution of the features. Specifically, the feature data are a multi-layer raster (i.e., a `terra::rast()` object). Each layer corresponds to a different vegetation community. Within each layer, cells values denote the presence (using value of 1) or absence (using value of 0) of the vegetation community across the study area.
+
 ```{r}
 # print the conservation feature data 
 print(tas_features)
@@ -57,6 +61,8 @@ plot(tas_features[[1:4]])
 ```
 
 ## Problem formulation
+
+Now we will formulate a conservation planing problem. To achieve this, we first specify which objects contain the planning unit and feature data (using the `problem()` function). Next, we specify that we want to use the minimum set objective function (using the `add_min_set_objective()` function). This objective function indicates that we wish to minimize the total cost of planning units selected by the prioritization. We then specify boundary penalties to reduce spatial fragmentation in the resulting prioritization (using the `add_boundary_penalties()` function; see the Calibrating trade-offs vignette for details on calibrating the penalty value). We also specify representation targets to ensure the resulting prioritization provides adequate coverage of each vegetation community (using the `add_relative_targets()` function). Specifically, we specify targets to ensure at least 17% of the spatial extent of each vegetation community (based on the [Aichi Target 11](https://www.cbd.int/sp/targets)). Additionally, we set constraints to ensure that planning units predominately covered by existing protected areas are selected by the prioritization (using the `add_locked_in_constraints()` function). Finally, we specify that the prioritization should either select – or not select – planning units for prioritization (using the `add_binary_decisions()` function).
 
 ```{r}
 # build problem
@@ -74,6 +80,10 @@ print(p1)
 ```
 
 ## Prioritization
+
+We can now solve the problem formulation (`p1`) to generate a prioritization (using the `solve()` function). The `prioritizr` R package supports a range of different exact algorithm solvers, including `Gurobi`, `IBM CPLEX`, `CBC`, `HiGHS`, `Rsymphony`, and `lpsymphony`. We will use the `Gurobi` solver for this example, and can specify this when building the problem using the `add_gurobi_solver()` function (as shown above).
+
+After solving the problem, the prioritization will be stored in the `solution_1` column of the `s1` object.
 
 ```{r}
 # solve problem
@@ -148,7 +158,11 @@ hist(
 )
 ```
 
+We can see that representation of the vegetation communities by existing protected areas is remarkably poor. For example, many of the vegetation communities have nearly zero coverage by existing protected areas. In other words, are almost entirely absent from existing protected areas. We can also see that all vegetation communities have at least 17% coverage by the prioritization – meaning that it meets the representation targets for all of the features.
+
 ## Evaluating importance
+
+After generating the prioritization, we can examine the relative importance of planning units selected by the prioritization. This can be useful to identify critically important planning units for conservation – in other words, places that contain biodiversity features which cannot be represented anywhere else – and schedule implementation of the prioritization. To achieve this, we will use an incremental rank approach. Briefly, this approach involves generating incremental prioritizations with increasing budgets, wherein planning units selected in a previous increment are locked in to the following solution. Additionally, locked out constraints are used to ensure that only planning units selected in the original solution are available for selection. 
 
 ```{r}
 # calculate relative importance
@@ -167,6 +181,84 @@ plot(st_as_sf(imp_s1[, "rs"]), main = "Overall importance")
 
 ## Portfolios
 
-```{r}
+Conservation planning exercises often involve generating multiple different prioritizations. This can help decision makers consider different options, and provide starting points for building consensus among stakeholders. To generate a range of different prioritizations given the same problem formulation, we can use portfolio functions. Here we will use the gap portfolio to generate 1000 solutions that are within 20% of optimality.
 
+```{r}
+# create new problem with a portfolio added to it
+p2 <-
+  p1 %>%
+  add_gap_portfolio(number_solutions = 1000, pool_gap = 0.2)
+
+# print problem
+print(p2)
 ```
+
+```{r}
+# generate prioritizations
+prt <- solve(p2)
+
+print(prt)
+```
+
+After generating all these prioritizations, we now want some way to visualize them. Because it would be onerous to look at each and every prioritization individually, we will use statistical analyses to help us. We can visualize the differences between these different prioritizations – based on which planning units they selected – using a hierarchical cluster analysis.
+
+```{r}
+# extract solutions
+prt_results <- sf::st_drop_geometry(prt)
+prt_results <- prt_results[, startsWith(names(prt_results), "solution_")]
+
+# calculate pair-wise distances between different prioritizations for analysis
+prt_dists <- vegan::vegdist(t(prt_results), method = "jaccard", binary = TRUE)
+
+# run cluster analysis
+prt_clust <- hclust(as.dist(prt_dists), method = "average")
+
+# visualize clusters
+opar <- par()
+par(oma = c(0, 0, 0, 0), mar= c(0, 4.1, 1.5, 2.1))
+plot(
+  prt_clust, labels = FALSE, sub = NA, xlab = "",
+  main = "Different prioritizations in portfolio"
+)
+suppressWarnings(par(opar))
+```
+
+We can see that there are approximately six main groups of prioritizations in the portfolio. To explore these different groups, let’s conduct another cluster analysis (i.e., a k-medoids analysis) to extract the most representative prioritization from each of these groups. In other words, we will run another statistical analysis to find the most central prioritization within each group.
+
+```{r}
+# run k-medoids analysis
+prt_med <- pam(prt_dists, k = 6)
+
+# extract names of prioritizations that are most central for each group.
+prt_med_names <- prt_med$medoids
+print(prt_med_names)
+```
+
+```{r}
+# create a copy of prt and set values for locked in planning units to -1
+# so we can easily visualize differences between prioritizations
+prt2 <- prt[, prt_med_names]
+prt2[which(tas_pu$locked_in > 0.5), prt_med_names] <- -1
+
+# plot a map showing main different prioritizations
+# dark grey: locked in planning units
+# grey: planning units not selected
+# green: selected planning units
+plot(st_as_sf(prt2), pal = c("grey60", "grey90", "darkgreen"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
