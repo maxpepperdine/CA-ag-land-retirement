@@ -58,7 +58,7 @@ annualRate <- read_csv(here("data/intermediate/4_cropRotationE/annualKey_e.csv")
 # NOTE: no need to do this with LandIQ data, only an issue with the old spatial data
 
 # # Find perimeter and area of LandIQ fields
-# kernPA <- kern %>% 
+# kernPA <- kern %>%
 #   mutate(
 #     perim = sf::st_perimeter(.),
 #     area = st_area(.),
@@ -67,45 +67,45 @@ annualRate <- read_csv(here("data/intermediate/4_cropRotationE/annualKey_e.csv")
 # 
 # 
 # # Organize by descending area / perimeter
-# kernAP <- kernPA %>% 
-#   select(ap) %>% 
-#   st_drop_geometry() %>% 
-#   arrange(ap) %>% 
+# kernAP <- kernPA %>%
+#   select(ap) %>%
+#   st_drop_geometry() %>%
+#   arrange(ap) %>%
 #   mutate(
 #     ap = as.vector(ap)
-#   ) %>% 
+#   ) %>%
 #   mutate(
 #     rank = row_number(),
 #     prop = ap / max(ap),
 #     round = rank / nrow(kernPA)
-#   ) 
+#   )
 # 
 # 
-# # Value of bottom 2.5% 
-# cutoff <- kernAP %>% 
-#   filter(round < 0.025) %>% 
+# # Value of bottom 2.5%
+# cutoff <- kernAP %>%
+#   filter(round < 0.025) %>%
 #   {{max(.$ap)}}
 # 
 # 
 # ## Filter LandIQ (kern) fields by ap value
-# apLandIQ <- kernPA %>% 
-#   filter(duplicated(geo_grp) == FALSE) %>% 
+# apLandIQ <- kernPA %>%
+#   filter(duplicated(geo_grp) == FALSE) %>%
 #   mutate(
 #     ap = as.vector(ap)
 #   )
 # 
 # # remove slivers from LandIQ fields (fields with ap less than cutoff)
-# LandIQFilter <- apLandIQ %>% 
+# LandIQFilter <- apLandIQ %>%
 #   filter(ap > cutoff)
 # 
 # # See how much land is lost due to filtering
-# LandIQLost <- apLandIQ %>% 
+# LandIQLost <- apLandIQ %>%
 #   filter(ap <= cutoff)
 # 
-# LandIQLost %>% 
+# LandIQLost %>%
 #   mutate(
 #     area = area %>% as.numeric() / 10000
-#   ) %>% 
+#   ) %>%
 #   {{sum(.$area)}}
 
 

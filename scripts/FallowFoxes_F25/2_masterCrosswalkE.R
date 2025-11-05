@@ -153,7 +153,7 @@ annualCross <- enframe(COMMap, name = NULL, value = "COMM") %>%
 # The crosswalk joins revenue crop categories to kern field crop categories
 
 
-#Read in revenue table - TO DO ************
+#Read in revenue table 
 revenueRaw <- read_csv(here::here("data/intermediate/1_cropRevenueCrosswalkE/final_revenue_e.csv"))
 
 revenue <- revenueRaw %>%

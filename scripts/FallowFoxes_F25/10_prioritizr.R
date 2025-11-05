@@ -48,7 +48,13 @@ cost <- targets[[1, 2]] / 1e6  # convert to "millions of dollars"
 waterTarget <- targets[[2, 2]] / 10
 foxTarget <- targets[[3, 2]]
 
+# filter habitat values < 0.001
+habitatFiltCheck <- habitatExtract %>% 
+  filter(habitat < 0.001 & habitat > 0)
 
+# filter water values < 0.0001
+habitatFiltCheck2 <- habitatExtract %>% 
+  filter(water < 0.0001 & water > 0)
 
 #Filter small hab / water values, and divide revenue by 1000, water by 10
 habitatProportion <- habitatExtract %>%
