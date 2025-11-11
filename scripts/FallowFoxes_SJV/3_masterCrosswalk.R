@@ -8,6 +8,7 @@ library(tidyverse)
 library(readxl)
 library(janitor)
 library(here)
+library(sf)
 
 
 # Water crosswalk -------------------------------------------------------
@@ -177,29 +178,40 @@ masterPre <- annualCross %>%
 SJV_plots <- read_sf(here("data/intermediate/2_cleanPlotsLandIQ/SJVID/SJVID.shp"))
 
 # join to master crosswalk and add revenue and water use values
-master <- SJV_plots %>% 
-  st_drop_geometry() %>% 
+master_SJV_plots <- SJV_plots %>% 
   left_join(masterPre, by = c("crp_ty_" = "COMM")) %>% 
   left_join(revenue, by = c("NASS", "county")) %>% 
   left_join(water, by = c("Crop" = "Crop", "county" = "County"))
 
+# save the SJV plots with crosswalk info
+# we'll combine this with estimated revenue values is 4_revenueEstimation.R
+write_sf(master_SJV_plots, 
+         here("data/intermediate/3_masterCrosswalk/sjv_crosswalkPlots_na/sjv_crosswalkPlots_na.shp"))
 
 
 
 # Find missing LandIQ/NASS crop revenue values ---------------------------------
 
-
 # examine which LandIQ and NASS crops in each county are missing price_per_acre values
-missing_crops_landIQ <- master %>%
+
+# LandIQ crop types missing revenue values
+missing_crops_landIQ <- master_SJV_plots %>%
   filter(is.na(price_per_acre)) %>%
   distinct(crp_ty_, county) %>%
   arrange(county, crp_ty_)
 
-# these are the crops we need to estimate revenue for in 4_revenueEstimation.R
-missing_crops_nass <- master %>%
+
+# NASS crop types missing revenue values
+# NA values in this df are idle or unclassified fallow that we'll estimate later
+missing_crops_nass_county <- master_SJV_plots %>%
   filter(is.na(price_per_acre)) %>%
   distinct(NASS, county) %>%
   arrange(county, NASS)
+# these are the crops we need to estimate revenue for in 4_revenueEstimation.R
+missing_crops_nass_sjv <- master_SJV_plots %>%
+  filter(is.na(price_per_acre)) %>%
+  distinct(NASS) %>%
+  arrange(NASS)
 
 
 ################################################################################
@@ -208,18 +220,23 @@ missing_crops_nass <- master %>%
 ### UPDATE AFTER 4_revenueEstimation.R IS RUN AND MOVE TO THAT SCRIPT###
 
 # Load in the estimated csv
-estimated <- read_csv(here("data/intermediate/2_1_revenueEstimation/nass_cropRevenueEstimates_2021.csv"))
+estimated <- read_csv(here("data/intermediate/kern_2021_archive/2_1_revenueEstimation/nass_cropRevenueEstimates_2021.csv"))
 
 
 # join the estimated dataframe to the master crosswalk
-masterFinal <- masterPre %>% 
+masterFinal <- master_SJV_plots %>% 
   left_join(estimated %>% select(crop, price_per_acre),
-            by = c("nass" = "crop")) %>%
+            by = c("NASS" = "crop")) %>%
   mutate(price_per_acre = if_else(
     is.na(price_per_acre.x) & !is.na(price_per_acre.y),
     price_per_acre.y,
     price_per_acre.x)) %>%
   select(-price_per_acre.x, -price_per_acre.y)
+
+missing_crops_nass_test <- masterFinal %>%
+  filter(is.na(price_per_acre)) %>%
+  distinct(NASS, county) %>%
+  arrange(county, NASS)
 
 
 # save
