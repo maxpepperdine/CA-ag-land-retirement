@@ -214,33 +214,16 @@ missing_crops_nass_sjv <- master_SJV_plots %>%
   arrange(NASS)
 
 
-################################################################################
-################################################################################
-
-### UPDATE AFTER 4_revenueEstimation.R IS RUN AND MOVE TO THAT SCRIPT###
-
-# Load in the estimated csv
-estimated <- read_csv(here("data/intermediate/kern_2021_archive/2_1_revenueEstimation/nass_cropRevenueEstimates_2021.csv"))
 
 
-# join the estimated dataframe to the master crosswalk
-masterFinal <- master_SJV_plots %>% 
-  left_join(estimated %>% select(crop, price_per_acre),
-            by = c("NASS" = "crop")) %>%
-  mutate(price_per_acre = if_else(
-    is.na(price_per_acre.x) & !is.na(price_per_acre.y),
-    price_per_acre.y,
-    price_per_acre.x)) %>%
-  select(-price_per_acre.x, -price_per_acre.y)
-
-missing_crops_nass_test <- masterFinal %>%
-  filter(is.na(price_per_acre)) %>%
-  distinct(NASS, county) %>%
-  arrange(county, NASS)
 
 
-# save
-write_csv(masterFinal, here("data/intermediate/2_masterCrosswalkE/masterCrosswalkE.csv"))
+
+
+
+
+
+
 
 
 
