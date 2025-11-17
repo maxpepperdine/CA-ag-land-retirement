@@ -13,6 +13,7 @@ library(janitor)
 
 # load the LandIQ data for 2022
 SJV2022Raw <- read_sf(here("data/raw/LandIQ/i15_crop_mapping_2022_shp"))
+crs(SJV2022Raw) # check CRS
 
 # SJV clean plots for 2022
 SJV_clean_2022 <- SJV2022Raw %>% 
@@ -175,7 +176,7 @@ write_sf(SJV2022_final, here("data/intermediate/2_cleanPlotsLandIQ/SJVID/SJVID.s
 
 
 # examine all distinct crop types in the SJV for 2022 LandIQ data
-# this will inform the crosswalk with crop revenue, water use, and annual/perennial data
+# this will inform the crosswalk with crop revenue, water use, and annual/perennial data in 3_masterCrosswalk.R
 distinct_crops_2022 <- SJV2022_final %>%
   st_drop_geometry() %>%
   distinct(croptyp, crop_type_name) %>%

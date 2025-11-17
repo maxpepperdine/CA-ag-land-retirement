@@ -49,7 +49,7 @@ endDate <- sjv %>%
 sjv2022Group <- endDate %>% 
   mutate(
     #Fix acres data column
-    acres1 = round(as.numeric(area) / 4046.86 , digits = 3)
+    acres1 = round(as.numeric(area) / 4046.86 , digits = 3), .after=acres
   ) %>% 
   st_drop_geometry()
 
@@ -131,46 +131,6 @@ joinAnnualKey <- dropDuplicates %>%
     meanWater = sumWater,
     .keep = "unused"
   )
-
-
-# Get average values for all crops to estimate fallowed value
-
-
-# joinAnnualKeyMean <- dropDuplicates %>% 
-#   group_by(endCrop, geo_grp) %>% 
-#   # For each plot sum revenue rates
-#   summarize(
-#     sumRev = sum(price_per_acre),
-#     sumWater = sum(water_use),
-#     area = mean(area)
-#   ) %>%
-#   # For each ending crop, find area-weighted average of all plots
-#   summarize(
-#     meanRev = weighted.mean(sumRev, area),
-#     meanWater = weighted.mean(sumWater, area),
-#   )
-
-# # Update master crosswalk with rotated annual rates
-# revenueRotationKey <- masterCrosswalk %>% 
-#   left_join(joinAnnualKeyMean, by = c("comm" = "endCrop")) %>% 
-#   mutate(
-#     pricePerAcre = ifelse(is.na(meanRev), 
-#                           price_per_acre,
-#                           meanRev),
-#     waterUse = ifelse(is.na(meanWater),
-#                       water_use,
-#                       meanWater),
-#   ) %>% 
-#   select(-c(meanRev, meanWater))
-# 
-# # drop eucalyptus, misc deciduous, mixed pasture, turf farms, flowers/nursey/christ tree, misc truck, greenhouse from revenueRotationKey
-# revenueRotationKeyFinal <- revenueRotationKey %>% 
-#   filter(!comm %in% c("Eucalyptus", "Miscellaneous Deciduous", "Mixed Pasture", "Turf Farms", 
-#                       "Flowers, Nursery and Christmas Tree Farms", "Miscellaneous Truck Crops", 
-#                       "Greenhouse"))
-# # Export 
-# write_csv(revenueRotationKeyFinal, here("data/intermediate/4_cropRotationE/annualKey_e.csv"))
-
 
 
 
