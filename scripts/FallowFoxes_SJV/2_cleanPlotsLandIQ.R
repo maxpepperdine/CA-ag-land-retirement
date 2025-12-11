@@ -1,7 +1,7 @@
 # clear environment
 rm(list = ls())
 
-# purpose: examine comm codes from LandIQ data for SJV
+# purpose: clean LandIQ fields and examine comm codes from LandIQ data for SJV
 # we'll use these to crosswalk with crop revenue and DWR data later 
 
 # load packages
@@ -13,7 +13,7 @@ library(janitor)
 
 # load the LandIQ data for 2022
 SJV2022Raw <- read_sf(here("data/raw/LandIQ/i15_crop_mapping_2022_shp"))
-crs(SJV2022Raw) # check CRS
+st_crs(SJV2022Raw) # check CRS
 
 # SJV clean plots for 2022
 SJV_clean_2022 <- SJV2022Raw %>% 
@@ -21,7 +21,7 @@ SJV_clean_2022 <- SJV2022Raw %>%
   # filter to SJV counties
   filter(county %in% c("San Joaquin", "Stanislaus", "Merced", "Madera", 
                        "Fresno", "Kings", "Tulare", "Kern")) %>% 
-  select(acres, county, region, 
+  select(unique_id, acres, county, region, 
          croptyp1, adoy1, 
          croptyp2, adoy2, 
          croptyp3, adoy3, 
@@ -47,12 +47,14 @@ SJV_clean_2022 <- SJV2022Raw %>%
     date_active4_doy = floor((adoy3 + adoy4) / 2),
     
     # inactive DOYs (except for the last one, which will be overwritten)
+    # set date inactices to 1 day before the next active date
     date_inactive1_doy = date_active2_doy - 1,
     date_inactive2_doy = date_active3_doy - 1,
     date_inactive3_doy = date_active4_doy - 1
   ) %>%
   
   # convert all DOYs to Date format
+  # subtracting 1 aligns numeric DOY with Date format correctly
   mutate(
     adate1 = as.Date(adoy1 - 1, origin = "2022-01-01"),
     adate2 = as.Date(adoy2 - 1, origin = "2022-01-01"),
@@ -74,7 +76,7 @@ SJV_clean_2022 <- SJV2022Raw %>%
   ) %>%
   
   select(
-    acres, county, region,
+    unique_id, acres, county, region,
     croptyp1, adoy1, adate1, date_active1, date_inactive1,
     croptyp2, adoy2, adate2, date_active2, date_inactive2,
     croptyp3, adoy3, adate3, date_active3, date_inactive3,
@@ -84,10 +86,12 @@ SJV_clean_2022 <- SJV2022Raw %>%
 
 # final cleaning
 SJV_clean_final <- SJV_clean_2022 %>%
-  # pivot longer to have one crop type per row
+  # pivot longer to have one crop type per row (i.e., one crop occurrence for each field)
   pivot_longer(
+    # select all columns for each crop type and their corresponding dates
     cols = matches("croptyp[1-4]|date_active[1-4]|date_inactive[1-4]"),
     names_to = c(".value", "season"),
+    # split column names into crop type and season number
     names_pattern = "([a-z_]+)([1-4])"
   ) %>%
   # remove placeholder and missing crops
@@ -97,7 +101,7 @@ SJV_clean_final <- SJV_clean_2022 %>%
     date_inactive = if_else(is.na(date_inactive), as.Date("2022-09-30"), date_inactive),
     croptype_category = paste0("croptyp", season)
   ) %>%
-  select(acres, county, region, croptype_category, croptyp, date_active, 
+  select(unique_id, acres, county, region, croptype_category, croptyp, date_active, 
          date_inactive, geometry)
 
 
@@ -164,7 +168,8 @@ SJV2022_final <- SJV2022_2D %>%
                                 "Turf Farms", "Flowers, Nursery and Christmas Tree Farms", 
                                 "Miscellaneous Truck Crops", "Greenhouse")) %>% 
   # drop any observation that's less than 1 acre
-  filter(acres >= 1)
+  filter(acres >= 1) %>% 
+  select(-index)
 
 
 # write to shapefile

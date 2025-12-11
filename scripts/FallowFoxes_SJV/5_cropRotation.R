@@ -149,7 +149,7 @@ cropRotationRaw <- endDate %>%
                                  "Idle - Short Term"), TRUE, FALSE),
   ) %>% 
   select(-c(price_per_acre, meanRev, water_use, meanWater, area.x, area.y)) %>% 
-  select(comm, acres, geo_grp:fallow) %>% 
+  select(uniqu_d, comm, acres, geo_grp:fallow) %>% 
   group_by(geo_grp)
 
 
@@ -197,8 +197,8 @@ metrics(cropRotation$waterPerAcre)
 
 # Export
 write_sf(cropRotation, 
-         here("data/intermediate/5_cropRotation/sjvYearRotation/sjvYearRotation.shp"))
-
+         here("data/intermediate/5_cropRotation/sjvYearRotation/sjvYearRotation.shp"), 
+         append = FALSE)
 
 
 

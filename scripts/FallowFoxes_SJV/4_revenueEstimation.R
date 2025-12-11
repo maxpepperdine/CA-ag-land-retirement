@@ -371,7 +371,8 @@ missing_crops_test <- SJV_landIQ_full_crosswalk %>%
 
 # export the LandIQ plots with all crosswalk info and revenue estimates
 write_sf(SJV_landIQ_full_crosswalk, 
-         here("data/intermediate/4_revenueEstimation/sjv_landIQ_fullCrosswalk/sjv_landIQ_fullCrosswalk.shp"))
+         here("data/intermediate/4_revenueEstimation/sjv_landIQ_fullCrosswalk/sjv_landIQ_fullCrosswalk.shp"), 
+         append = FALSE)
 
 
 
