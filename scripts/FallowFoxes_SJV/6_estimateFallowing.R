@@ -1,3 +1,13 @@
+# =============================================================================
+# Estimating Crop Revenue and Water Use for Fallowed Fields in the SJV
+# =============================================================================
+# Purpose: For fields classified as idle or fallow in the SJV dataset, estimate
+#          their crop revenue and water use based on nearest neighbor analysis
+#          from cultivated fields. If there's a last cultivated crop as identified
+#          in `lastCultivatedLandIQ_2022.R`, use that crop's values for estimation.
+# =============================================================================
+
+
 # clear environment
 rm(list = ls())
 
@@ -24,6 +34,11 @@ source(here("scripts/FallowFoxes_SJV/0_startup/functions.R"))
 
 # sjv Year Data
 sjv <- read_sf(here("data/intermediate/5_cropRotation/sjvYearRotation/sjvYearRotation.shp"))
+
+# sjv last cultivated data (from lastCultivatedLandIQ_2022.R)
+sjv_lastCult <- read_sf(here("data/intermediate/misc/lastCultivatedLandIQ_2022/landiq_2022_lastCultivated.shp")) %>% 
+  select(uniqu_d, comm, last_comm, everything())
+
 
 # ensure CRS is CA Albers (EPSG:3310)
 st_crs(sjv)

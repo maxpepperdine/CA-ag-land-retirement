@@ -149,7 +149,7 @@ cropRotationRaw <- endDate %>%
                                  "Idle - Short Term"), TRUE, FALSE),
   ) %>% 
   select(-c(price_per_acre, meanRev, water_use, meanWater, area.x, area.y)) %>% 
-  select(uniqu_d, comm, acres, geo_grp:fallow) %>% 
+  select(uniqu_d, county, comm, acres, geo_grp:fallow) %>% 
   group_by(geo_grp)
 
 

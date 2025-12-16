@@ -20,24 +20,21 @@ library(here)
 
 # define file paths to cleaned LandIQ plots
 path_2022 <- here("data/intermediate/5_cropRotation/sjvYearRotation/sjvYearRotation.shp")
-path_2021 <- here("data/intermediate/misc/2021/2_cleanPlotsLandIQ_2021/SJVID_2021/SJVID_2021.shp")
-path_2020 <- here("data/intermediate/misc/2020/2_cleanPlotsLandIQ_2020/SJVID_2020/SJVID_2020.shp")
-path_2019 <- here("data/intermediate/misc/2019/2_cleanPlotsLandIQ_2019/SJVID_2019/SJVID_2019.shp")
-path_2018 <- here("data/intermediate/misc/2018/2_cleanPlotsLandIQ_2018/SJVID_2018/SJVID_2018.shp")
+path_2021 <- here("data/intermediate/misc/2021/5_cropRotation_2021/sjvYearRotation/sjvYearRotation_2021.shp")
+path_2020 <- here("data/intermediate/misc/2020/5_cropRotation_2020/sjvYearRotation/sjvYearRotation_2020.shp")
+path_2019 <- here("data/intermediate/misc/2019/5_cropRotation_2019/sjvYearRotation/sjvYearRotation_2019.shp")
+path_2018 <- here("data/intermediate/misc/2018/5_cropRotation_2018/sjvYearRotation/sjvYearRotation_2018.shp")
 
 # read in all cleaned LandIQ plots
 landiq_2022 <- read_sf(path_2022)
-landiq_2021 <- read_sf(path_2021) %>% 
-  rename(comm = crp_ty_)
-landiq_2020 <- read_sf(path_2020) %>% 
-  rename(comm = crp_ty_)
-landiq_2019 <- read_sf(path_2019) %>% 
-  rename(comm = crp_ty_)
-landiq_2018 <- read_sf(path_2018) %>% 
-  rename(comm = crp_ty_)
+landiq_2021 <- read_sf(path_2021)
+landiq_2020 <- read_sf(path_2020)
+landiq_2019 <- read_sf(path_2019)
+landiq_2018 <- read_sf(path_2018)
 
 # define the comm classes that indicate fallow/idle land
 idle_comms <- c("Unclassified Fallow", "Idle - Long Term", "Idle - Short Term")
+
 
 # =============================================================================
 # STEP 2: create lookup tables from historical years (just UniqueID and comm)
@@ -66,10 +63,18 @@ lookup_2018 <- landiq_2018 %>%
 
 
 # =============================================================================
-# STEP 3: join 2018-2021 data to 2022 data
+# STEP 3: filter to idle/fallow fields in 2022, then join 2018-2021 data to 2022 data
 # =============================================================================
 
-landiq_2022_joined <- landiq_2022 %>%
+# separate idle/fallow fields from cultivated fields
+landiq_2022_idle <- landiq_2022 %>%
+  filter(comm %in% idle_comms)
+
+landiq_2022_cultivated <- landiq_2022 %>%
+  filter(!(comm %in% idle_comms))
+
+# join historical data to 2022 idle/fallow fields
+landiq_2022_idle_joined <- landiq_2022_idle %>%
   left_join(lookup_2021, by = c("uniqu_d")) %>%
   left_join(lookup_2020, by = c("uniqu_d")) %>%
   left_join(lookup_2019, by = c("uniqu_d")) %>%
@@ -111,25 +116,15 @@ find_last_crop <- function(comm_2021, comm_2020, comm_2019, comm_2018,
 
 # Apply the function to determine last cultivated crop for idle/fallow fields
 
-landiq_2022_final <- landiq_2022_joined %>%
+landiq_2022_idle_final <- landiq_2022_idle_joined %>%
   mutate(
-    # Initialize last_comm as NA for all records
-    last_comm = NA_character_,
-    
-    # Only calculate last_comm for idle/fallow fields
-    last_comm = case_when(
-      # If current comm is NOT in idle categories, set last_comm to NA
-      !(comm %in% idle_categories) ~ NA_character_,
-      
-      # If current comm IS in idle categories, find the last cultivated crop
-      TRUE ~ mapply(
-        find_last_crop,
-        comm_2021,
-        comm_2020,
-        comm_2019,
-        comm_2018,
-        MoreArgs = list(idle_cats = idle_comms)
-      )
+    last_comm = mapply(
+      find_last_crop,
+      comm_2021,
+      comm_2020,
+      comm_2019,
+      comm_2018,
+      MoreArgs = list(idle_comms = idle_comms)
     )
   )
 
@@ -138,13 +133,40 @@ landiq_2022_final <- landiq_2022_joined %>%
 # STEP 5: clean up and generate some summary statistics
 # =============================================================================
 
+# remove comm columns from historical years
+landiq_2022_idle_final_clean <- landiq_2022_idle_final %>%
+  select(-comm_2021, -comm_2020, -comm_2019, -comm_2018)
+
+# add last_comm column (as NA) to cultivated fields for consistency
+landiq_2022_cultivated <- landiq_2022_cultivated %>%
+  mutate(last_comm = NA_character_)
+
+# combine back with cultivated fields from 2022
+landiq_2022_final <- bind_rows(landiq_2022_cultivated, landiq_2022_idle_final_clean)
+# check the crs
+st_crs(landiq_2022_final)
 
 
+# Count of idle/fallow fields in 2022 (using already-filtered idle dataset)
+idle_summary <- landiq_2022_idle_final_clean %>%
+  st_drop_geometry() %>%
+  group_by(comm) %>%
+  summarise(
+    total_fields = n(),
+    fields_with_last_crop = sum(!is.na(last_comm)),
+    fields_without_last_crop = sum(is.na(last_comm)),
+    .groups = "drop"
+  )
+
+print(idle_summary)
 
 
+# =============================================================================
+# STEP 6: save the output
+# =============================================================================
 
-
-
+write_sf(landiq_2022_final, 
+         here("data/intermediate/misc/lastCultivatedLandIQ_2022/landiq_2022_lastCultivated.shp"))
 
 
 
