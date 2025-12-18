@@ -186,7 +186,7 @@ idle_summary_pretty <- idle_summary %>%
 # =============================================================================
 
 write_sf(landiq_2022_final, 
-         here("data/intermediate/misc/lastCultivatedLandIQ_2022/landiq_2022_lastCultivated.shp"))
+         here("data/intermediate/misc/1_lastCultivatedLandIQ_2022/landiq_2022_lastCultivated.shp"))
 
 
 
