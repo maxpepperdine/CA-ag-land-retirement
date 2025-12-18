@@ -169,6 +169,9 @@ masterPre <- annualCross %>%
   left_join(revCross, by = "COMM") %>% 
   left_join(waterCross, by = "COMM")
 
+# # save the masterPre crosswalk
+# write_csv(masterPre, 
+#           here("data/intermediate/3_masterCrosswalk/sjv_masterPre_crosswalk.csv"))
 
 
 

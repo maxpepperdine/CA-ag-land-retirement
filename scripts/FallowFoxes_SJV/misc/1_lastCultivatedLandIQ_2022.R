@@ -114,8 +114,7 @@ find_last_crop <- function(comm_2021, comm_2020, comm_2019, comm_2018,
 }
 
 
-# Apply the function to determine last cultivated crop for idle/fallow fields
-
+# apply the function to determine last cultivated crop for idle/fallow fields
 landiq_2022_idle_final <- landiq_2022_idle_joined %>%
   mutate(
     last_comm = mapply(
@@ -127,6 +126,12 @@ landiq_2022_idle_final <- landiq_2022_idle_joined %>%
       MoreArgs = list(idle_comms = idle_comms)
     )
   )
+
+
+# clean up the output to check
+landiq_2022_idle_final_check <- landiq_2022_idle_final %>%
+  select(uniqu_d, county, comm, comm_2021, comm_2020, comm_2019, comm_2018, last_comm, 
+         everything())
 
 
 # =============================================================================
@@ -160,6 +165,21 @@ idle_summary <- landiq_2022_idle_final_clean %>%
 
 print(idle_summary)
 
+# make a prettier table of the idle_summary information
+idle_summary_pretty <- idle_summary %>%
+  mutate(
+    percent_with_last_crop = round((fields_with_last_crop / total_fields) * 100, 2),
+    percent_without_last_crop = round((fields_without_last_crop / total_fields) * 100, 2)
+  ) %>%
+  select(
+    comm,
+    total_fields,
+    fields_with_last_crop,
+    percent_with_last_crop,
+    fields_without_last_crop,
+    percent_without_last_crop
+  )
+
 
 # =============================================================================
 # STEP 6: save the output
@@ -167,6 +187,9 @@ print(idle_summary)
 
 write_sf(landiq_2022_final, 
          here("data/intermediate/misc/lastCultivatedLandIQ_2022/landiq_2022_lastCultivated.shp"))
+
+
+
 
 
 
