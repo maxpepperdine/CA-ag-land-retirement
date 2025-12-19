@@ -75,13 +75,32 @@ sjv_final <- sjv_joined_revWat %>%
   mutate(
     # replace rvPrAcr: use lookup value if field is idle AND has a last_comm
     rvPrAcr = case_when(
-      comm %in% idle_categories & !is.na(last_comm) & !is.na(lookup_rvPrAcr) ~ lookup_rvPrAcr,
+      comm %in% idle_categories & 
+        !is.na(last_comm) & 
+        !is.na(lookup_rvPrAcr) ~ lookup_rvPrAcr,
       TRUE ~ rvPrAcr
     ),
     # replace wtrPrAc: use lookup value if field is idle AND has a last_comm
     wtrPrAc = case_when(
-      comm %in% idle_categories & !is.na(last_comm) & !is.na(lookup_wtrPrAc) ~ lookup_wtrPrAc,
+      comm %in% idle_categories & 
+        !is.na(last_comm) & 
+        !is.na(lookup_wtrPrAc) ~ lookup_wtrPrAc,
       TRUE ~ wtrPrAc
+    ),
+  ) %>% 
+  mutate(
+    # reclaculate total revenue and water use for idle categories only
+    revYear = case_when(
+      comm %in% idle_categories & 
+        !is.na(last_comm) & 
+        !is.na(rvPrAcr) ~ rvPrAcr * acres,
+      TRUE ~ revYear
+    ),
+    waterYr = case_when(
+      comm %in% idle_categories & 
+        !is.na(last_comm) & 
+        !is.na(wtrPrAc) ~ wtrPrAc * acres,
+      TRUE ~ waterYr
     )
   ) %>%
   # remove the temporary lookup columns
@@ -112,7 +131,8 @@ update_summary <- sjv_joined %>%
 
 # export data
 write_sf(sjv_final, 
-         here("data/intermediate/misc/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.shp"))
+         here("data/intermediate/misc/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.shp"), 
+         append = FALSE)
 
 
 

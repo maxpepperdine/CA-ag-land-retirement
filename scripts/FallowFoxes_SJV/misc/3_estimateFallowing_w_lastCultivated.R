@@ -3,7 +3,9 @@
 # =============================================================================
 # Purpose: For fields classified as idle or fallow in the SJV dataset, estimate
 #          their crop revenue and water use based on nearest neighbor analysis
-#          from cultivated fields.
+#          from cultivated fields. If there's a last cultivated crop as identified
+#          in `1_lastCultivatedLandIQ_2022.R`, we'll use that crop's values for 
+#          estimation as calculated in `2_lastCultivatedRevWater.R`.
 # =============================================================================
 
 
@@ -31,13 +33,15 @@ source(here("scripts/FallowFoxes_SJV/0_startup/functions.R"))
 
 # Load in Data ------------------------------------------------------------
 
-# sjv Year Data
-sjv <- read_sf(here("data/intermediate/5_cropRotation/sjvYearRotation/sjvYearRotation.shp"))
+# sjv Year Data with last cultivated revenue and water info (from 2_lastCultivatedRevWater.R)
+sjv <- read_sf(here("data/intermediate/misc/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.shp"))
 # ensure CRS is CA Albers (EPSG:3310)
 st_crs(sjv)
 
 
-# Split SJV into fallow not fallow ---------------------------------------
+# =============================================================================
+# STEP 1: Split SJV into fallow not fallow 
+# =============================================================================
 
 sjvNoFallow <- sjv %>% 
   filter(fallow == FALSE) %>% 
@@ -70,6 +74,49 @@ sjvNFArea <- sum(sjvNoFallow$acres)
 # calculate proportion of fallowed land in the SJV
 propFallow <- sjvFArea / (sjvFArea + sjvNFArea)
 print(paste0("Proportion of fallowed land in the SJV: ", round(propFallow * 100, 2), "%"))
+
+
+
+# =============================================================================
+# STEP 2: Split SJV into (1) fallow/idle land with last cultivated crop info 
+#         and cultivated land and (2) fallow/idle land without last cultivated 
+#         crop info
+# =============================================================================
+
+# (1) fallow land with last cultivated crop info and cultivated land
+sjvCropFallowLastCultivated <- sjv %>%
+  # keep all cultivated land and fallow land w/o 0s in pricePerAcre and waterUse
+  filter(
+    fallow == FALSE | 
+      (fallow == TRUE & 
+         rvPrAcr != 0 & 
+         wtrPrAc != 0)
+  ) %>%
+  mutate(
+    geoGroup = geo_grp,
+    pricePerAcre = rvPrAcr,
+    waterUse = wtrPrAc,
+    revenue = revYear,
+    water = waterYr,
+    .keep = "unused"
+  )
+
+# (2) fallow land without last cultivated crop info
+sjvFallowNoLastCultivated <- sjv %>%
+  # keep only fallow land w/ 0s in pricePerAcre and water
+  filter(
+    fallow == TRUE & 
+      (rvPrAcr == 0 | 
+         wtrPrAc == 0)
+  ) %>%
+  mutate(
+    geoGroup = geo_grp,
+    pricePerAcre = rvPrAcr,
+    waterUse = wtrPrAc,
+    revenue = revYear,
+    water = waterYr,
+    .keep = "unused"
+  )
 
 
 # Estimate crop revenue and water use of fallowed land ------------------------
