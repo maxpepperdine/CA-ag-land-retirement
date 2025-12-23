@@ -1,0 +1,85 @@
+---
+title: "Processing Env Predictor Variables for SDMs"
+format: html
+---
+
+```{r}
+# clear the environment
+rm(list = ls())
+```
+
+## Overview/Purpose
+
+This script processes environmental predictor variables for use in species distribution models (SDMs). It will load each of the predictor variables in raster format, ensure they are aligned to a common extent and resolution, and then export the processed rasters for use in modeling.
+
+## Setup
+
+#### Load packages
+
+```{r}
+# load required packages
+library(terra)
+library(here)
+library(tidyverse)
+```
+
+#### Load data
+
+```{r}
+# ==============================================================================
+# BCM data 
+# ==============================================================================
+
+## AET
+# file paths for BCM AET monthly average rasters
+aet_path <- list.files(path = here("data/raw/bcm/bcmv8_historic/monthly_avgs/"), 
+                       pattern = "aet_.*_avg\\.tif$", 
+                       full.names = TRUE)
+
+# load AET rasters as a SpatRaster
+aet_stack <- rast(aet_path)
+```
+
+## Data Processing
+
+#### BCM
+
+```{r}
+# ==============================================================================
+# AET
+# ==============================================================================
+
+# check the projection, extent, and resolution of the AET stack
+crs(aet_stack) # EPSG:3310
+ext(aet_stack) 
+res(aet_stack) # 270m
+
+# this is already in the desired projection, extent, and resolution
+# we will resample/project other layers to match this one
+
+# calculate the mean AET across all months
+aet_mean <- mean(aet_stack)
+plot(aet_mean, main = "Mean AET")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
