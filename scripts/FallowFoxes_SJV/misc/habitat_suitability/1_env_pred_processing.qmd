@@ -21,6 +21,8 @@ This script processes environmental predictor variables for use in species distr
 library(terra)
 library(here)
 library(tidyverse)
+library(tigris)
+library(sf)
 ```
 
 #### Load data
@@ -38,6 +40,34 @@ aet_path <- list.files(path = here("data/raw/bcm/bcmv8_historic/monthly_avgs/"),
 
 # load AET rasters as a SpatRaster
 aet_stack <- rast(aet_path)
+
+
+# ==============================================================================
+# gSSURGO
+# ==============================================================================
+
+## % clay
+# file path for gSSURGO % clay raster
+clay_path <- here("data/raw/gssurgo/processed/clay_pct_0_10cm_sjv_270m.tif")
+clay_rast <- rast(clay_path)
+
+## pH
+# file path for gSSURGO pH raster
+ph_path <- here("data/raw/gssurgo/processed/pH_0_10cm_sjv_270m.tif")
+ph_rast <- rast(ph_path)
+
+# EC
+# file path for gSSURGO EC raster
+ec_path <- here("data/raw/gssurgo/processed/ec_dS_m_0_10cm_sjv_270m.tif")
+ec_rast <- rast(ec_path)
+
+
+# ==============================================================================
+# slope (open topography)
+# ==============================================================================
+
+elevation_path <- here("data/raw/open_topography/output_USGS30m.tif")
+elevation_rast <- rast(elevation_path)
 ```
 
 ## Data Processing
@@ -62,12 +92,126 @@ aet_mean <- mean(aet_stack)
 plot(aet_mean, main = "Mean AET")
 ```
 
+#### Make SJV spat vector
+
+```{r}
+# get California counties from Census TIGER/Line shapefiles
+ca_counties <- counties(state = "CA")
+
+# define San Joaquin Valley counties
+sjv_counties <- c("San Joaquin", "Stanislaus", "Merced", "Madera", 
+                  "Fresno", "Kings", "Tulare", "Kern")
+
+# filter and combine into one polygon
+sjv <- ca_counties %>%
+  filter(NAME %in% sjv_counties) %>%
+  st_union() %>% 
+  st_transform(crs = crs(aet_mean)) %>% # transform to aet raster CRS
+  vect() # convert to terra vector format
+
+# crop AET mean raster to SJV extent
+aet_mean_sjv <- aet_mean %>% 
+  crop(sjv) %>%
+  mask(sjv)
+```
+
+#### gSSURGO
+
+```{r}
+# resample gSSURGO rasters to match AET
+clay_resampled <- resample(clay_rast, 
+                           aet_mean_sjv, 
+                           method = "mean")
+ph_resampled <- resample(ph_rast, 
+                         aet_mean_sjv, 
+                         method = "mean")
+ec_resampled <- resample(ec_rast, 
+                         aet_mean_sjv, 
+                         method = "mean")
+
+# confirm all rasters have the same extent and resolution
+crs(clay_resampled) == crs(aet_mean_sjv)
+crs(ph_resampled) == crs(aet_mean_sjv)
+crs(ec_resampled) == crs(aet_mean_sjv)
+
+ext(clay_resampled) == ext(aet_mean_sjv)
+ext(ph_resampled) == ext(aet_mean_sjv)
+ext(ec_resampled) == ext(aet_mean_sjv)
+
+res(clay_resampled) == res(aet_mean_sjv)
+res(ph_resampled) == res(aet_mean_sjv)
+res(ec_resampled) == res(aet_mean_sjv)
+```
+
+#### Slope
+
+```{r}
+# check the projection, extent, and resolution of the elevation raster
+crs(elevation_rast) # EPSG:4326
+ext(elevation_rast)
+res(elevation_rast) # 30m
 
 
+# project elevation raster to match AET and crop to SJV extent 
+elevation_proj <- project(elevation_rast, 
+                          aet_mean_sjv, 
+                          method = "mean")
+crs(elevation_proj) # confirm EPSG:3310
 
 
+# calculate slope from elevation
+slope_rast <- terrain(elevation_proj, 
+                      v = "slope", 
+                      unit = "degrees")
+plot(slope_rast, main = "Slope (degrees)")
 
 
+# crop to SJV
+slope_sjv <- slope_rast %>% 
+  crop(sjv) %>%
+  mask(sjv)
+
+
+# resample to match AET resolution and extent
+slope_resampled <- resample(slope_sjv, 
+                            aet_mean_sjv, 
+                            method = "mean")
+plot(slope_resampled, main = "Elevation")
+
+
+# confirm all rasters have the same extent and resolution
+crs(slope_resampled) == crs(aet_mean_sjv)
+ext(slope_resampled) == ext(aet_mean_sjv)
+res(slope_resampled) == res(aet_mean_sjv)
+```
+
+## Export Processed Rasters
+
+```{r}
+# path to output directory
+output_dir <- here("data/intermediate/misc/habitat_suitability/env_predictors/")
+
+# export mean AET raster
+writeRaster(aet_mean_sjv, 
+            filename = file.path(output_dir, "aet_mon_mean_sjv_270m.tif"), 
+            overwrite = TRUE)
+
+# export gSSURGO rasters
+writeRaster(clay_resampled, 
+            filename = file.path(output_dir, "clay_pct_0_10cm_sjv_270m.tif"), 
+            overwrite = TRUE)
+writeRaster(ph_resampled, 
+            filename = file.path(output_dir, "ph_0_10cm_sjv_270m.tif"), 
+            overwrite = TRUE)
+writeRaster(ec_resampled, 
+            filename = file.path(output_dir, "ec_dS_m_0_10cm_sjv_270m.tif"), 
+            overwrite = TRUE)
+
+# export slope raster
+writeRaster(slope_resampled, 
+            filename = file.path(output_dir, "slope_deg_sjv_270m.tif"), 
+            overwrite = TRUE)
+```
 
 
 
