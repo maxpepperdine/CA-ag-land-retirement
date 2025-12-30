@@ -11,12 +11,12 @@ library(sf)
 library(here)
 library(janitor)
 
-# load the LandIQ data for 2018
-SJV2018Raw <- read_sf(here("data/raw/LandIQ/i15_Crop_Mapping_2018_SHP"))
-st_crs(SJV2018Raw) # check CRS
+# load the LandIQ data for 2020
+SJV2020Raw <- read_sf(here("data/raw/LandIQ/i15_Crop_Mapping_2020"))
+st_crs(SJV2020Raw) # check CRS
 
-# SJV clean plots for 2018
-SJV_clean_2018 <- SJV2018Raw %>% 
+# SJV clean plots for 2020
+SJV_clean_2020 <- SJV2020Raw %>% 
   clean_names() %>% 
   # filter to SJV counties
   filter(county %in% c("San Joaquin", "Stanislaus", "Merced", "Madera", 
@@ -55,24 +55,24 @@ SJV_clean_2018 <- SJV2018Raw %>%
   
   # convert all DOYs to Date format
   mutate(
-    adate1 = as.Date(adoy1 - 1, origin = "2018-01-01"),
-    adate2 = as.Date(adoy2 - 1, origin = "2018-01-01"),
-    adate3 = as.Date(adoy3 - 1, origin = "2018-01-01"),
-    adate4 = as.Date(adoy4 - 1, origin = "2018-01-01"),
+    adate1 = as.Date(adoy1 - 1, origin = "2020-01-01"),
+    adate2 = as.Date(adoy2 - 1, origin = "2020-01-01"),
+    adate3 = as.Date(adoy3 - 1, origin = "2020-01-01"),
+    adate4 = as.Date(adoy4 - 1, origin = "2020-01-01"),
     
     # fixed start and end of water year
-    date_active1 = as.Date("2017-10-01"),
-    date_inactive4 = as.Date("2018-09-30"),
+    date_active1 = as.Date("2019-10-01"),
+    date_inactive4 = as.Date("2020-09-30"),
     
     # other active/inactive dates based on midpoints
     # subtracting 1 aligns numeric DOY with Date format correctly
-    date_active2 = as.Date(date_active2_doy - 1, origin = "2018-01-01"),
-    date_active3 = as.Date(date_active3_doy - 1, origin = "2018-01-01"),
-    date_active4 = as.Date(date_active4_doy - 1, origin = "2018-01-01"),
+    date_active2 = as.Date(date_active2_doy - 1, origin = "2020-01-01"),
+    date_active3 = as.Date(date_active3_doy - 1, origin = "2020-01-01"),
+    date_active4 = as.Date(date_active4_doy - 1, origin = "2020-01-01"),
     
-    date_inactive1 = as.Date(date_inactive1_doy - 1, origin = "2018-01-01"),
-    date_inactive2 = as.Date(date_inactive2_doy - 1, origin = "2018-01-01"),
-    date_inactive3 = as.Date(date_inactive3_doy - 1, origin = "2018-01-01")
+    date_inactive1 = as.Date(date_inactive1_doy - 1, origin = "2020-01-01"),
+    date_inactive2 = as.Date(date_inactive2_doy - 1, origin = "2020-01-01"),
+    date_inactive3 = as.Date(date_inactive3_doy - 1, origin = "2020-01-01")
   ) %>%
   
   select(
@@ -85,7 +85,7 @@ SJV_clean_2018 <- SJV2018Raw %>%
 
 
 # final cleaning
-SJV_clean_final <- SJV_clean_2018 %>%
+SJV_clean_final <- SJV_clean_2020 %>%
   # pivot longer to have one crop type per row (i.e., one crop occurrence for each field)
   pivot_longer(
     # select all columns for each crop type and their corresponding dates
@@ -97,8 +97,8 @@ SJV_clean_final <- SJV_clean_2018 %>%
   # remove placeholder and missing crops
   filter(croptyp != "****" & !is.na(croptyp)) %>%  
   mutate(
-    date_active = if_else(is.na(date_active), as.Date("2017-10-01"), date_active),
-    date_inactive = if_else(is.na(date_inactive), as.Date("2018-09-30"), date_inactive),
+    date_active = if_else(is.na(date_active), as.Date("2019-10-01"), date_active),
+    date_inactive = if_else(is.na(date_inactive), as.Date("2020-09-30"), date_inactive),
     croptype_category = paste0("croptyp", season)
   ) %>%
   select(unique_id, acres, county, region, croptype_category, croptyp, date_active, 
@@ -117,7 +117,7 @@ SJV_Geo <- SJV_clean_final %>%
   )
 
 # join the geoGroup back to the main data
-SJV2018 <- SJV_clean_final %>% 
+SJV2020 <- SJV_clean_final %>% 
   st_join(SJV_Geo, join = st_equals)
 
 
@@ -126,32 +126,32 @@ matching <- read_csv(here("data/intermediate/0_input/matchingSheet.csv"))
 
 
 # join to get full crop names and clean column names
-SJV2018 <- SJV2018 %>%
+SJV2020 <- SJV2020 %>%
   left_join(matching, by = c("croptyp" = "Code")) %>%
   clean_names()
 
 # check CRS -- should be EPSG 3310
-st_crs(SJV2018)
+st_crs(SJV2020)
 
 # drop Z values
-SJV2018_2D <- st_zm(SJV2018)
+SJV2020_2D <- st_zm(SJV2020)
 
 
 ################################################################################
 # we're thinking of dropping the following LandIQ crop types:
 # "Eucalyptus", "Miscellaneous Deciduous", "Mixed Pasture", "Turf Farms", "Flowers, Nursery and Christmas Tree Farms", "Miscellaneous Truck Crops", "Greenhouse"
-# first, let's see how many acres they represent in the SJV for 2018
+# first, let's see how many acres they represent in the SJV for 2020
 
 # acres we'd be dropping
-acres_to_drop <- SJV2018_2D %>%
+acres_to_drop <- SJV2020_2D %>%
   filter(crop_type_name %in% c("Eucalyptus", "Miscellaneous Deciduous", "Mixed Pasture", 
                                "Turf Farms", "Flowers, Nursery and Christmas Tree Farms", 
                                "Miscellaneous Truck Crops", "Greenhouse")) %>%
   st_drop_geometry() %>%
   summarise(drop_acres = sum(acres, na.rm = TRUE))
 
-# total acres in LandIQ SJV plots for 2018
-total_acres <- SJV2018_2D %>%
+# total acres in LandIQ SJV plots for 2020
+total_acres <- SJV2020_2D %>%
   st_drop_geometry() %>%
   summarise(total_acres = sum(acres, na.rm = TRUE))
 
@@ -163,7 +163,7 @@ percentage_dropped <- (acres_to_drop$drop_acres / total_acres$total_acres) * 100
 ################################################################################
 
 # drop the crop types from the data
-SJV2018_final <- SJV2018_2D %>%
+SJV2020_final <- SJV2020_2D %>%
   filter(!crop_type_name %in% c("Eucalyptus", "Miscellaneous Deciduous", "Mixed Pasture", 
                                 "Turf Farms", "Flowers, Nursery and Christmas Tree Farms", 
                                 "Miscellaneous Truck Crops", "Greenhouse")) %>% 
@@ -173,16 +173,16 @@ SJV2018_final <- SJV2018_2D %>%
 
 
 # write to shapefile
-write_sf(SJV2018_final, here("data/intermediate/misc/2018/2_cleanPlotsLandIQ_2018/SJVID_2018/SJVID_2018.shp"), 
+write_sf(SJV2020_final, here("data/intermediate/misc/LandIQ_processing/2020/2_cleanPlotsLandIQ_2020/SJVID_2020/SJVID_2020.shp"), 
          append = FALSE)
 
 
 ################################################################################
 
 
-# examine all distinct crop types in the SJV for 2018 LandIQ data
+# examine all distinct crop types in the SJV for 2020 LandIQ data
 # this will inform the crosswalk with crop revenue, water use, and annual/perennial data in 3_masterCrosswalk.R
-distinct_crops_2018 <- SJV2018_final %>%
+distinct_crops_2020 <- SJV2020_final %>%
   st_drop_geometry() %>%
   distinct(croptyp, crop_type_name) %>%
   arrange(croptyp)

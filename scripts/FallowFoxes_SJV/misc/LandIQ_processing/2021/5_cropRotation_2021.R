@@ -20,7 +20,7 @@ source(here("scripts/FallowFoxes_SJV/0_startup/functions.R"))
 
 
 # read in the .shp created in 2_cleanPlotsLandIQ_2021.R 
-sjv <- read_sf(here("data/intermediate/misc/2021/2_cleanPlotsLandIQ_2021/SJVID_2021/SJVID_2021.shp")) %>% 
+sjv <- read_sf(here("data/intermediate/misc/LandIQ_processing/2021/2_cleanPlotsLandIQ_2021/SJVID_2021/SJVID_2021.shp")) %>% 
   clean_names()
 
 
@@ -54,7 +54,7 @@ nrow(sjv_lastCrop) == n_distinct(sjv$uniqu_d)
 # Export ----------------------------------------------------------------
 
 write_sf(sjv_lastCrop, 
-         here("data/intermediate/misc/2021/5_cropRotation_2021/sjvYearRotation/sjvYearRotation_2021.shp"), 
+         here("data/intermediate/misc/LandIQ_processing/2021/5_cropRotation_2021/sjvYearRotation/sjvYearRotation_2021.shp"), 
          append = FALSE)
 
 

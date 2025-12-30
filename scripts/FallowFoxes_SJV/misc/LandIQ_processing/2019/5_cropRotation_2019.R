@@ -19,8 +19,8 @@ library(janitor)
 source(here("scripts/FallowFoxes_SJV/0_startup/functions.R"))
 
 
-# read in the .shp created in 2_cleanPlotsLandIQ_2020.R 
-sjv <- read_sf(here("data/intermediate/misc/2020/2_cleanPlotsLandIQ_2020/SJVID_2020/SJVID_2020.shp")) %>% 
+# read in the .shp created in 2_cleanPlotsLandIQ_2019.R 
+sjv <- read_sf(here("data/intermediate/misc/LandIQ_processing/2019/2_cleanPlotsLandIQ_2019/SJVID_2019/SJVID_2019.shp")) %>% 
   clean_names()
 
 
@@ -54,7 +54,7 @@ nrow(sjv_lastCrop) == n_distinct(sjv$uniqu_d)
 # Export ----------------------------------------------------------------
 
 write_sf(sjv_lastCrop, 
-         here("data/intermediate/misc/2020/5_cropRotation_2020/sjvYearRotation/sjvYearRotation_2020.shp"), 
+         here("data/intermediate/misc/LandIQ_processing/2019/5_cropRotation_2019/sjvYearRotation/sjvYearRotation_2019.shp"), 
          append = FALSE)
 
 

@@ -23,7 +23,7 @@ library(here)
 sjv <- read_sf(here("data/intermediate/5_cropRotation/sjvYearRotation/sjvYearRotation.shp"))
 
 # LandIQ plots with last cultivated crop info (from 1_lastCultivatedLandIQ_2022.R)
-sjv_lastCult <- read_sf(here("data/intermediate/misc/1_lastCultivatedLandIQ_2022/landiq_2022_lastCultivated.shp")) %>% 
+sjv_lastCult <- read_sf(here("data/intermediate/misc/LandIQ_processing/1_lastCultivatedLandIQ_2022/landiq_2022_lastCultivated.shp")) %>% 
   select(uniqu_d, comm, last_comm, everything())
 
 # join last cultivated crop info to sjv year data
@@ -131,7 +131,7 @@ update_summary <- sjv_joined %>%
 
 # export data
 write_sf(sjv_final, 
-         here("data/intermediate/misc/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.shp"), 
+         here("data/intermediate/misc/LandIQ_processing/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.shp"), 
          append = FALSE)
 
 

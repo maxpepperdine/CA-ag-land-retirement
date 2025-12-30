@@ -34,7 +34,7 @@ source(here("scripts/FallowFoxes_SJV/0_startup/functions.R"))
 # Load in Data ------------------------------------------------------------
 
 # sjv Year Data with last cultivated revenue and water info (from 2_lastCultivatedRevWater.R)
-sjv <- read_sf(here("data/intermediate/misc/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.shp"))
+sjv <- read_sf(here("data/intermediate/misc/LandIQ_processing/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.shp"))
 # ensure CRS is CA Albers (EPSG:3310)
 st_crs(sjv)
 
