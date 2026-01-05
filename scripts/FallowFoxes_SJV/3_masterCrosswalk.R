@@ -147,8 +147,19 @@ revenue <- revenueRaw %>%
 # units are acre-ft/acre
 waterRaw <- read_xlsx(here("data/intermediate/0_input/wateruse.xlsx"))
 
+# if crop category (rows 5:24) is 0, replace with `Avg. AW` value for that row
+waterFill <- waterRaw
+for (i in 5:24) {
+    waterFill[[i]] <- ifelse(
+      waterFill[[i]] == 0,
+      waterFill[["Avg. AW"]],
+      waterFill[[i]]
+    )
+}
+
+
 # pivot longer
-water <- waterRaw %>% 
+water <- waterFill %>% 
   pivot_longer(5:25, names_to = "Crop", values_to = "waterUse") %>%
   select(Crop, waterUse, County) %>% 
   # filter out "Avg. AW" observations in Crop column
@@ -189,7 +200,8 @@ master_SJV_plots <- SJV_plots %>%
 # save the SJV plots with crosswalk info
 # we'll combine this with estimated revenue values is 4_revenueEstimation.R
 write_sf(master_SJV_plots, 
-         here("data/intermediate/3_masterCrosswalk/sjv_crosswalkPlots_na/sjv_crosswalkPlots_na.shp"))
+         here("data/intermediate/3_masterCrosswalk/sjv_crosswalkPlots_na/sjv_crosswalkPlots_na.shp"), 
+         append = FALSE)
 
 
 
