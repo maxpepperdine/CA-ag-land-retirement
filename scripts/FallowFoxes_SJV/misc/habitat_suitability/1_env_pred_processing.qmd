@@ -113,9 +113,45 @@ sjv <- ca_counties %>%
 aet_mean_sjv <- aet_mean %>% 
   crop(sjv) %>%
   mask(sjv)
+
+# plot cropped AET raster
+plot(aet_mean_sjv, main = "Mean AET (SJV)")
+```
+
+#### Fill NA values in AET raster
+
+The AET raster has some NA values in small areas. This causes errors in `Wallace`. We will fill these values with the mean value of neighboring cells.
+
+```{r}
+# define function to fill NA values with mean of neighboring cells
+fill_all_na <- function(raster, max_iter = 100) {
+  r <- raster
+  for (i in 1:max_iter) {
+    if (!any(is.na(values(r)))) break
+    r <- focal(r, 
+               w = 3,                # 3x3 moving window
+               fun = mean, 
+               na.rm = TRUE,         # ignore NAs in calculation
+               na.policy = "only")   # only replace NA cells, leave others as is
+  }
+  return(r)
+}
+
+# apply function to AET raster
+aet_mean_sjv_filled <- fill_all_na(aet_mean_sjv)
+
+# crop to SJV again to ensure no edge effects
+aet_mean_sjv_filled <- aet_mean_sjv_filled %>%
+  crop(sjv) %>%
+  mask(sjv)
+
+# plot final AET raster
+plot(aet_mean_sjv_filled, main = "Mean AET (filled NA values)")
 ```
 
 #### gSSURGO
+
+Resample gSSURGO rasters to match AET `ext`, `res`, and `crs`.
 
 ```{r}
 # resample gSSURGO rasters to match AET
@@ -142,6 +178,45 @@ res(clay_resampled) == res(aet_mean_sjv)
 res(ph_resampled) == res(aet_mean_sjv)
 res(ec_resampled) == res(aet_mean_sjv)
 ```
+
+The gSSURGO data has a lot of NA values in some areas. This causes errors in `Wallace`. We might fill these values with other data later, but for now we will fill them with the mean value of neighboring cells.
+
+```{r}
+# apply fill NA function to gSSURGO rasters
+clay_filled <- fill_all_na(clay_resampled)
+ph_filled <- fill_all_na(ph_resampled)
+ec_filled <- fill_all_na(ec_resampled)
+
+# crop to SJV again to ensure no edge effects
+clay_filled <- clay_filled %>% 
+  crop(sjv) %>%
+  mask(sjv)
+ph_filled <- ph_filled %>% 
+  crop(sjv) %>%
+  mask(sjv)
+ec_filled <- ec_filled %>% 
+  crop(sjv) %>%
+  mask(sjv)
+
+# make sure all rasters have the same extent and resolution
+crs(clay_filled) == crs(aet_mean_sjv)
+crs(ph_filled) == crs(aet_mean_sjv)
+crs(ec_filled) == crs(aet_mean_sjv)
+
+ext(clay_filled) == ext(aet_mean_sjv)
+ext(ph_filled) == ext(aet_mean_sjv)
+ext(ec_filled) == ext(aet_mean_sjv)
+
+res(clay_filled) == res(aet_mean_sjv)
+res(ph_filled) == res(aet_mean_sjv)
+res(ec_filled) == res(aet_mean_sjv)
+
+# plot filled gSSURGO rasters
+plot(clay_filled, main = "% Clay (filled NA values)")
+plot(ph_filled, main = "pH (filled NA values)")
+plot(ec_filled, main = "EC (filled NA values)")
+```
+
 
 #### Slope
 
@@ -187,23 +262,25 @@ res(slope_resampled) == res(aet_mean_sjv)
 
 ## Export Processed Rasters
 
+#### EPSG:3310, 270m resolution, SJV extent
+
 ```{r}
 # path to output directory
 output_dir <- here("data/intermediate/misc/habitat_suitability/env_predictors/")
 
 # export mean AET raster
-writeRaster(aet_mean_sjv, 
+writeRaster(aet_mean_sjv_filled, 
             filename = file.path(output_dir, "aet_mon_mean_sjv_270m.tif"), 
             overwrite = TRUE)
 
 # export gSSURGO rasters
-writeRaster(clay_resampled, 
+writeRaster(clay_filled, 
             filename = file.path(output_dir, "clay_pct_0_10cm_sjv_270m.tif"), 
             overwrite = TRUE)
-writeRaster(ph_resampled, 
+writeRaster(ph_filled, 
             filename = file.path(output_dir, "ph_0_10cm_sjv_270m.tif"), 
             overwrite = TRUE)
-writeRaster(ec_resampled, 
+writeRaster(ec_filled, 
             filename = file.path(output_dir, "ec_dS_m_0_10cm_sjv_270m.tif"), 
             overwrite = TRUE)
 
@@ -213,9 +290,67 @@ writeRaster(slope_resampled,
             overwrite = TRUE)
 ```
 
+#### WGS84, ~0.00242 degree resolution at equator, SJV extent
 
+Reproject all rasters to WGS 84 (EPSG:4326) for use in Wallace.
 
+```{r}
+# project all rasters to WGS 84
+aet_wgs84 <- project(aet_mean_sjv_filled, 
+                     "EPSG:4326", 
+                     method = "mean")
+clay_wgs84 <- project(clay_filled, 
+                      "EPSG:4326", 
+                      method = "mean")
+ph_wgs84 <- project(ph_filled, 
+                    "EPSG:4326", 
+                    method = "mean")
+ec_wgs84 <- project(ec_filled, 
+                    "EPSG:4326", 
+                    method = "mean")
+slope_wgs84 <- project(slope_resampled, 
+                       "EPSG:4326", 
+                       method = "mean")
 
+# confirm all rasters have the same extent and resolution
+crs(aet_wgs84) == crs(clay_wgs84)
+crs(aet_wgs84) == crs(ph_wgs84)
+crs(aet_wgs84) == crs(ec_wgs84)
+crs(aet_wgs84) == crs(slope_wgs84)
+ext(aet_wgs84) == ext(clay_wgs84)
+ext(aet_wgs84) == ext(ph_wgs84)
+ext(aet_wgs84) == ext(ec_wgs84)
+ext(aet_wgs84) == ext(slope_wgs84)
+res(aet_wgs84) == res(clay_wgs84)
+res(aet_wgs84) == res(ph_wgs84)
+res(aet_wgs84) == res(ec_wgs84)
+res(aet_wgs84) == res(slope_wgs84)
+```
+
+Save the WGS84 rasters.
+
+```{r}
+# export mean AET raster in WGS84
+writeRaster(aet_wgs84, 
+            filename = file.path(output_dir, "WGS84/aet_mon_mean_sjv_wgs84.tif"), 
+            overwrite = TRUE)
+
+# export gSSURGO rasters in WGS84
+writeRaster(clay_wgs84, 
+            filename = file.path(output_dir, "WGS84/clay_pct_0_10cm_sjv_wgs84.tif"), 
+            overwrite = TRUE)
+writeRaster(ph_wgs84, 
+            filename = file.path(output_dir, "WGS84/ph_0_10cm_sjv_wgs84.tif"), 
+            overwrite = TRUE)
+writeRaster(ec_wgs84, 
+            filename = file.path(output_dir, "WGS84/ec_dS_m_0_10cm_sjv_wgs84.tif"), 
+            overwrite = TRUE)
+
+# export slope raster in WGS84
+writeRaster(slope_wgs84, 
+            filename = file.path(output_dir, "WGS84/slope_deg_sjv_wgs84.tif"), 
+            overwrite = TRUE)
+```
 
 
 
