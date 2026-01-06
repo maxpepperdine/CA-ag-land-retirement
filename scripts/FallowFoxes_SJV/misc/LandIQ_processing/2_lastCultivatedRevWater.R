@@ -128,6 +128,15 @@ update_summary <- sjv_joined %>%
     fields_not_updated_no_match = sum(!is.na(last_comm) & is.na(lookup_rvPrAcr))
   )
 
+# filter to fields not updated no match for review
+fields_not_updated_no_match <- sjv_joined %>%
+  st_drop_geometry() %>%
+  filter(comm %in% idle_categories) %>%
+  left_join(
+    revenue_water_lookup,
+    by = c("county" = "county", "last_comm" = "comm")
+  ) %>%
+  filter(!is.na(last_comm) & is.na(lookup_rvPrAcr))
 
 # export data
 write_sf(sjv_final, 

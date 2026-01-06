@@ -105,9 +105,9 @@ if (st_crs(landiq_2022_idle_joined) != st_crs(landiq_2014)) {
 
 # prepare 2014 and 2016 data for join -- keep just the crop variable
 landiq_2016_slim <- landiq_2016 %>%
-  select(comm_2016 = crp2016)
+  select(comm_2016 = comm)
 landiq_2014_slim <- landiq_2014 %>%
-  select(comm_2014 = crp2014)
+  select(comm_2014 = comm)
 
 
 # spatial join 2016 data to idle fields
