@@ -29,17 +29,23 @@ library(sf)
 
 ```{r}
 # ==============================================================================
-# BCM data 
+# BCM data (30-year averages from 1991-2020)
 # ==============================================================================
 
 ## AET
 # file paths for BCM AET monthly average rasters
-aet_path <- list.files(path = here("data/raw/bcm/bcmv8_historic/monthly_avgs/"), 
-                       pattern = "aet_.*_avg\\.tif$", 
-                       full.names = TRUE)
+aet_rast <- rast(here("data/raw/bcm/BCMv8_1991_2020_aves/aet1991_2020_ave.asc"))
+crs(aet_rast) <- "EPSG:3310" # assign correct CRS
+# QC resolution & crs
+res(aet_rast) # 270m resolution
+crs(aet_rast) # EPSG:3310
 
-# load AET rasters as a SpatRaster
-aet_stack <- rast(aet_path)
+## MAP
+ppt_rast <- rast(here("data/raw/bcm/BCMv8_1991_2020_aves/ppt1991_2020_ave.asc"))
+crs(ppt_rast) <- "EPSG:3310" # assign correct CRS
+# QC resolution & crs
+res(ppt_rast) # 270m resolution
+crs(ppt_rast) # EPSG:3310
 
 
 # ==============================================================================
@@ -48,17 +54,17 @@ aet_stack <- rast(aet_path)
 
 ## % clay
 # file path for gSSURGO % clay raster
-clay_path <- here("data/raw/gssurgo/processed/clay_pct_0_10cm_sjv_270m.tif")
+clay_path <- here("data/raw/gssurgo/processed/clay_pct_0_10cm_CA_270m.tif")
 clay_rast <- rast(clay_path)
 
 ## pH
 # file path for gSSURGO pH raster
-ph_path <- here("data/raw/gssurgo/processed/pH_0_10cm_sjv_270m.tif")
+ph_path <- here("data/raw/gssurgo/processed/pH_0_10cm_CA_270m.tif")
 ph_rast <- rast(ph_path)
 
 # EC
 # file path for gSSURGO EC raster
-ec_path <- here("data/raw/gssurgo/processed/ec_dS_m_0_10cm_sjv_270m.tif")
+ec_path <- here("data/raw/gssurgo/processed/ec_dS_m_0_10cm_CA_270m.tif")
 ec_rast <- rast(ec_path)
 
 
@@ -66,8 +72,16 @@ ec_rast <- rast(ec_path)
 # slope (open topography)
 # ==============================================================================
 
-elevation_path <- here("data/raw/open_topography/output_USGS30m.tif")
-elevation_rast <- rast(elevation_path)
+# open topography limits the size of raster downloads
+# we have separate elevation rasters for northern and southern CA
+
+# northern CA elevation raster path
+nCA_elevation_path <- here("data/raw/open_topography/output_nCA_USGS30m.tif")
+nCA_elevation_rast <- rast(nCA_elevation_path)
+
+# southern CA elevation raster path
+sCA_elevation_path <- here("data/raw/open_topography/output_sCA_USGS30m.tif")
+sCA_elevation_rast <- rast(sCA_elevation_path)
 ```
 
 ## Data Processing
@@ -95,30 +109,72 @@ plot(aet_mean, main = "Mean AET")
 #### Make SJV spat vector
 
 ```{r}
-# get California counties from Census TIGER/Line shapefiles
-ca_counties <- counties(state = "CA")
-
-# define San Joaquin Valley counties
-sjv_counties <- c("San Joaquin", "Stanislaus", "Merced", "Madera", 
-                  "Fresno", "Kings", "Tulare", "Kern")
-
-# filter and combine into one polygon
-sjv <- ca_counties %>%
-  filter(NAME %in% sjv_counties) %>%
-  st_union() %>% 
-  st_transform(crs = crs(aet_mean)) %>% # transform to aet raster CRS
-  vect() # convert to terra vector format
-
-# crop AET mean raster to SJV extent
-aet_mean_sjv <- aet_mean %>% 
-  crop(sjv) %>%
-  mask(sjv)
-
-# plot cropped AET raster
-plot(aet_mean_sjv, main = "Mean AET (SJV)")
+# # get California counties from Census TIGER/Line shapefiles
+# ca_counties <- counties(state = "CA")
+# 
+# # define San Joaquin Valley counties
+# sjv_counties <- c("San Joaquin", "Stanislaus", "Merced", "Madera", 
+#                   "Fresno", "Kings", "Tulare", "Kern")
+# 
+# # filter and combine into one polygon
+# sjv <- ca_counties %>%
+#   filter(NAME %in% sjv_counties) %>%
+#   st_union() %>% 
+#   st_transform(crs = crs(aet_mean)) %>% # transform to aet raster CRS
+#   vect() # convert to terra vector format
+# 
+# # crop AET mean raster to SJV extent
+# aet_mean_sjv <- aet_mean %>% 
+#   crop(sjv) %>%
+#   mask(sjv)
+# 
+# # plot cropped AET raster
+# plot(aet_mean_sjv, main = "Mean AET (SJV)")
 ```
 
-#### Fill NA values in AET raster
+#### Make CA boundary spat vector
+
+```{r}
+# get California state boundary from Census TIGER/Line shapefiles
+ca_state <- states() %>%
+  filter(NAME == "California") %>%
+  st_transform(crs = crs(aet_rast)) %>% # transform to aet raster CRS
+  vect() # convert to terra vector format
+plot(ca_state, main = "California State Boundary")
+```
+
+#### BCM
+
+###### Crop `PPT` and `AET` to CA boundary
+
+```{r}
+# crop AET raster to CA boundary
+aet_ca <- aet_rast %>%
+  crop(ca_state) %>%
+  mask(ca_state)
+
+# view range of AET values in CA
+summary(values(aet_ca))
+# -9999 indicates no data values -- these should be NA
+values(aet_ca)[values(aet_ca) == -9999] <- NA
+
+
+# crop PPT raster to CA boundary
+ppt_ca <- ppt_rast %>%
+  crop(ca_state) %>%
+  mask(ca_state)
+# -9999 also indicates no data values -- these should be NA
+values(ppt_ca)[values(ppt_ca) == -9999] <- NA
+
+# view range of PPT values in CA
+summary(values(ppt_ca))
+
+# plot cropped rasters
+plot(aet_ca, main = "AET (CA Boundary)")
+plot(ppt_ca, main = "PPT (CA Boundary)")
+```
+
+###### Fill NA values in AET raster
 
 The AET raster has some NA values in small areas. This causes errors in `Wallace`. We will fill these values with the mean value of neighboring cells.
 
@@ -138,15 +194,25 @@ fill_all_na <- function(raster, max_iter = 100) {
 }
 
 # apply function to AET raster
-aet_mean_sjv_filled <- fill_all_na(aet_mean_sjv)
+aet_ca_filled <- fill_all_na(aet_ca)
 
-# crop to SJV again to ensure no edge effects
-aet_mean_sjv_filled <- aet_mean_sjv_filled %>%
-  crop(sjv) %>%
-  mask(sjv)
+# crop to PPT to ensure no edge effects
+aet_ca_filled <- aet_ca_filled %>%
+  crop(ppt_ca) %>%
+  mask(ppt_ca)
+
+# resample ppt to match aet extent
+ppt_ca <- resample(ppt_ca, 
+                   aet_ca_filled, 
+                   method = "mean")
+
+# QC make sure aet and ppt have same extent and resolution
+crs(aet_ca_filled) == crs(ppt_ca)
+ext(aet_ca_filled) == ext(ppt_ca)
+res(aet_ca_filled) == res(ppt_ca)
 
 # plot final AET raster
-plot(aet_mean_sjv_filled, main = "Mean AET (filled NA values)")
+plot(aet_ca_filled, main = "Mean AET (filled NA values)")
 ```
 
 #### gSSURGO
@@ -156,27 +222,27 @@ Resample gSSURGO rasters to match AET `ext`, `res`, and `crs`.
 ```{r}
 # resample gSSURGO rasters to match AET
 clay_resampled <- resample(clay_rast, 
-                           aet_mean_sjv, 
+                           aet_ca_filled, 
                            method = "mean")
 ph_resampled <- resample(ph_rast, 
-                         aet_mean_sjv, 
+                         aet_ca_filled, 
                          method = "mean")
 ec_resampled <- resample(ec_rast, 
-                         aet_mean_sjv, 
+                         aet_ca_filled, 
                          method = "mean")
 
 # confirm all rasters have the same extent and resolution
-crs(clay_resampled) == crs(aet_mean_sjv)
-crs(ph_resampled) == crs(aet_mean_sjv)
-crs(ec_resampled) == crs(aet_mean_sjv)
+crs(clay_resampled) == crs(aet_ca_filled)
+crs(ph_resampled) == crs(aet_ca_filled)
+crs(ec_resampled) == crs(aet_ca_filled)
 
-ext(clay_resampled) == ext(aet_mean_sjv)
-ext(ph_resampled) == ext(aet_mean_sjv)
-ext(ec_resampled) == ext(aet_mean_sjv)
+ext(clay_resampled) == ext(aet_ca_filled)
+ext(ph_resampled) == ext(aet_ca_filled)
+ext(ec_resampled) == ext(aet_ca_filled)
 
-res(clay_resampled) == res(aet_mean_sjv)
-res(ph_resampled) == res(aet_mean_sjv)
-res(ec_resampled) == res(aet_mean_sjv)
+res(clay_resampled) == res(aet_ca_filled)
+res(ph_resampled) == res(aet_ca_filled)
+res(ec_resampled) == res(aet_ca_filled)
 ```
 
 The gSSURGO data has a lot of NA values in some areas. This causes errors in `Wallace`. We might fill these values with other data later, but for now we will fill them with the mean value of neighboring cells.
@@ -187,29 +253,29 @@ clay_filled <- fill_all_na(clay_resampled)
 ph_filled <- fill_all_na(ph_resampled)
 ec_filled <- fill_all_na(ec_resampled)
 
-# crop to SJV again to ensure no edge effects
+# crop to aet raster to ensure no edge effects
 clay_filled <- clay_filled %>% 
-  crop(sjv) %>%
-  mask(sjv)
+  crop(aet_ca_filled) %>%
+  mask(aet_ca_filled)
 ph_filled <- ph_filled %>% 
-  crop(sjv) %>%
-  mask(sjv)
+  crop(aet_ca_filled) %>%
+  mask(aet_ca_filled)
 ec_filled <- ec_filled %>% 
-  crop(sjv) %>%
-  mask(sjv)
+  crop(aet_ca_filled) %>%
+  mask(aet_ca_filled)
 
 # make sure all rasters have the same extent and resolution
-crs(clay_filled) == crs(aet_mean_sjv)
-crs(ph_filled) == crs(aet_mean_sjv)
-crs(ec_filled) == crs(aet_mean_sjv)
+crs(clay_filled) == crs(aet_ca_filled)
+crs(ph_filled) == crs(aet_ca_filled)
+crs(ec_filled) == crs(aet_ca_filled)
 
-ext(clay_filled) == ext(aet_mean_sjv)
-ext(ph_filled) == ext(aet_mean_sjv)
-ext(ec_filled) == ext(aet_mean_sjv)
+ext(clay_filled) == ext(aet_ca_filled)
+ext(ph_filled) == ext(aet_ca_filled)
+ext(ec_filled) == ext(aet_ca_filled)
 
-res(clay_filled) == res(aet_mean_sjv)
-res(ph_filled) == res(aet_mean_sjv)
-res(ec_filled) == res(aet_mean_sjv)
+res(clay_filled) == res(aet_ca_filled)
+res(ph_filled) == res(aet_ca_filled)
+res(ec_filled) == res(aet_ca_filled)
 
 # plot filled gSSURGO rasters
 plot(clay_filled, main = "% Clay (filled NA values)")
@@ -227,37 +293,49 @@ ext(elevation_rast)
 res(elevation_rast) # 30m
 
 
-# project elevation raster to match AET and crop to SJV extent 
-elevation_proj <- project(elevation_rast, 
-                          aet_mean_sjv, 
-                          method = "mean")
-crs(elevation_proj) # confirm EPSG:3310
+# project elevation rasters to match AET
+nCA_elevation_proj <- project(nCA_elevation_rast, 
+                              aet_ca_filled, 
+                              method = "mean")
+crs(nCA_elevation_proj) # confirm EPSG:3310
+
+sCA_elevation_proj <- project(sCA_elevation_rast, 
+                              aet_ca_filled, 
+                              method = "mean")
+crs(sCA_elevation_proj) # confirm EPSG:3310  
+
+# resample southern CA elevation to match northern CA elevation
+sCA_elevation_resampled <- resample(sCA_elevation_proj, 
+                                    nCA_elevation_proj, 
+                                    method = "mean")
+
+
+# merge northern and southern CA elevation rasters
+elevation_merged <- terra::merge(nCA_elevation_proj, sCA_elevation_resampled)
+
+# crop to CA
+elevation_ca <- elevation_merged %>%
+  crop(aet_ca_filled) %>%
+  mask(aet_ca_filled)
+plot(elevation_ca, main = "Elevation (CA Boundary)")
 
 
 # calculate slope from elevation
-slope_rast <- terrain(elevation_proj, 
+slope_rast <- terrain(elevation_ca, 
                       v = "slope", 
                       unit = "degrees")
-plot(slope_rast, main = "Slope (degrees)")
-
-
-# crop to SJV
-slope_sjv <- slope_rast %>% 
-  crop(sjv) %>%
-  mask(sjv)
-
 
 # resample to match AET resolution and extent
-slope_resampled <- resample(slope_sjv, 
-                            aet_mean_sjv, 
+slope_resampled <- resample(slope_rast, 
+                            aet_ca_filled, 
                             method = "mean")
 plot(slope_resampled, main = "Elevation")
 
 
 # confirm all rasters have the same extent and resolution
-crs(slope_resampled) == crs(aet_mean_sjv)
-ext(slope_resampled) == ext(aet_mean_sjv)
-res(slope_resampled) == res(aet_mean_sjv)
+crs(slope_resampled) == crs(aet_ca_filled)
+ext(slope_resampled) == ext(aet_ca_filled)
+res(slope_resampled) == res(aet_ca_filled)
 ```
 
 ## Export Processed Rasters
@@ -268,25 +346,30 @@ res(slope_resampled) == res(aet_mean_sjv)
 # path to output directory
 output_dir <- here("data/intermediate/misc/habitat_suitability/env_predictors/")
 
-# export mean AET raster
-writeRaster(aet_mean_sjv_filled, 
-            filename = file.path(output_dir, "aet_mon_mean_sjv_270m.tif"), 
+# export AET raster
+writeRaster(aet_ca_filled, 
+            filename = file.path(output_dir, "aet1991_2020_ave_CA_270m.tif"), 
+            overwrite = TRUE)
+
+# explort PPT raster
+writeRaster(ppt_ca, 
+            filename = file.path(output_dir, "ppt1991_2020_ave_CA_270m.tif"), 
             overwrite = TRUE)
 
 # export gSSURGO rasters
 writeRaster(clay_filled, 
-            filename = file.path(output_dir, "clay_pct_0_10cm_sjv_270m.tif"), 
+            filename = file.path(output_dir, "clay_pct_0_10cm_CA_270m.tif"), 
             overwrite = TRUE)
 writeRaster(ph_filled, 
-            filename = file.path(output_dir, "ph_0_10cm_sjv_270m.tif"), 
+            filename = file.path(output_dir, "ph_0_10cm_CA_270m.tif"), 
             overwrite = TRUE)
 writeRaster(ec_filled, 
-            filename = file.path(output_dir, "ec_dS_m_0_10cm_sjv_270m.tif"), 
+            filename = file.path(output_dir, "ec_dS_m_0_10cm_CA_270m.tif"), 
             overwrite = TRUE)
 
 # export slope raster
 writeRaster(slope_resampled, 
-            filename = file.path(output_dir, "slope_deg_sjv_270m.tif"), 
+            filename = file.path(output_dir, "slope_deg_CA_270m.tif"), 
             overwrite = TRUE)
 ```
 
@@ -296,7 +379,10 @@ Reproject all rasters to WGS 84 (EPSG:4326) for use in Wallace.
 
 ```{r}
 # project all rasters to WGS 84
-aet_wgs84 <- project(aet_mean_sjv_filled, 
+aet_wgs84 <- project(aet_ca_filled, 
+                     "EPSG:4326", 
+                     method = "mean")
+ppt_wgs84 <- project(ppt_ca, 
                      "EPSG:4326", 
                      method = "mean")
 clay_wgs84 <- project(clay_filled, 
@@ -313,14 +399,17 @@ slope_wgs84 <- project(slope_resampled,
                        method = "mean")
 
 # confirm all rasters have the same extent and resolution
+crs(aet_wgs84) == crs(ppt_wgs84)
 crs(aet_wgs84) == crs(clay_wgs84)
 crs(aet_wgs84) == crs(ph_wgs84)
 crs(aet_wgs84) == crs(ec_wgs84)
 crs(aet_wgs84) == crs(slope_wgs84)
+ext(aet_wgs84) == ext(ppt_wgs84)
 ext(aet_wgs84) == ext(clay_wgs84)
 ext(aet_wgs84) == ext(ph_wgs84)
 ext(aet_wgs84) == ext(ec_wgs84)
 ext(aet_wgs84) == ext(slope_wgs84)
+res(aet_wgs84) == res(ppt_wgs84)
 res(aet_wgs84) == res(clay_wgs84)
 res(aet_wgs84) == res(ph_wgs84)
 res(aet_wgs84) == res(ec_wgs84)
@@ -330,25 +419,28 @@ res(aet_wgs84) == res(slope_wgs84)
 Save the WGS84 rasters.
 
 ```{r}
-# export mean AET raster in WGS84
+# export BCM rasters in WGS84
 writeRaster(aet_wgs84, 
-            filename = file.path(output_dir, "WGS84/aet_mon_mean_sjv_wgs84.tif"), 
+            filename = file.path(output_dir, "WGS84/aet1991_2020_ave_CA_wgs84.tif"), 
+            overwrite = TRUE)
+writeRaster(ppt_wgs84, 
+            filename = file.path(output_dir, "WGS84/ppt1991_2020_ave_CA_wgs84.tif"), 
             overwrite = TRUE)
 
 # export gSSURGO rasters in WGS84
 writeRaster(clay_wgs84, 
-            filename = file.path(output_dir, "WGS84/clay_pct_0_10cm_sjv_wgs84.tif"), 
+            filename = file.path(output_dir, "WGS84/clay_pct_0_10cm_CA_wgs84.tif"), 
             overwrite = TRUE)
 writeRaster(ph_wgs84, 
-            filename = file.path(output_dir, "WGS84/ph_0_10cm_sjv_wgs84.tif"), 
+            filename = file.path(output_dir, "WGS84/ph_0_10cm_CA_wgs84.tif"), 
             overwrite = TRUE)
 writeRaster(ec_wgs84, 
-            filename = file.path(output_dir, "WGS84/ec_dS_m_0_10cm_sjv_wgs84.tif"), 
+            filename = file.path(output_dir, "WGS84/ec_dS_m_0_10cm_CA_wgs84.tif"), 
             overwrite = TRUE)
 
 # export slope raster in WGS84
 writeRaster(slope_wgs84, 
-            filename = file.path(output_dir, "WGS84/slope_deg_sjv_wgs84.tif"), 
+            filename = file.path(output_dir, "WGS84/slope_deg_CA_wgs84.tif"), 
             overwrite = TRUE)
 ```
 

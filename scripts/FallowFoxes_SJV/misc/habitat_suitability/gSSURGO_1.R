@@ -41,7 +41,7 @@ library(here)
 # =============================================================================
 
 # path to gSSURGO gdb
-gdb_path <- "C:/Users/maxpe/Downloads/gSSURGO_CA/gSSURGO_CA.gdb"
+gdb_path <- here("data/raw/gssurgo/gSSURGO_CA/gSSURGO_CA.gdb")
 
 # List available layers (uncomment to explore)
 # st_layers(gdb_path)
@@ -116,12 +116,12 @@ summary(lookup)
 # STEP 4: Read gSSURGO map unit key raster and crop to San Joaquin Valley
 # =============================================================================
 
-# read the gSSURGO raster where each cell is a map unit key (mukey)
-mukey_rast <- rast(gdb_path, "MURASTER_10m")
+# # read the gSSURGO raster where each cell is a map unit key (mukey)
+# mukey_rast <- rast(gdb_path, "MURASTER_10m")
 
-# project to CA Albers (EPSG 3310)
-mukey_rast <- project(mukey_rast, "EPSG:3310", 
-                      method = "near") # near to preserve mukey integers
+# # project to CA Albers (EPSG 3310)
+# mukey_rast <- project(mukey_rast, "EPSG:3310", 
+#                       method = "near") # near to preserve mukey integers
 
 
 # # save the projected raster to avoid reprojecting in future runs
@@ -135,26 +135,29 @@ mukey_rast <- rast(mukey_rast_file)
 # check CRS
 crs(mukey_rast)
 
+################################################################################
+# uncomment and replace all following muskey_rast w/ mukey_sjv if we want to clip data to SJV
+################################################################################
 
-# get California counties from Census TIGER/Line shapefiles
-ca_counties <- counties(state = "CA")
-
-# define San Joaquin Valley counties
-sjv_counties <- c("San Joaquin", "Stanislaus", "Merced", "Madera", 
-                  "Fresno", "Kings", "Tulare", "Kern")
-
-# filter and combine into one polygon
-sjv <- ca_counties %>%
-  filter(NAME %in% sjv_counties) %>%
-  st_union() %>% 
-  st_transform(crs = crs(mukey_rast)) %>% # transform to raster CRS
-  vect() # convert to terra vector format
-
-
-# crop and mask the raster to SJV
-mukey_sjv <- mukey_rast %>%
-  crop(sjv) %>%
-  mask(sjv)
+# # get California counties from Census TIGER/Line shapefiles
+# ca_counties <- counties(state = "CA")
+# 
+# # define San Joaquin Valley counties
+# sjv_counties <- c("San Joaquin", "Stanislaus", "Merced", "Madera", 
+#                   "Fresno", "Kings", "Tulare", "Kern")
+# 
+# # filter and combine into one polygon
+# sjv <- ca_counties %>%
+#   filter(NAME %in% sjv_counties) %>%
+#   st_union() %>% 
+#   st_transform(crs = crs(mukey_rast)) %>% # transform to raster CRS
+#   vect() # convert to terra vector format
+# 
+# 
+# # crop and mask the raster to SJV
+# mukey_sjv <- mukey_rast %>%
+#   crop(sjv) %>%
+#   mask(sjv)
 
 
 # =============================================================================
@@ -176,9 +179,9 @@ ec_vec[lookup$mukey] <- lookup$ec
 # read raster values, reclassify, and write out
 # using terra's app() function for memory-safe processing
 
-ph_rast <- app(mukey_sjv, fun = function(x) ph_vec[x])
-clay_rast <- app(mukey_sjv, fun = function(x) clay_vec[x])
-ec_rast <- app(mukey_sjv, fun = function(x) ec_vec[x])
+ph_rast <- app(mukey_rast, fun = function(x) ph_vec[x])
+clay_rast <- app(mukey_rast, fun = function(x) clay_vec[x])
+ec_rast <- app(mukey_rast, fun = function(x) ec_vec[x])
 
 # rename layers
 names(ph_rast) <- "pH_0_10cm"
@@ -192,14 +195,14 @@ plot(ph_rast, main = "pH (1:1 H2O) 0-10 cm")
 plot(ec_rast, main = "Electrical Conductivity (dS/m) 0-10 cm")
 
 
-# save intermediate 10m rasters (optional)
-clay_10m_file <- here("data/raw/gssurgo/processed/clay_pct_0_10cm_sjv_10m.tif")
-ph_10m_file <- here("data/raw/gssurgo/processed/pH_0_10cm_sjv_10m.tif")
-ec_10m_file <- here("data/raw/gssurgo/processed/ec_dS_m_0_10cm_sjv_10m.tif")
-
-writeRaster(clay_rast, clay_10m_file, overwrite = TRUE)
-writeRaster(ph_rast, ph_10m_file, overwrite = TRUE)
-writeRaster(ec_rast, ec_10m_file, overwrite = TRUE)
+# # save intermediate 10m rasters (optional)
+# clay_10m_file <- here("data/raw/gssurgo/processed/clay_pct_0_10cm_sjv_10m.tif")
+# ph_10m_file <- here("data/raw/gssurgo/processed/pH_0_10cm_sjv_10m.tif")
+# ec_10m_file <- here("data/raw/gssurgo/processed/ec_dS_m_0_10cm_sjv_10m.tif")
+# 
+# writeRaster(clay_rast, clay_10m_file, overwrite = TRUE)
+# writeRaster(ph_rast, ph_10m_file, overwrite = TRUE)
+# writeRaster(ec_rast, ec_10m_file, overwrite = TRUE)
 
 
 # =============================================================================
@@ -233,9 +236,9 @@ plot(ec_270m, main = "Electrical Conductivity (dS/m) 0-10 cm at 270m")
 
 
 # write final rasters
-clay_file <- here("data/raw/gssurgo/processed/clay_pct_0_10cm_sjv_270m.tif")
-ph_file <- here("data/raw/gssurgo/processed/pH_0_10cm_sjv_270m.tif")
-ec_file <- here("data/raw/gssurgo/processed/ec_dS_m_0_10cm_sjv_270m.tif")
+clay_file <- here("data/raw/gssurgo/processed/clay_pct_0_10cm_CA_270m.tif")
+ph_file <- here("data/raw/gssurgo/processed/pH_0_10cm_CA_270m.tif")
+ec_file <- here("data/raw/gssurgo/processed/ec_dS_m_0_10cm_CA_270m.tif")
 
 writeRaster(clay_270m, clay_file, overwrite = TRUE)
 writeRaster(ph_270m, ph_file, overwrite = TRUE)
