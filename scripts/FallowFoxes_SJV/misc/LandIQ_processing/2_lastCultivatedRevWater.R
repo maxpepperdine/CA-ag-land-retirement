@@ -138,6 +138,34 @@ fields_not_updated_no_match <- sjv_joined %>%
   ) %>%
   filter(!is.na(last_comm) & is.na(lookup_rvPrAcr))
 
+
+# some fields with a last comm weren't updated because there was no match 
+# in the lookup table (i.e., no revenue/water use data for that county-comm combo)
+# we'll assign these last comms as NAs and estimate their values in the next script
+sjv_final <- sjv_final %>%
+  mutate(
+    last_comm = case_when(
+      comm %in% idle_categories & 
+        !is.na(last_comm) & 
+        rvPrAcr == 0 ~ NA_character_,
+      TRUE ~ last_comm
+    )
+  )
+
+# update summary test
+update_summary_test <- sjv_final_test %>%
+  st_drop_geometry() %>%
+  filter(comm %in% idle_categories) %>%
+  summarise(
+    total_idle_fields = n(),
+    fields_with_last_comm = sum(!is.na(last_comm)),
+    fields_updated = sum(!is.na(last_comm) & !is.na(rvPrAcr)),
+    fields_not_updated_no_last_comm = sum(is.na(last_comm)),
+    # this should now be zero
+    fields_not_updated_no_match = sum(!is.na(last_comm) & is.na(rvPrAcr))
+  )
+
+
 # export data
 write_sf(sjv_final, 
          here("data/intermediate/misc/LandIQ_processing/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.shp"), 

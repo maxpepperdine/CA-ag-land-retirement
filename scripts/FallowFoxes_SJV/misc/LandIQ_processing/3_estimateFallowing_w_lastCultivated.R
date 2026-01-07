@@ -156,7 +156,7 @@ allsjv <- sjv_fallow_est %>%
     # indicate retired fields as those fallow for 3 or more years
     retired = ifelse(comm == "Idle - Long Term", 1, 0)
   ) %>% 
-  select(id, geoGroup, acres, comm, annual, nass, crop, 
+  select(id, uniqu_d, geoGroup, acres, comm, last_comm, annual, nass, crop, 
          fallow, retired, pricePerAcre, waterUse, revenue, water)
 
 
@@ -227,6 +227,35 @@ fallowSummary <- sjv_fallow_est %>%
     avg_waterUse = mean(waterUse)
   )
 print(fallowSummary)
+
+
+# Summary statistics for fallow lands w/ last cultivated -----------------------
+
+fallow_w_last_cult_Summary <- sjv_crop_fallow_w_last_cult %>%
+  st_drop_geometry() %>%
+  filter(fallow == TRUE) %>%
+  summarise(
+    total_acres = sum(acres),
+    total_revenue = sum(revenue),
+    total_water = sum(water),
+    avg_pricePerAcre = mean(pricePerAcre),
+    avg_waterUse = mean(waterUse)
+  )
+print(fallow_w_last_cult_Summary)
+
+
+# Summary statistics for all cultivated lands --------------------------------
+
+cultivatedSummary <- sjvNoFallow %>%
+  st_drop_geometry() %>%
+  summarise(
+    total_acres = sum(acres),
+    total_revenue = sum(revenue),
+    total_water = sum(water),
+    avg_pricePerAcre = mean(pricePerAcre),
+    avg_waterUse = mean(waterUse)
+  )
+print(cultivatedSummary)
 
 
 # Export ------------------------------------------------------------------
