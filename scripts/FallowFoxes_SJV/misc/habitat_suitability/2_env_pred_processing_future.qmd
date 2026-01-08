@@ -1,0 +1,250 @@
+---
+title: "2_env_pred_processing_future"
+format: html
+---
+
+```{r}
+# clear the environment
+rm(list = ls())
+```
+
+## Overview/Purpose
+
+This script processes all of the future climate variables from the BCM that we'll use as environmental predictor variables to transfer our species distribution models (SDMs). We'll be processing the following data:
+
+- `aet`: actual evapotranspiration
+- `cwd`: climatic water deficit
+- `ppt`: precipitation
+
+For each climate variable, we have data for:
+
+- two 30-year averaged time periods (`2020-2049`, `2040-2069`) 
+- three GCMs (`CNRM-CM5`, `GFDL-CM3`, `MIROC5`)
+- two emission scenarios (`RCP45`, `RCP85`)
+
+The resulting processed raster files will be saved in the `data/intermediate/misc/env_predictors/bcm_gcm_ensemble/` directory. There will be 12 files produced, one for each combination of climate variable, time period, and emission scenario averaged across all three GCMs.
+
+## Setup
+
+#### Load packages
+
+```{r}
+# load required packages
+library(terra)
+library(here)
+library(tidyverse)
+library(tigris)
+library(sf)
+```
+
+#### Load the template raster to match crs, extent, and resolution
+
+```{r}
+# processed aet historic raster
+ref_raster <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/aet1991_2020_ave_CA_270m.tif"))
+```
+
+#### Define future BCM data file paths & parameters
+
+```{r}
+# BCM future data path
+input_dir <- here("data/raw/bcm/bcmv8_future/")
+output_dir <- here("data/intermediate/misc/habitat_suitability/env_predictors/bcm_gcm_ensemble/")
+
+# define parameters
+climate_vars <- c("aet", "cwd", "ppt")
+gcms <- c("CNRM-CM5", "GFDL-CM3", "MIROC5")
+scenarios <- c("RCP45", "RCP85")
+time_periods <- c("2020_2049", "2040_2069")
+```
+
+## Create functions for data processing
+
+#### Function to create file path
+
+```{r}
+# file path function to get the .asc file path for a given: 
+# variable, gcm, scenario, and period
+
+get_asc_path <- function(input_dir, var, gcm, scenario, period) {
+  # construct folder name: var_GCM_scenario_30yr
+  folder_name <- paste0(var, "_", gcm, "_", scenario, "_30yr")
+  
+  # construct file name: var_period_ave.asc
+  file_name <- paste0(var, "_", period, "_ave.asc")
+  
+  # full path
+  file_path <- file.path(input_dir, folder_name, file_name)
+  
+  return(file_path)
+}
+```
+
+#### Function to average rasters across GCMs
+
+```{r}
+# average rasters across GCMs for a given variable, scenario, and period
+
+average_across_gcms <- function(input_dir, var, gcms, scenario, period) {
+  # collect rasters from all GCMs
+  raster_list <- list()
+  
+  for (i in seq_along(gcms)) {
+    gcm <- gcms[i]
+    file_path <- get_asc_path(input_dir, var, gcm, scenario, period)
+    
+    # check if file exists
+    if (!file.exists(file_path)) {
+      warning("File not found: ", file_path)
+      next
+    }
+    
+    # read the raster
+    message("  Reading: ", basename(file_path), " from ", gcm)
+    r <- rast(file_path)
+    
+    # set CRS - BCM data uses California Albers (EPSG:3310)
+    crs(r) <- "EPSG:3310"
+    
+    raster_list[[i]] <- r
+  }
+  
+  # check if we have any rasters to average
+  if (length(raster_list) == 0) {
+    stop("No rasters found for ", var, " ", scenario, " ", period)
+  }
+  
+  # stack all rasters and calculate mean
+  raster_stack <- rast(raster_list)
+  ensemble_mean <- mean(raster_stack, na.rm = TRUE)
+  
+  return(ensemble_mean)
+}
+```
+
+#### Function to align raster to match processed historic raster
+
+```{r}
+# reproject and resample to match reference raster
+
+align_to_reference <- function(input_raster, ref_raster, method = "mean") {
+ 
+  # step 1: reproject to match reference CRS if needed
+  if (!same.crs(input_raster, ref_raster)) {
+    message("    Reprojecting to match reference CRS...")
+    input_raster <- project(input_raster, crs(ref_raster))
+  }
+  
+  # step 2: resample to match reference resolution and extent
+  # this also effectively clips to the reference extent
+  message("    Resampling to match reference resolution and extent...")
+  aligned_raster <- resample(input_raster, ref_raster, method = method)
+  
+  # Step 3: sask to reference raster (use NA values from reference as mask)
+  message("    Masking to reference raster...")
+  aligned_raster <- mask(aligned_raster, ref_raster)
+  
+  return(aligned_raster)
+}
+```
+
+## Process data: loop through variables, scenarios, and periods
+
+```{r}
+# track output files
+output_files <- character()
+
+# process each combination of variable, scenario, and time period
+for (var in climate_vars) {
+  for (scenario in scenarios) {
+    for (period in time_periods) {
+      
+      message("\nProcessing: ", toupper(var), " | ", scenario, " | ", period)
+      message(paste(rep("-", 50), collapse = ""))
+      
+      # calculate ensemble mean across GCMs
+      ensemble_raster <- average_across_gcms(
+        input_dir = input_dir,
+        var = var,
+        gcms = gcms,
+        scenario = scenario,
+        period = period
+      )
+      
+      # align to reference raster (reproject, resample, clip, mask)
+      message("  Aligning to reference raster...")
+      ensemble_raster <- align_to_reference(
+        input_raster = ensemble_raster,
+        ref_raster = ref_raster,
+        method = "mean" 
+      )
+      
+      # construct output filename
+      # format: var_scenario_period_gcm_ensemble.tif
+      output_name <- paste0(var, "_", scenario, "_", period, "_gcm_ensemble.tif")
+      output_path <- file.path(output_dir, output_name)
+      
+      # save as GeoTIFF
+      writeRaster(
+        ensemble_raster,
+        filename = output_path,
+        overwrite = TRUE
+      )
+      
+      message("  Saved: ", output_name)
+      output_files <- c(output_files, output_path)
+    }
+  }
+}
+```
+
+#### Project to WGS84 (`EPSG:4326`) for use in Wallace
+
+```{r}
+# define output directory
+wgs_output_dir <- file.path(output_dir, "WGS")
+
+# track WGS84 output files
+wgs_output_files <- character()
+
+# reproject each ensemble file to WGS84
+for (f in output_files) {
+  message("Reprojecting: ", basename(f))
+  
+  # load the raster
+  r <- rast(f)
+  
+  # reproject to WGS84
+  r_wgs <- project(r, "EPSG:4326", method = "mean")
+  
+  # construct output filename (add _wgs84 suffix)
+  original_name <- tools::file_path_sans_ext(basename(f))
+  wgs_output_name <- paste0(original_name, "_wgs84.tif")
+  wgs_output_path <- file.path(wgs_output_dir, wgs_output_name)
+  
+  # save as GeoTIFF
+  writeRaster(
+    r_wgs,
+    filename = wgs_output_path,
+    overwrite = TRUE,
+    gdal = c("COMPRESS=LZW")
+  )
+  
+  message("  Saved: ", wgs_output_name)
+  wgs_output_files <- c(wgs_output_files, wgs_output_path)
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
