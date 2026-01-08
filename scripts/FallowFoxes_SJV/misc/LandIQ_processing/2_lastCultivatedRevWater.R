@@ -153,7 +153,7 @@ sjv_final <- sjv_final %>%
   )
 
 # update summary test
-update_summary_test <- sjv_final_test %>%
+update_summary_test <- sjv_final %>%
   st_drop_geometry() %>%
   filter(comm %in% idle_categories) %>%
   summarise(
