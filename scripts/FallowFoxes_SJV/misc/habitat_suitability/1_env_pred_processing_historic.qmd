@@ -10,7 +10,7 @@ rm(list = ls())
 
 ## Overview/Purpose
 
-This script processes environmental predictor variables for use in species distribution models (SDMs). It will load each of the predictor variables in raster format, ensure they are aligned to a common extent and resolution, and then export the processed rasters for use in modeling.
+This script processes environmental predictor variables for use in species distribution models (SDMs). It will load each of the predictor variables in terra's `SpatRaster` format, ensure they are aligned to a common extent and resolution, and then export the processed rasters for use in modeling.
 
 ## Setup
 
@@ -35,7 +35,6 @@ library(sf)
 # ==============================================================================
 
 ## AET
-# file paths for BCM AET monthly average rasters
 aet_rast <- rast(here("data/raw/bcm/BCMv8_1991_2020_aves/aet1991_2020_ave.asc"))
 crs(aet_rast) <- "EPSG:3310" # assign correct CRS
 # QC resolution & crs
@@ -49,16 +48,12 @@ crs(ppt_rast) <- "EPSG:3310" # assign correct CRS
 res(ppt_rast) # 270m resolution
 crs(ppt_rast) # EPSG:3310
 
-
-# ==============================================================================
-# BCM future data (30-year averages from 2020-2049)
-# ==============================================================================
-
-# BCM future data path
-bcm_future_path <- here("data/raw/bcm/bcmv8_future/")
-
-
-
+## CWD
+cwd_rast <- rast(here("data/raw/bcm/BCMv8_1991_2020_aves/cwd1991_2020_ave.asc"))
+crs(cwd_rast) <- "EPSG:3310" # assign correct CRS
+# QC resolution & crs
+res(cwd_rast) # 270m resolution
+crs(cwd_rast) # EPSG:3310
 ```
 
 ###### gSSURGO
@@ -105,26 +100,6 @@ sCA_elevation_rast <- rast(sCA_elevation_path)
 
 ## Data Processing
 
-#### BCM
-
-```{r}
-# ==============================================================================
-# AET
-# ==============================================================================
-
-# check the projection, extent, and resolution of the AET stack
-crs(aet_stack) # EPSG:3310
-ext(aet_stack) 
-res(aet_stack) # 270m
-
-# this is already in the desired projection, extent, and resolution
-# we will resample/project other layers to match this one
-
-# calculate the mean AET across all months
-aet_mean <- mean(aet_stack)
-plot(aet_mean, main = "Mean AET")
-```
-
 #### Make SJV spat vector
 
 ```{r}
@@ -164,7 +139,7 @@ plot(ca_state, main = "California State Boundary")
 
 #### BCM
 
-###### Crop `PPT` and `AET` to CA boundary
+###### Crop `AET`, `CWD`, and `PPT` CA boundary
 
 ```{r}
 # crop AET raster to CA boundary
@@ -182,15 +157,26 @@ values(aet_ca)[values(aet_ca) == -9999] <- NA
 ppt_ca <- ppt_rast %>%
   crop(ca_state) %>%
   mask(ca_state)
-# -9999 also indicates no data values -- these should be NA
-values(ppt_ca)[values(ppt_ca) == -9999] <- NA
-
 # view range of PPT values in CA
 summary(values(ppt_ca))
+# -9999 indicates no data values -- these should be NA
+values(ppt_ca)[values(ppt_ca) == -9999] <- NA
+
+
+# crop CWD raster to CA boundary
+cwd_ca <- cwd_rast %>%
+  crop(ca_state) %>%
+  mask(ca_state)
+# view range of CWD values in CA
+summary(values(cwd_ca))
+# -9999 indicates no data values -- these should be NA
+values(cwd_ca)[values(cwd_ca) == -9999] <- NA
+
 
 # plot cropped rasters
 plot(aet_ca, main = "AET (CA Boundary)")
 plot(ppt_ca, main = "PPT (CA Boundary)")
+plot(cwd_ca, main = "CWD (CA Boundary)")
 ```
 
 ###### Fill NA values in AET raster
@@ -212,6 +198,7 @@ fill_all_na <- function(raster, max_iter = 100) {
   return(r)
 }
 
+## AET
 # apply function to AET raster
 aet_ca_filled <- fill_all_na(aet_ca)
 
@@ -225,13 +212,34 @@ ppt_ca <- resample(ppt_ca,
                    aet_ca_filled, 
                    method = "mean")
 
-# QC make sure aet and ppt have same extent and resolution
+
+## CWD
+# apply function to CWD raster
+cwd_ca_filled <- fill_all_na(cwd_ca)
+
+# crop to PPT to ensure no edge effects
+cwd_ca_filled <- cwd_ca_filled %>%
+  crop(ppt_ca) %>%
+  mask(ppt_ca)
+
+# resample cwd to match aet extent
+cwd_ca_filled <- resample(cwd_ca_filled, 
+                          aet_ca_filled, 
+                          method = "mean")
+
+
+# QC make sure aet, cwd and ppt have same extent and resolution
 crs(aet_ca_filled) == crs(ppt_ca)
 ext(aet_ca_filled) == ext(ppt_ca)
 res(aet_ca_filled) == res(ppt_ca)
 
-# plot final AET raster
+crs(aet_ca_filled) == crs(cwd_ca_filled)
+ext(aet_ca_filled) == ext(cwd_ca_filled)
+res(aet_ca_filled) == res(cwd_ca_filled)
+
+# plot final AET & CWD raster
 plot(aet_ca_filled, main = "Mean AET (filled NA values)")
+plot(cwd_ca_filled, main = "Mean CWD (filled NA values)")
 ```
 
 #### gSSURGO
@@ -306,12 +314,6 @@ plot(ec_filled, main = "EC (filled NA values)")
 #### Slope
 
 ```{r}
-# check the projection, extent, and resolution of the elevation raster
-crs(elevation_rast) # EPSG:4326
-ext(elevation_rast)
-res(elevation_rast) # 30m
-
-
 # project elevation rasters to match AET
 nCA_elevation_proj <- project(nCA_elevation_rast, 
                               aet_ca_filled, 
@@ -363,17 +365,23 @@ res(slope_resampled) == res(aet_ca_filled)
 
 ```{r}
 # path to output directory
-output_dir <- here("data/intermediate/misc/habitat_suitability/env_predictors/")
+output_dir <- here("data/intermediate/misc/habitat_suitability/env_predictors/baseline")
 
 # export AET raster
 writeRaster(aet_ca_filled, 
             filename = file.path(output_dir, "aet1991_2020_ave_CA_270m.tif"), 
             overwrite = TRUE)
 
-# explort PPT raster
+# export PPT raster
 writeRaster(ppt_ca, 
             filename = file.path(output_dir, "ppt1991_2020_ave_CA_270m.tif"), 
             overwrite = TRUE)
+
+# export CWD raster
+writeRaster(cwd_ca_filled,
+            filename = file.path(output_dir, "cwd1991_2020_ave_CA_270m.tif"), 
+            overwrite = TRUE)
+
 
 # export gSSURGO rasters
 writeRaster(clay_filled, 
@@ -386,6 +394,7 @@ writeRaster(ec_filled,
             filename = file.path(output_dir, "ec_dS_m_0_10cm_CA_270m.tif"), 
             overwrite = TRUE)
 
+
 # export slope raster
 writeRaster(slope_resampled, 
             filename = file.path(output_dir, "slope_deg_CA_270m.tif"), 
@@ -394,28 +403,17 @@ writeRaster(slope_resampled,
 
 #### WGS84, ~0.00242 degree resolution at equator, SJV extent
 
-Reproject all rasters to WGS 84 (EPSG:4326) for use in Wallace.
+Reproject all rasters to WGS 84 (`EPSG:4326`) for use in Wallace.
 
 ```{r}
 # project all rasters to WGS 84
-aet_wgs84 <- project(aet_ca_filled, 
-                     "EPSG:4326", 
-                     method = "mean")
-ppt_wgs84 <- project(ppt_ca, 
-                     "EPSG:4326", 
-                     method = "mean")
-clay_wgs84 <- project(clay_filled, 
-                      "EPSG:4326", 
-                      method = "mean")
-ph_wgs84 <- project(ph_filled, 
-                    "EPSG:4326", 
-                    method = "mean")
-ec_wgs84 <- project(ec_filled, 
-                    "EPSG:4326", 
-                    method = "mean")
-slope_wgs84 <- project(slope_resampled, 
-                       "EPSG:4326", 
-                       method = "mean")
+aet_wgs84 <- project(aet_ca_filled, "EPSG:4326", method = "mean")
+ppt_wgs84 <- project(ppt_ca, "EPSG:4326", method = "mean")
+cwd_wgs84 <- project(cwd_ca_filled, "EPSG:4326", method = "mean")
+clay_wgs84 <- project(clay_filled, "EPSG:4326", method = "mean")
+ph_wgs84 <- project(ph_filled, "EPSG:4326", method = "mean")
+ec_wgs84 <- project(ec_filled, "EPSG:4326", method = "mean")
+slope_wgs84 <- project(slope_resampled, "EPSG:4326", method = "mean")
 
 # confirm all rasters have the same extent and resolution
 crs(aet_wgs84) == crs(ppt_wgs84)
@@ -423,16 +421,21 @@ crs(aet_wgs84) == crs(clay_wgs84)
 crs(aet_wgs84) == crs(ph_wgs84)
 crs(aet_wgs84) == crs(ec_wgs84)
 crs(aet_wgs84) == crs(slope_wgs84)
+crs(aet_wgs84) == crs(cwd_wgs84)
+
 ext(aet_wgs84) == ext(ppt_wgs84)
 ext(aet_wgs84) == ext(clay_wgs84)
 ext(aet_wgs84) == ext(ph_wgs84)
 ext(aet_wgs84) == ext(ec_wgs84)
 ext(aet_wgs84) == ext(slope_wgs84)
+ext(aet_wgs84) == ext(cwd_wgs84)
+
 res(aet_wgs84) == res(ppt_wgs84)
 res(aet_wgs84) == res(clay_wgs84)
 res(aet_wgs84) == res(ph_wgs84)
 res(aet_wgs84) == res(ec_wgs84)
 res(aet_wgs84) == res(slope_wgs84)
+res(aet_wgs84) == res(cwd_wgs84)
 ```
 
 Save the WGS84 rasters.
@@ -444,6 +447,9 @@ writeRaster(aet_wgs84,
             overwrite = TRUE)
 writeRaster(ppt_wgs84, 
             filename = file.path(output_dir, "WGS84/ppt1991_2020_ave_CA_wgs84.tif"), 
+            overwrite = TRUE)
+writeRaster(cwd_wgs84, 
+            filename = file.path(output_dir, "WGS84/cwd1991_2020_ave_CA_wgs84.tif"), 
             overwrite = TRUE)
 
 # export gSSURGO rasters in WGS84
@@ -462,7 +468,6 @@ writeRaster(slope_wgs84,
             filename = file.path(output_dir, "WGS84/slope_deg_CA_wgs84.tif"), 
             overwrite = TRUE)
 ```
-
 
 
 

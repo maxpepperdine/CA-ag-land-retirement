@@ -2,10 +2,11 @@
 # Estimating Crop Revenue and Water Use for Fallowed Fields in the SJV
 # =============================================================================
 # Purpose: For fields classified as idle or fallow in the SJV dataset, estimate
-#          their crop revenue and water use based on nearest neighbor analysis
-#          from cultivated fields. If there's a last cultivated crop as identified
-#          in `1_lastCultivatedLandIQ_2022.R`, we'll use that crop's values for 
-#          estimation as calculated in `2_lastCultivatedRevWater.R`.
+#          their crop revenue and water use based on the median values from all
+#          idle/fallow fields with last cultivated info. If there's a last 
+#          cultivated crop as identified in `1_lastCultivatedLandIQ_2022.R`, 
+#          we'll use that crop's values for estimation as calculated in 
+#          2_lastCultivatedRevWater.R`.
 # =============================================================================
 
 
@@ -109,45 +110,45 @@ sjv_fallow_no_last_cult <- sjv %>%
     .keep = "unused"
   )
 
-################################################################################
+
+
+# =============================================================================
 # STEP 3: Estimate crop revenue and water use of fallowed land w/ no last
-#         cultivated info using nearest neighbor analysis from cultivated lands
-################################################################################
+#         cultivated info using median value from fields w/ last cultivated info
+# =============================================================================
 
-
-# get the 8 nearest neighbors to each fallow plot w/o last cultivated info
-knn_fallow <- nngeo::st_nn(sjv_fallow_no_last_cult, 
-                           sjv_crop_fallow_w_last_cult, 
-                           k = 8)
-
-# extract values from neighbors
-nn_values <- lapply(knn_fallow, function(idx) sjv_crop_fallow_w_last_cult[idx,])
-
-fallow_est_knn <- do.call(
-  rbind,
-  lapply(seq_along(sjv_fallow_no_last_cult$geometry), function(i) {
-    tibble(
-      geoGroup = sjv_fallow_no_last_cult$geoGroup[i],
-      est_pricePerAcre = mean(nn_values[[i]]$pricePerAcre, na.rm = TRUE),
-      est_waterUse = mean(nn_values[[i]]$waterUse, na.rm = TRUE)
-    )
-  })
+# find the median pricePerAcre from fallowed lands with last cultivated info
+median_pricePerAcre <- median(
+  sjv_crop_fallow_w_last_cult %>%
+    st_drop_geometry() %>%
+    filter(fallow == TRUE) %>%
+    pull(pricePerAcre),
+  na.rm = TRUE
 )
 
-# assign all estimated values to fallowed lands in the allsjv data frame
+# find the median waterUse from fallowed lands with last cultivated info
+median_waterUse <- median(
+  sjv_crop_fallow_w_last_cult %>%
+    st_drop_geometry() %>%
+    filter(fallow == TRUE) %>%
+    pull(waterUse),
+  na.rm = TRUE
+)
+
+
+# assign median values to fallowed lands w/o last cultivated info
 sjv_fallow_est <- sjv_fallow_no_last_cult %>%
-  left_join(fallow_est_knn, by = "geoGroup") %>%
   mutate(
-    pricePerAcre = ifelse(pricePerAcre == 0, est_pricePerAcre, pricePerAcre),
-    waterUse     = ifelse(waterUse == 0, est_waterUse, waterUse), 
+    pricePerAcre = median_pricePerAcre,
+    waterUse = median_waterUse,
     revenue = pricePerAcre * acres,
     water = waterUse * acres
-  ) %>% 
-  select(-c(est_pricePerAcre, est_waterUse))
+  )
+
 
 # bind back to non fallowed lands and fallowed lands with last cultivated info
 allsjv <- sjv_fallow_est %>%
-  bind_rows(sjv_crop_fallow_w_last_cult) %>% 
+  bind_rows(sjv_crop_fallow_w_last_cult) %>%
   # order rows by ascending geoGroup
   arrange(geoGroup) %>% 
   mutate(
@@ -162,28 +163,9 @@ allsjv <- sjv_fallow_est %>%
          fallow, retired, pricePerAcre, waterUse, revenue, water)
 
 
-
-# =============================================================================
-# STEP 4: Estimate crop revenue and water use of fallowed land w/ no last
-#         cultivated info using median value from fields w/ last cultivated info
-# =============================================================================
-
-# find the median pricePerAcre and waterUse from fallowed lands with last cultivated info
-median_pricePerAcre <- median(
-  sjv_crop_fallow_w_last_cult %>%
-    st_drop_geometry() %>%
-    filter(fallow == TRUE) %>%
-    pull(pricePerAcre),
-  na.rm = TRUE
-)
-
-median_waterUse <- median(
-  sjv_crop_fallow_w_last_cult %>%
-    st_drop_geometry() %>%
-    filter(fallow == TRUE) %>%
-    pull(waterUse),
-  na.rm = TRUE
-)
+# ==============================================================================
+# STEP 4: Summary statistics and export
+# ==============================================================================
 
 
 # Summary statistics for fallowed lands w/o last cultivated info ---------------
@@ -231,7 +213,7 @@ print(cultivatedSummary)
 
 # Export ------------------------------------------------------------------
 
-write_sf(allsjv, here("data/intermediate/6_estimateFallowing/sjvAddFallow/sjvAddFallow.shp"))
+write_sf(allsjv, here("data/intermediate/6_estimateFallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.shp"))
 
 
 

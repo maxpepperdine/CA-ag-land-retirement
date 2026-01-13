@@ -41,7 +41,7 @@ library(sf)
 
 ```{r}
 # processed aet historic raster
-ref_raster <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/aet1991_2020_ave_CA_270m.tif"))
+ref_raster <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/aet1991_2020_ave_CA_270m.tif"))
 ```
 
 #### Define future BCM data file paths & parameters
@@ -49,7 +49,7 @@ ref_raster <- rast(here("data/intermediate/misc/habitat_suitability/env_predicto
 ```{r}
 # BCM future data path
 input_dir <- here("data/raw/bcm/bcmv8_future/")
-output_dir <- here("data/intermediate/misc/habitat_suitability/env_predictors/bcm_gcm_ensemble/")
+output_dir <- here("data/intermediate/misc/habitat_suitability/env_predictors/future/bcm_gcm_ensemble/")
 
 # define parameters
 climate_vars <- c("aet", "cwd", "ppt")
@@ -106,6 +106,10 @@ average_across_gcms <- function(input_dir, var, gcms, scenario, period) {
     # set CRS - BCM data uses California Albers (EPSG:3310)
     crs(r) <- "EPSG:3310"
     
+    # replace -9999 with NA
+    message("    Converting -9999 to NA...")
+    r[r == -9999] <- NA
+    
     raster_list[[i]] <- r
   }
   
@@ -119,6 +123,24 @@ average_across_gcms <- function(input_dir, var, gcms, scenario, period) {
   ensemble_mean <- mean(raster_stack, na.rm = TRUE)
   
   return(ensemble_mean)
+}
+```
+
+#### Function to fill NAs with 3x3 focal mean
+
+```{r}
+# function to fill NA values with mean of neighboring cells (3x3 moving window)
+fill_all_na <- function(raster, max_iter = 100) {
+  r <- raster
+  for (i in 1:max_iter) {
+    if (!any(is.na(values(r)))) break
+    r <- focal(r,
+               w = 3,                # 3x3 moving window
+               fun = mean,
+               na.rm = TRUE,         # ignore NAs in calculation
+               na.policy = "only")   # only replace NA cells, leave others as is
+  }
+  return(r)
 }
 ```
 
@@ -179,6 +201,39 @@ for (var in climate_vars) {
         method = "mean" 
       )
       
+      
+      # fill remaining NAs with 3x3 moving window mean
+      message("  Filling NAs with 3x3 moving window mean...")
+      na_count_before <- sum(is.na(values(ensemble_raster)))
+      message("    NAs before filling: ", na_count_before)
+      
+      ensemble_raster <- fill_all_na(ensemble_raster, max_iter = 100)
+      
+      na_count_after <- sum(is.na(values(ensemble_raster)))
+      message("    NAs after filling: ", na_count_after)
+      message("    NAs filled: ", na_count_before - na_count_after)
+      
+      
+      # crop to ref raster to remove edge effects
+      message("  Cropping to reference raster extent to remove edge effects...")
+      ensemble_raster <- ensemble_raster %>% 
+        crop(ref_raster) %>% 
+        mask(ref_raster)
+      
+      
+      # re-align again to reference
+      message("  Re-aligning to reference raster after filling NAs...")
+      ensemble_raster <- align_to_reference(
+        input_raster = ensemble_raster,
+        ref_raster = ref_raster,
+        method = "mean"
+      )
+      
+      # check final NA count
+      final_na_count <- sum(is.na(values(ensemble_raster)))
+      message("    Final NAs after re-alignment: ", final_na_count)
+      
+      
       # construct output filename
       # format: var_scenario_period_gcm_ensemble.tif
       output_name <- paste0(var, "_", scenario, "_", period, "_gcm_ensemble.tif")
@@ -192,6 +247,13 @@ for (var in climate_vars) {
       )
       
       message("  Saved: ", output_name)
+      
+      # get summary statistics
+      message("  Summary statistics:")
+      raster_summary <- summary(values(ensemble_raster))
+      print(raster_summary)
+      message("")
+      
       output_files <- c(output_files, output_path)
     }
   }
@@ -201,8 +263,8 @@ for (var in climate_vars) {
 #### Project to WGS84 (`EPSG:4326`) for use in Wallace
 
 ```{r}
-# define output directory
-wgs_output_dir <- file.path(output_dir, "WGS")
+# define output directory for WGS84 files
+wgs_output_dir <- file.path(output_dir, "WGS84")
 
 # track WGS84 output files
 wgs_output_files <- character()
@@ -226,8 +288,7 @@ for (f in output_files) {
   writeRaster(
     r_wgs,
     filename = wgs_output_path,
-    overwrite = TRUE,
-    gdal = c("COMPRESS=LZW")
+    overwrite = TRUE
   )
   
   message("  Saved: ", wgs_output_name)
