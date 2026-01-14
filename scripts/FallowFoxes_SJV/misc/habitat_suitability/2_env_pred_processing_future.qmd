@@ -19,7 +19,7 @@ This script processes all of the future climate variables from the BCM that we'l
 For each climate variable, we have data for:
 
 - two 30-year averaged time periods (`2020-2049`, `2040-2069`) 
-- three GCMs (`CNRM-CM5`, `GFDL-CM3`, `MIROC5`)
+- four GCMs (`CanESM2`, `CNRM-CM5`, `HadGEM2-ES`, `MIROC5`)
 - two emission scenarios (`RCP45`, `RCP85`)
 
 The resulting processed raster files will be saved in the `data/intermediate/misc/env_predictors/bcm_gcm_ensemble/` directory. There will be 12 files produced, one for each combination of climate variable, time period, and emission scenario averaged across all three GCMs.
@@ -53,7 +53,7 @@ output_dir <- here("data/intermediate/misc/habitat_suitability/env_predictors/fu
 
 # define parameters
 climate_vars <- c("aet", "cwd", "ppt")
-gcms <- c("CNRM-CM5", "GFDL-CM3", "MIROC5")
+gcms <- c("CanESM2", "CNRM-CM5", "HadGEM2-ES", "MIROC5")
 scenarios <- c("RCP45", "RCP85")
 time_periods <- c("2020_2049", "2040_2069")
 ```
