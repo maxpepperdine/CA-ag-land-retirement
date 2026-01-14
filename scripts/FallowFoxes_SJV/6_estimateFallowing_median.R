@@ -159,8 +159,8 @@ allsjv <- sjv_fallow_est %>%
     # indicate retired fields as those fallow for 3 or more years
     retired = ifelse(comm == "Idle - Long Term", 1, 0)
   ) %>% 
-  select(id, uniqu_d, geoGroup, acres, comm, last_comm, annual, nass, crop, 
-         fallow, retired, pricePerAcre, waterUse, revenue, water)
+  select(id, uniqu_d, geoGroup, acres, comm, last_comm, county, annual, nass, 
+         crop, fallow, retired, pricePerAcre, waterUse, revenue, water)
 
 
 # ==============================================================================
@@ -213,7 +213,8 @@ print(cultivatedSummary)
 
 # Export ------------------------------------------------------------------
 
-write_sf(allsjv, here("data/intermediate/6_estimateFallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.shp"))
+write_sf(allsjv, here("data/intermediate/6_estimateFallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.shp"), 
+         append = FALSE)
 
 
 
