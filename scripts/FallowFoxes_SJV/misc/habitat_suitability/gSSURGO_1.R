@@ -143,13 +143,20 @@ crs(mukey_rast)
 # ca_counties <- counties(state = "CA")
 # 
 # # define San Joaquin Valley counties
-# sjv_counties <- c("San Joaquin", "Stanislaus", "Merced", "Madera", 
+# sjv_counties <- c("San Joaquin", "Stanislaus", "Merced", "Madera",
 #                   "Fresno", "Kings", "Tulare", "Kern")
 # 
 # # filter and combine into one polygon
 # sjv <- ca_counties %>%
 #   filter(NAME %in% sjv_counties) %>%
-#   st_union() %>% 
+#   st_union() %>%
+#   st_transform(crs = crs(mukey_rast)) %>% # transform to raster CRS
+#   vect() # convert to terra vector format
+# 
+# # filter and combine into one polygon
+# sjv <- ca_counties %>%
+#   filter(NAME %in% sjv_counties) %>%
+#   st_union() %>%
 #   st_transform(crs = crs(mukey_rast)) %>% # transform to raster CRS
 #   vect() # convert to terra vector format
 # 
