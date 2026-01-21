@@ -50,8 +50,7 @@ sjv_knn <- read_sf(here("data/intermediate/6_estimateFallowing_knn/sjvAddFallowK
 # Find Targets, values for median estimation fields -----------------------
 
 sjvFallow_med <- sjv_med %>%
-  filter(fallow == 1) %>% 
-  filter(county == "Kern")
+  filter(fallow == 1)
 
 water_med <- metrics(sjvFallow_med$water) %>% 
   as_tibble_row() %>% 
@@ -84,35 +83,35 @@ sumTable_med <- bind_rows(rev_med, water_med, acres_med) %>%
 
 # Find Targets, values for KNN estimation fields --------------------------
 
-sjvFallow_knn <- sjv_knn %>%
-  filter(fallow == 1) %>% 
-  filter(county == "Kern")
-
-water_knn <- metrics(sjvFallow_knn$water) %>%
-  as_tibble_row() %>% 
-  mutate(Cat = "water (acre-ft)")
-
-acres_knn <- metrics(sjvFallow_knn$acres) %>% 
-  as_tibble_row() %>% 
-  mutate(Cat = "acres")
-
-rev_knn <- metrics(sjvFallow_knn$revenue) %>% 
-  as_tibble_row() %>% 
-  mutate(Cat = "revenue ($)")
-
-# create clean summary table
-sumTable_knn <- bind_rows(rev_knn, water_knn, acres_knn) %>% 
-  dplyr::select(Cat, everything()) %>% 
-  t() %>% 
-  row_to_names(1) %>% 
-  as.data.frame() %>% 
-  rownames_to_column("stat") %>% 
-  as_tibble() %>% 
-  mutate(across(2:4, as.numeric)) %>% 
-  mutate(across(2:4, round)) %>% 
-  filter(stat == "sum") %>% 
-  pivot_longer(2:3, names_to = "Target", values_to = "Values") %>% 
-  dplyr::select(-stat, -acres)
+# sjvFallow_knn <- sjv_knn %>%
+#   filter(fallow == 1) %>% 
+#   filter(county == "Kern")
+# 
+# water_knn <- metrics(sjvFallow_knn$water) %>%
+#   as_tibble_row() %>% 
+#   mutate(Cat = "water (acre-ft)")
+# 
+# acres_knn <- metrics(sjvFallow_knn$acres) %>% 
+#   as_tibble_row() %>% 
+#   mutate(Cat = "acres")
+# 
+# rev_knn <- metrics(sjvFallow_knn$revenue) %>% 
+#   as_tibble_row() %>% 
+#   mutate(Cat = "revenue ($)")
+# 
+# # create clean summary table
+# sumTable_knn <- bind_rows(rev_knn, water_knn, acres_knn) %>% 
+#   dplyr::select(Cat, everything()) %>% 
+#   t() %>% 
+#   row_to_names(1) %>% 
+#   as.data.frame() %>% 
+#   rownames_to_column("stat") %>% 
+#   as_tibble() %>% 
+#   mutate(across(2:4, as.numeric)) %>% 
+#   mutate(across(2:4, round)) %>% 
+#   filter(stat == "sum") %>% 
+#   pivot_longer(2:3, names_to = "Target", values_to = "Values") %>% 
+#   dplyr::select(-stat, -acres)
 
 
 

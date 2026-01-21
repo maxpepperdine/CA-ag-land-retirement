@@ -126,7 +126,7 @@ median_pricePerAcre <- median(
   na.rm = TRUE
 )
 
-# find the median waterUse from fallowed lands with last cultivated info
+# find the median waterUse (acre-ft/acre) from fallowed lands with last cultivated info
 median_waterUse <- median(
   sjv_crop_fallow_w_last_cult %>%
     st_drop_geometry() %>%
