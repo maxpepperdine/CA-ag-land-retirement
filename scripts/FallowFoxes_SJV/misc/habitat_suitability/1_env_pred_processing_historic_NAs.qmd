@@ -191,67 +191,27 @@ plot(ppt_ca, main = "PPT (CA Boundary)")
 plot(cwd_ca, main = "CWD (CA Boundary)")
 ```
 
-###### Fill NA values in AET raster
-
-The AET raster has some NA values in small areas. This causes errors in `Wallace`. We will fill these values with the mean value of neighboring cells.
+###### Resample BCM rasters to common extent and resolution
 
 ```{r}
-# define function to fill NA values with mean of neighboring cells
-fill_all_na <- function(raster, max_iter = 100) {
-  r <- raster
-  for (i in 1:max_iter) {
-    if (!any(is.na(values(r)))) break
-    r <- focal(r, 
-               w = 3,                # 3x3 moving window
-               fun = mean, 
-               na.rm = TRUE,         # ignore NAs in calculation
-               na.policy = "only")   # only replace NA cells, leave others as is
-  }
-  return(r)
-}
-
-## AET
-# apply function to AET raster
-aet_ca_filled <- fill_all_na(aet_ca)
-
-# crop to PPT to ensure no edge effects
-aet_ca_filled <- aet_ca_filled %>%
-  crop(ppt_ca) %>%
-  mask(ppt_ca)
-
-# resample ppt to match aet extent
+# resample PPT to match AET extent
 ppt_ca <- resample(ppt_ca, 
-                   aet_ca_filled, 
+                   aet_ca, 
                    method = "mean")
 
+# resample CWD to match AET extent
+cwd_ca <- resample(cwd_ca, 
+                   aet_ca, 
+                   method = "mean")
 
-## CWD
-# apply function to CWD raster
-cwd_ca_filled <- fill_all_na(cwd_ca)
+# confirm all rasters have the same extent and resolution
+crs(aet_ca) == crs(ppt_ca)
+ext(aet_ca) == ext(ppt_ca)
+res(aet_ca) == res(ppt_ca)
 
-# crop to PPT to ensure no edge effects
-cwd_ca_filled <- cwd_ca_filled %>%
-  crop(ppt_ca) %>%
-  mask(ppt_ca)
-
-# resample cwd to match aet extent
-cwd_ca_filled <- resample(cwd_ca_filled, 
-                          aet_ca_filled, 
-                          method = "mean")
-
-
-# QC make sure aet, cwd and ppt have same extent and resolution
-crs(aet_ca_filled) == crs(ppt_ca)
-ext(aet_ca_filled) == ext(ppt_ca)
-res(aet_ca_filled) == res(ppt_ca)
-
-crs(aet_ca_filled) == crs(cwd_ca_filled)
-ext(aet_ca_filled) == ext(cwd_ca_filled)
-res(aet_ca_filled) == res(cwd_ca_filled)
-
-# plot final AET & CWD raster
-plot(aet_ca_filled, main = "Mean AET (filled NA values)")
-plot(cwd_ca_filled, main = "Mean CWD (filled NA values)")
+crs(aet_ca) == crs(cwd_ca)
+ext(aet_ca) == ext(cwd_ca)
+res(aet_ca) == res(cwd_ca)
 ```
 
 #### gSSURGO
@@ -261,65 +221,27 @@ Resample gSSURGO rasters to match AET `ext`, `res`, and `crs`.
 ```{r}
 # resample gSSURGO rasters to match AET
 clay_resampled <- resample(clay_rast, 
-                           aet_ca_filled, 
+                           aet_ca, 
                            method = "mean")
 ph_resampled <- resample(ph_rast, 
-                         aet_ca_filled, 
+                         aet_ca, 
                          method = "mean")
 ec_resampled <- resample(ec_rast, 
-                         aet_ca_filled, 
+                         aet_ca, 
                          method = "mean")
 
 # confirm all rasters have the same extent and resolution
-crs(clay_resampled) == crs(aet_ca_filled)
-crs(ph_resampled) == crs(aet_ca_filled)
-crs(ec_resampled) == crs(aet_ca_filled)
+crs(clay_resampled) == crs(aet_ca)
+crs(ph_resampled) == crs(aet_ca)
+crs(ec_resampled) == crs(aet_ca)
 
-ext(clay_resampled) == ext(aet_ca_filled)
-ext(ph_resampled) == ext(aet_ca_filled)
-ext(ec_resampled) == ext(aet_ca_filled)
+ext(clay_resampled) == ext(aet_ca)
+ext(ph_resampled) == ext(aet_ca)
+ext(ec_resampled) == ext(aet_ca)
 
-res(clay_resampled) == res(aet_ca_filled)
-res(ph_resampled) == res(aet_ca_filled)
-res(ec_resampled) == res(aet_ca_filled)
-```
-
-The gSSURGO data has a lot of NA values in some areas. This causes errors in `Wallace`. We might fill these values with other data later, but for now we will fill them with the mean value of neighboring cells.
-
-```{r}
-# apply fill NA function to gSSURGO rasters
-clay_filled <- fill_all_na(clay_resampled)
-ph_filled <- fill_all_na(ph_resampled)
-ec_filled <- fill_all_na(ec_resampled)
-
-# crop to aet raster to ensure no edge effects
-clay_filled <- clay_filled %>% 
-  crop(aet_ca_filled) %>%
-  mask(aet_ca_filled)
-ph_filled <- ph_filled %>% 
-  crop(aet_ca_filled) %>%
-  mask(aet_ca_filled)
-ec_filled <- ec_filled %>% 
-  crop(aet_ca_filled) %>%
-  mask(aet_ca_filled)
-
-# make sure all rasters have the same extent and resolution
-crs(clay_filled) == crs(aet_ca_filled)
-crs(ph_filled) == crs(aet_ca_filled)
-crs(ec_filled) == crs(aet_ca_filled)
-
-ext(clay_filled) == ext(aet_ca_filled)
-ext(ph_filled) == ext(aet_ca_filled)
-ext(ec_filled) == ext(aet_ca_filled)
-
-res(clay_filled) == res(aet_ca_filled)
-res(ph_filled) == res(aet_ca_filled)
-res(ec_filled) == res(aet_ca_filled)
-
-# plot filled gSSURGO rasters
-plot(clay_filled, main = "% Clay (filled NA values)")
-plot(ph_filled, main = "pH (filled NA values)")
-plot(ec_filled, main = "EC (filled NA values)")
+res(clay_resampled) == res(aet_ca)
+res(ph_resampled) == res(aet_ca)
+res(ec_resampled) == res(aet_ca)
 ```
 
 #### Slope
@@ -327,12 +249,12 @@ plot(ec_filled, main = "EC (filled NA values)")
 ```{r}
 # project elevation rasters to match AET
 nCA_elevation_proj <- project(nCA_elevation_rast, 
-                              aet_ca_filled, 
+                              aet_ca, 
                               method = "mean")
 crs(nCA_elevation_proj) # confirm EPSG:3310
 
 sCA_elevation_proj <- project(sCA_elevation_rast, 
-                              aet_ca_filled, 
+                              aet_ca, 
                               method = "mean")
 crs(sCA_elevation_proj) # confirm EPSG:3310  
 
@@ -347,8 +269,8 @@ elevation_merged <- terra::merge(nCA_elevation_proj, sCA_elevation_resampled)
 
 # crop to CA
 elevation_ca <- elevation_merged %>%
-  crop(aet_ca_filled) %>%
-  mask(aet_ca_filled)
+  crop(ca_state) %>%
+  mask(ca_state)
 plot(elevation_ca, main = "Elevation (CA Boundary)")
 
 
@@ -359,15 +281,15 @@ slope_rast <- terrain(elevation_ca,
 
 # resample to match AET resolution and extent
 slope_resampled <- resample(slope_rast, 
-                            aet_ca_filled, 
+                            aet_ca, 
                             method = "mean")
 plot(slope_resampled, main = "Elevation")
 
 
 # confirm all rasters have the same extent and resolution
-crs(slope_resampled) == crs(aet_ca_filled)
-ext(slope_resampled) == ext(aet_ca_filled)
-res(slope_resampled) == res(aet_ca_filled)
+crs(slope_resampled) == crs(aet_ca)
+ext(slope_resampled) == ext(aet_ca)
+res(slope_resampled) == res(aet_ca)
 ```
 
 ## Export Processed Rasters
@@ -376,10 +298,10 @@ res(slope_resampled) == res(aet_ca_filled)
 
 ```{r}
 # path to output directory
-output_dir <- here("data/intermediate/misc/habitat_suitability/env_predictors/baseline")
+output_dir <- here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/keep_NAs")
 
 # export AET raster
-writeRaster(aet_ca_filled, 
+writeRaster(aet_ca, 
             filename = file.path(output_dir, "aet1991_2020_ave_CA_270m.tif"), 
             overwrite = TRUE)
 
@@ -389,19 +311,19 @@ writeRaster(ppt_ca,
             overwrite = TRUE)
 
 # export CWD raster
-writeRaster(cwd_ca_filled,
+writeRaster(cwd_ca,
             filename = file.path(output_dir, "cwd1991_2020_ave_CA_270m.tif"), 
             overwrite = TRUE)
 
 
 # export gSSURGO rasters
-writeRaster(clay_filled, 
+writeRaster(clay_resampled, 
             filename = file.path(output_dir, "clay_pct_0_10cm_CA_270m.tif"), 
             overwrite = TRUE)
-writeRaster(ph_filled, 
+writeRaster(ph_resampled, 
             filename = file.path(output_dir, "ph_0_10cm_CA_270m.tif"), 
             overwrite = TRUE)
-writeRaster(ec_filled, 
+writeRaster(ec_resampled, 
             filename = file.path(output_dir, "ec_dS_m_0_10cm_CA_270m.tif"), 
             overwrite = TRUE)
 
@@ -418,12 +340,12 @@ Reproject all rasters to WGS 84 (`EPSG:4326`) for use in Wallace.
 
 ```{r}
 # project all rasters to WGS 84
-aet_wgs84 <- project(aet_ca_filled, "EPSG:4326", method = "mean")
+aet_wgs84 <- project(aet_ca, "EPSG:4326", method = "mean")
 ppt_wgs84 <- project(ppt_ca, "EPSG:4326", method = "mean")
-cwd_wgs84 <- project(cwd_ca_filled, "EPSG:4326", method = "mean")
-clay_wgs84 <- project(clay_filled, "EPSG:4326", method = "mean")
-ph_wgs84 <- project(ph_filled, "EPSG:4326", method = "mean")
-ec_wgs84 <- project(ec_filled, "EPSG:4326", method = "mean")
+cwd_wgs84 <- project(cwd_ca, "EPSG:4326", method = "mean")
+clay_wgs84 <- project(clay_resampled, "EPSG:4326", method = "mean")
+ph_wgs84 <- project(ph_resampled, "EPSG:4326", method = "mean")
+ec_wgs84 <- project(ec_resampled, "EPSG:4326", method = "mean")
 slope_wgs84 <- project(slope_resampled, "EPSG:4326", method = "mean")
 
 # confirm all rasters have the same extent and resolution

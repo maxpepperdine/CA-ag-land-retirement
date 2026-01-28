@@ -1,0 +1,108 @@
+---
+title: "0_occurrence_data_processing"
+format: html
+---
+
+```{r}
+# clear workspace
+rm(list = ls())
+```
+
+## Load packages
+
+```{r}
+# load packages
+library(tidyverse)
+library(sf)
+library(here)
+```
+
+## Load data
+
+#### BNLL
+
+```{r}
+# gbif occurrences 
+bnll_gbif <- read_csv(here("data/raw/occurrence_points/bnll/gbif_0003623-260120142942310_cleaned.csv"))
+
+# gbit and VertNet occurrences
+bnll_gbif_vertnet <- read_csv(here("data/raw/occurrence_points/bnll/gbif_VertNet_0003608-260120142942310.csv"))
+
+# Stewart et al. (2019) occurrences on retired ag land
+bnll_stewart <- read_csv(here("data/raw/occurrence_points/bnll/stewart2019_pone.0210766.s007.csv"))
+```
+
+## Clean records
+
+#### BNLL
+
+###### GBIF data
+
+```{r}
+# clean names and select some variables 
+# convert variable names into suitable format for Wallace
+# first field must be named “scientific_name” and include the species’ name in binomial nomenclature
+# need to have the genus & species separated by a space, with genus capitalized
+# next two fields must be “longitude”, and “latitude” (in that order)
+bnll_occur_wallace <- bnll_gbif %>% 
+  janitor::clean_names() %>% 
+  select(gbif_id, species,
+         latitude = decimal_latitude, longitude = decimal_longitude, 
+         year, basis_of_record, institution_code) %>% 
+  rename(scientific_name = species) %>%
+  relocate(scientific_name, .before = gbif_id) %>% 
+  relocate(longitude, .after = scientific_name) %>%
+  relocate(latitude, .after = longitude)
+```
+
+###### Stewart data
+
+```{r}
+# add missing columns to match Wallace format
+bnll_stewart <- bnll_stewart %>% 
+  janitor::clean_names() %>%
+  mutate(scientific_name = "Gambelia sila",
+         gbif_id = NA,
+         basis_of_record = "HUMAN_OBSERVATION",
+         institution_code = "Stewart et al. (2019)") %>% 
+  relocate(scientific_name, .before = latitude) %>%
+  relocate(longitude, .after = scientific_name) %>%
+  relocate(latitude, .after = longitude) %>%
+  relocate(year, .after = gbif_id)
+```
+
+###### Combine GBIF and Stewart data
+
+```{r}
+# combine both datasets
+bnll_occur_combined <- bind_rows(bnll_occur_wallace, bnll_stewart)
+```
+
+## Export cleaned data
+
+#### BNLL
+
+```{r}
+# export clean data as csv
+# this is the occurrence data to use in Wallace!
+write_csv(bnll_occur_combined, 
+          here("data/raw/occurrence_points/bnll/wallace/bnll_occur_wallace.csv"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

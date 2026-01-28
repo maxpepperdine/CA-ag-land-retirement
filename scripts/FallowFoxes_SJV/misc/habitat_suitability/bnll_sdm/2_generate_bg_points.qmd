@@ -1,0 +1,166 @@
+---
+title: "0_1_background_data_processing"
+format: html
+---
+
+```{r}
+# clean environment
+rm(list = ls())
+```
+
+## Overview
+
+This script processes the bg data for habitat suitability modeling for the blunt-nosed leopard lizard (Gambelia sila) in the San Joaquin Valley, CA. It will load our BNLL occurrence data, generate a 50 km buffer around each occurrence point, and then find all geographically unique vertebrate (phylum Vertebrata) occurrence points within that buffer. These will be the background points for the BNLL MaxEnt model.
+
+## Load packages
+
+```{r}
+library(tidyverse)
+library(here)
+library(rgbif)
+library(sf)
+```
+
+## Load data
+
+```{r}
+# Load BNLL occurrence data
+bnll_occs <- read_csv(here("data/raw/occurrence_points/bnll/wallace/bnll_occur_wallace.csv"))
+```
+
+## Data processing
+
+#### Create 50 km buffer around BNLL occ points
+
+```{r}
+# convert BNLL occ data to sf object
+bnll_sf <- st_as_sf(bnll_occs, 
+                    coords = c("longitude", "latitude"), 
+                    crs = 4326)
+
+# transform to projected CRS for buffering (EPSG:3310 - NAD83 / California Albers)
+bnll_sf_proj <- st_transform(bnll_sf, crs = 3310)
+
+# create 50 km buffer around each occurrence point
+bnll_buffer <- st_buffer(bnll_sf_proj, dist = 50000)
+
+# combine buffers into a single polygon
+bnll_buffer_union <- st_union(bnll_buffer)
+
+# transform buffer back to WGS84
+bnll_buffer_wgs84 <- st_transform(bnll_buffer_union, crs = 4326)
+
+# # save buffer to file for testing
+# write_sf(bnll_buffer_wgs84, here("data/intermediate/misc/habitat_suitability/vertebrate_bg_points/bnll_50km_buffer.shp"))
+```
+
+```{r}
+# set buffer to WKT format for rgbif::occ_download()
+bnll_buffer_wkt <- st_as_text(st_geometry(bnll_buffer_wgs84)[[1]])
+nchar(bnll_buffer_wkt)  # check length of WKT string
+
+# buffer is too long for rgbif, so simplify it
+buffer_simplify <- st_simplify(bnll_buffer_wgs84, dTolerance = 500)
+buffer_simplify_wkt <- st_as_text(st_geometry(buffer_simplify)[[1]])
+nchar(buffer_simplify_wkt)  # check length of WKT string
+
+```
+
+#### Obtain & process occ records using `rgbif::occ_download()`
+
+```{r}
+# set up GBIF credentials (one-time setup)
+options(gbif_user = "mpepperdine")
+options(gbif_pwd = " ")
+options(gbif_email = " ")
+
+
+# This works with occ_download and allows all three classes in one request
+download_key <- occ_download(
+  pred_in("taxonKey", c(359, 358, 131)),  # Mammalia, Reptilia, Amphibia
+  pred("hasCoordinate", TRUE),
+  pred("hasGeospatialIssue", FALSE),
+  pred_gte("year", 1990),
+  pred_lte("year", 2025),
+  pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
+  pred_lte("coordinateUncertaintyInMeters", 500),
+  pred_within(buffer_simplify_wkt)  # Your buffer
+)
+
+# check download status
+cat("Download key:", download_key, "\n")
+cat("Check status at: https://www.gbif.org/occurrence/download/", download_key, "\n")
+
+# check the download status programatically; this might take a while...
+occ_download_wait(download_key, status_ping = 10)  # Check every 10 seconds
+
+# download the data
+download_file <- occ_download_get(download_key, path = ".")
+
+# import the data
+vertebrate_data <- occ_download_import(download_file)
+
+# convert to sf
+vertebrate_sf <- st_as_sf(vertebrate_data,
+                          coords = c("decimalLongitude", "decimalLatitude"),
+                          crs = 4326)
+
+
+# intersect occ points with the original precise buffer
+vertebrate_in_buffer <- st_intersection(vertebrate_sf, bnll_buffer_wgs84)  # Original!
+
+# remove duplicates
+vertebrate_unique <- vertebrate_in_buffer %>%
+  distinct(geometry, .keep_all = TRUE) %>% 
+  # save relevant columns only
+  select(gbifID, institutionCode, year, basisOfRecord, scientificName, class, 
+         classKey, species)
+
+# extract coordinates for MaxEnt and env data extraction
+background_coords <- st_coordinates(vertebrate_unique)
+colnames(background_coords) <- c("longitude", "latitude")
+
+# Create final dataframe
+background_df <- cbind(
+  as.data.frame(st_drop_geometry(vertebrate_unique)),
+  background_coords
+)
+```
+
+Save the data
+
+```{r}
+# save SF to test
+write_sf(vertebrate_unique, here("data/intermediate/misc/habitat_suitability/vertebrate_bg_points/vertebrate_bg_points.shp"),
+         append = FALSE)
+
+
+# save final background points to CSV
+write_csv(background_df, here("data/intermediate/misc/habitat_suitability/vertebrate_bg_points/vertebrate_bg_points.csv"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

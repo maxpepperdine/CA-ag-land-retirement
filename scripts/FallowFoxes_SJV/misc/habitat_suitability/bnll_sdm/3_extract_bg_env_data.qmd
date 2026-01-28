@@ -1,0 +1,91 @@
+---
+title: "Extract environmental data to background points"
+format: html
+editor: visual
+date: last-modified
+editor_options: 
+  chunk_output_type: console
+---
+
+## Overview
+
+This script extracts environmental data to the BNLL background points (created in `2_generate_bg_points.qmd`) for use in MaxEnt modeling. The environmental data includes:
+
+- BCM climate (AET, PPT)
+- gSSURGO soil data (pH, % clay, EC)
+- Slope
+
+```{r}
+rm(list=ls())
+```
+
+## Load packages
+
+```{r}
+library(terra)      # for raster processing
+library(tidyverse)  # always
+library(sf)         # for spatial data processing
+```
+
+## Load data
+
+#### Environmental rasters
+
+```{r}
+# load all env rasters
+env_rasters <- rast(list.files(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/keep_NAs"), 
+                               pattern = ".tif$", 
+                               full.names = TRUE))
+plot(env_rasters)
+```
+
+#### BNLL background points (created in `2_generate_bg_points.qmd`)
+
+```{r}
+# load background points
+bnll_bg <- read_csv(here("data/intermediate/misc/habitat_suitability/vertebrate_bg_points/vertebrate_bg_points.csv"))
+
+# convert bg points to SpatVector
+bnll_bg_vect <- vect(bnll_bg, 
+                     geom = c("longitude", "latitude"), 
+                     crs = "EPSG:4326")
+
+# make sure crs matches env rasters
+bnll_bg_vect <- project(bnll_bg_vect, crs(env_rasters))
+```
+
+## Extract environmental data to background points
+
+```{r}
+# extract env data to bg points
+bnll_bg_env <- terra::extract(env_rasters, bnll_bg_vect, 
+                              bind = TRUE)
+
+# set as sf object
+bnll_bg_env_sf <- st_as_sf(bnll_bg_env, 
+                           coords = c("longitude", "latitude")) %>% 
+  select(species, year, all_of(names(env_rasters)))
+
+# extract geometry columns as lon/lat
+bnll_bg_env_df <- bnll_bg_env_sf %>% 
+  mutate(longitude = st_coordinates(bnll_bg_env_sf)[,1],
+         latitude = st_coordinates(bnll_bg_env_sf)[,2], 
+         .before = "aet1991_2020_ave") %>% 
+  st_drop_geometry()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

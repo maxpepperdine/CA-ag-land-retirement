@@ -3,6 +3,18 @@ title: "3_hab_suit_diff"
 format: html
 ---
 
+```{r}
+install.packages("remotes")
+remotes::install_github("wallaceEcoMod/wallace")
+```
+
+
+```{r}
+library(wallace)
+run_wallace()
+```
+
+
 
 ```{r}
 # clear the environment
