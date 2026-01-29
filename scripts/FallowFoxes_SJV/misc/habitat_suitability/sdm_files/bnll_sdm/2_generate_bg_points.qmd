@@ -1,6 +1,11 @@
 ---
-title: "0_1_background_data_processing"
+title: "Generate BNLL background points"
+author: "Maxwell Pepperdine"
 format: html
+editor: visual
+date: last-modified
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r}
@@ -10,15 +15,15 @@ rm(list = ls())
 
 ## Overview
 
-This script processes the bg data for habitat suitability modeling for the blunt-nosed leopard lizard (Gambelia sila) in the San Joaquin Valley, CA. It will load our BNLL occurrence data, generate a 50 km buffer around each occurrence point, and then find all geographically unique vertebrate (phylum Vertebrata) occurrence points within that buffer. These will be the background points for the BNLL MaxEnt model.
+This script generates the bg data for habitat suitability modeling for the blunt-nosed leopard lizard (Gambelia sila) in the San Joaquin Valley, CA. It will load our BNLL occurrence data, generate a 50 km buffer around each occurrence point, and then find all geographically unique vertebrate (phylum Vertebrata) occurrence points within that buffer. These will be the background points for the BNLL MaxEnt model.
 
 ## Load packages
 
 ```{r}
-library(tidyverse)
-library(here)
-library(rgbif)
-library(sf)
+library(tidyverse)  # always
+library(here)       # for file paths
+library(rgbif)      # for GBIF data download
+library(sf)         # for spatial data processing
 ```
 
 ## Load data
@@ -63,7 +68,6 @@ nchar(bnll_buffer_wkt)  # check length of WKT string
 buffer_simplify <- st_simplify(bnll_buffer_wgs84, dTolerance = 500)
 buffer_simplify_wkt <- st_as_text(st_geometry(buffer_simplify)[[1]])
 nchar(buffer_simplify_wkt)  # check length of WKT string
-
 ```
 
 #### Obtain & process occ records using `rgbif::occ_download()`
@@ -71,8 +75,8 @@ nchar(buffer_simplify_wkt)  # check length of WKT string
 ```{r}
 # set up GBIF credentials (one-time setup)
 options(gbif_user = "mpepperdine")
-options(gbif_pwd = " ")
-options(gbif_email = " ")
+options(gbif_pwd = "Pumbaason@20")
+options(gbif_email = "max.pepperdine@gmail.com")
 
 
 # This works with occ_download and allows all three classes in one request
@@ -103,11 +107,14 @@ vertebrate_data <- occ_download_import(download_file)
 # convert to sf
 vertebrate_sf <- st_as_sf(vertebrate_data,
                           coords = c("decimalLongitude", "decimalLatitude"),
-                          crs = 4326)
+                          crs = 4326) %>% 
+  # remove all BNLL occ points
+  filter(species != "Gambelia sila")
 
 
 # intersect occ points with the original precise buffer
-vertebrate_in_buffer <- st_intersection(vertebrate_sf, bnll_buffer_wgs84)  # Original!
+# this keeps only points within 50 km of BNLL occs
+vertebrate_in_buffer <- st_intersection(vertebrate_sf, bnll_buffer_wgs84)
 
 # remove duplicates
 vertebrate_unique <- vertebrate_in_buffer %>%
@@ -131,29 +138,13 @@ Save the data
 
 ```{r}
 # save SF to test
-write_sf(vertebrate_unique, here("data/intermediate/misc/habitat_suitability/vertebrate_bg_points/vertebrate_bg_points.shp"),
+write_sf(vertebrate_unique, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points/bnll_bg_points.shp"),
          append = FALSE)
 
 
 # save final background points to CSV
-write_csv(background_df, here("data/intermediate/misc/habitat_suitability/vertebrate_bg_points/vertebrate_bg_points.csv"))
+write_csv(background_df, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points/bnll_bg_points.csv"))
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

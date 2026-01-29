@@ -1,0 +1,310 @@
+---
+title: "BNLL MaxEnt prediction generation"
+author: "Maxwell Pepperdine"
+format: html
+editor: visual
+date: last-modified
+editor_options: 
+  chunk_output_type: console
+---
+
+## Overview
+
+This script reads in the prepared BNLL occurrence records (produced in `1_extract_occ_env_data.qmd`) and background points (produced in `2_generate_bg_points.qmd` and `3_extract_bg_env_data.qmd`) to evaluate and generate MaxEnt models using the `dismo` package.
+
+```{r}
+rm(list = ls())
+```
+
+## Load packages
+
+```{r}
+library(tidyverse) # always
+library(dismo)     # for MaxEnt
+library(terra)     # for raster data
+library(corrplot)  # for plotting correlation matrix
+library(ENMeval)   # for model evaluation
+library(rJava)     # needed for MaxEnt predictions
+library(sf)        # for spatial data
+library(tmap)      # for plotting better maps
+```
+
+## Bind the occurrence and background data into one df
+
+#### Load data
+
+```{r}
+# load occurrence data with env data extracted
+occ_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/1_extract_occ_env_data/bnll_occ_env_data.csv"))
+
+# load background data with env data extracted
+bg_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/3_extract_bg_env_data/bnll_bg_env_data.csv"))
+```
+
+```{r}
+# env pred raster for reprojecting
+env_raster <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/keep_NAs/aet1991_2020_ave_CA_270m.tif"))
+```
+
+
+#### Prepare data for Maxent
+
+Add a column indicating presence (1) or absence/background (0), and bind the two datasets together.
+
+```{r}
+# add presence column to occ data
+occ_data_bind <- occ_data %>%
+  mutate(presence = 1, 
+         .after = 2)
+
+# add presence column to bg data
+bg_data_bind <- bg_data %>%
+  mutate(presence = 0, 
+         .after = 2)
+
+# bind the two datasets together
+full_data <- rbind(occ_data_bind, bg_data_bind)
+```
+
+## Model evaluation
+
+#### Test for correlation
+
+Assessing the correlation between environmental variables for MaxEnt. A Pearson correlation matrix is produced; based on the values, certain variables may be removed from the final SWD file.
+
+```{r}
+# select only the environmental variables
+env_data_corr <- full_data %>%
+  dplyr::select(4:10)
+
+# create a correlation matrix
+cor_matrix <- cor(env_data_corr, # binded occ & bg data with only env variables
+                  method = "pearson", # Pearson correlation method
+                  use = "complete.obs") # use complete observations only
+
+# plot the correlation matrix with corrplot
+cor_plot <- corrplot::corrplot(cor_matrix,
+                               method = "color", # color method
+                               type = "upper", # upper triangle
+                               tl.col = "black", # text label color
+                               tl.srt = 45, # text label rotation
+                               addCoef.col = "black", # add correlation coefficients
+                               number.cex = 0.7) # number size
+```
+
+#### Model evaluation
+
+Using the `ENMevaluate()` function from the `ENMeval` package, we can evaluate the model performance using different feature classes and regularization multipliers. Spatial partitioning with the `block` partition method is used to evaluate model performance.
+
+After selecting the best model, we can use the `maxent()` function from the `dismo` package to run the model with the selected feature class and regularization multiplier. In this step, we'll use the `jacknife` partition argument to assess the importance of each environmental variable in the model.
+
+```{r}
+# set up the block for spatial partitioning
+block <- ENMeval::get.block(occ_data, bg_data, 
+                            orientation = "lat_lon")
+# check for even distribution of blocks
+table(block$occs.grp)
+
+
+## Evaluating the model
+max.eval.bnll <- ENMeval::ENMevaluate(occs = occ_data, 
+                                      bg = bg_data, 
+                                      tune.args = list(fc = c("L", "LQ", "P"), 
+                                                      rm = seq(0.5, 3, 0.5)),
+                                      algorithm = "maxnet", 
+                                      partitions = "block")
+```
+
+```{r}
+# examine the model results
+max.eval.bnll
+eval.results(max.eval.bnll) # model evaluation results
+eval.tune.settings(max.eval.bnll) # extract the tuning parameter settings 
+eval.results.partitions(max.eval.bnll) # assess model performance for each partition
+
+# plot stat results across values of the tuning parameters
+evalplot.stats(e = max.eval.bnll, 
+               # or.mtp me
+               stats = c("or.mtp", "auc.val"), 
+               facet.labels = c("or.mtp" = "OR (mtp)", 
+                                "auc.val" = "AUC (val)"),
+               x.var = "rm", 
+               color = "fc", 
+               error.bars = FALSE)
+
+# removing delta.AICc for plotting because it gets included with AIC by default
+max.eval.filtered <- max.eval.bnll
+max.eval.filtered@results <- max.eval.bnll@results[, !colnames(max.eval.bnll@results) %in% "delta.AICc"]
+
+evalplot.stats(e = max.eval.filtered,
+               stats = c("AICc", "auc.train"),
+               facet.labels = c("AICc" = "AIC", 
+                                "auc.train" = "AUC (train)"), 
+               x.var = "rm",
+               color = "fc",
+               error.bars = FALSE)
+
+
+#==============================================================================
+# Best model: fc.LQ_rm.0.5
+#==============================================================================
+
+
+# save the evaluation results to avoid re-running the model
+save(max.eval.bnll, 
+     file = here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/max_eval_bnll_1-28-26.rda"))
+
+# load the evaluation results
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/max_eval_bnll_1-28-26.rda"))
+```
+
+## Running MaxEnt & generating predictions
+
+After identifying the best model based on the evaluation results, we'll run the model using the `dismo::maxent()` function. This generates a model object that can be used to predict baseline (historical) and future BNLL occurrence probability under projected environmental data using the `dismo::predict()` function.
+
+#### Run MaxEnt with the selected model
+
+This section generates a MaxEnt model using the selected feature class and regularization multiplier from the evaluation results above that produced the highest performing models (`fc.LQ_rm.0.5`).
+
+These model objects are then used to predict baseline (historical) and future BNLL occurrence probabilities.
+
+#### Baseline (fc LQ and rm 0.5)
+
+```{r}
+## set up model parameters based on the evaluation results
+
+# select environmental predictors as a df
+x <- full_data %>% 
+  na.omit() %>%
+  # select only the environmental variables
+  dplyr::select(4:10)
+
+# # examine how many presence and absence points were lost from NA removal
+# x_summary <- x %>%
+#   group_by(presence) %>%
+#   summarize(n = n())
+
+# occurrence & background data 
+# if using a df for `x` maxent() requires a vector of 0's and 1's for presence 
+# and absence that equal nrow(x)
+p <- full_data %>% 
+  na.omit() %>%
+  pull(presence) # turn p into a vector of 0's and 1's for presence and absence
+
+# set arguments for the maxent() function
+args <- c("jackknife=TRUE",      # assess variable importance
+          "linear=TRUE",         # use linear features
+          "quadratic=TRUE",      # use quadratic features
+          "hinge=FALSE",         # do not use hinge features
+          "product=FALSE",       # do not use product features
+          "threshold=FALSE",     # do not use threshold features
+          "responsecurves=TRUE", # generate response curves
+          "writeplotdata=TRUE",  # write output data used to make response curves 
+          "betamultiplier=0.5")    # this is the rm coefficient from ENMevaluate()
+
+# path to save results
+path <- here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/")
+
+
+## final model run
+maxent_bnll <- maxent(x = x, 
+                      p = p, 
+                      args = args, 
+                      path = path)
+
+# save model object for prediction rasters
+save(maxent_bnll, 
+     file = here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+```
+
+#### Predict baseline (historical) BNLL occurrence probability
+
+```{r}
+#### set up the prediction parameters
+
+## load the model object
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+
+
+## load the environmental data as a raster stack 
+
+# define the path to the predictor variable rasters
+env_path <- here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/keep_NAs")
+env_files <- list.files(env_path, 
+                        pattern = ".tif$", 
+                        full.names = TRUE)
+
+# get a raster stack of the land cover files
+x_stack <- raster::stack(env_files)
+names(x_stack) # check the layer names; need to match pred var names in SWD data
+# make sure the raster stack is in EPSG:3310
+x_stack <- projectRaster(x_stack, crs = crs(env_raster))
+crs(x_stack)
+
+# # match the layer names to the predictor variable names in the SWD data
+# # change if needed
+# names(x_stack) <- c(" ")
+
+
+## define the extent as the extent from the Stewart SDM
+
+# load the Stewart BNLL extent shapefile
+stewart_bnll_ext_path <- here("data/raw/extent_range_boundaries/stewart_sdm_ext/stewart_sdm_ext.shp")
+
+stewart_bnll_ext <- read_sf(stewart_bnll_ext_path) %>% 
+  sf::st_make_valid() # make sure the geometry is valid
+
+# assign the correct CRS
+stewart_bnll_ext <- st_transform(stewart_bnll_ext, crs(x_stack))
+
+# extent object required for dismo
+stewart_bnll_ext <- extent(stewart_bnll_ext)
+
+
+## define the filename path for the prediction raster
+filename_bnll <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred.tif")
+
+
+## predict current HEC 
+dismo::predict(object = maxent_bnll, 
+               x = x_stack, 
+               ext = stewart_bnll_ext,
+               filename = filename_bnll, 
+               overwrite = TRUE)
+
+## plot the prediction raster!!
+pred_rast_bnll <- rast(filename_bnll)
+plot(pred_rast_bnll, 
+     main = "MaxEnt Predicted Habitat Suitability for Blunt-nosed Leopard Lizard (Gambelia sila)")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

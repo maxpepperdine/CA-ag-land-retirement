@@ -11,9 +11,9 @@ editor_options:
 
 This script extracts environmental data to the BNLL background points (created in `2_generate_bg_points.qmd`) for use in MaxEnt modeling. The environmental data includes:
 
-- BCM climate (AET, PPT)
-- gSSURGO soil data (pH, % clay, EC)
-- Slope
+-   BCM climate (AET, PPT)
+-   gSSURGO soil data (pH, % clay, EC)
+-   Slope
 
 ```{r}
 rm(list=ls())
@@ -25,6 +25,7 @@ rm(list=ls())
 library(terra)      # for raster processing
 library(tidyverse)  # always
 library(sf)         # for spatial data processing
+library(here)       # for file paths
 ```
 
 ## Load data
@@ -43,7 +44,7 @@ plot(env_rasters)
 
 ```{r}
 # load background points
-bnll_bg <- read_csv(here("data/intermediate/misc/habitat_suitability/vertebrate_bg_points/vertebrate_bg_points.csv"))
+bnll_bg <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points/bnll_bg_points.csv"))
 
 # convert bg points to SpatVector
 bnll_bg_vect <- vect(bnll_bg, 
@@ -52,6 +53,7 @@ bnll_bg_vect <- vect(bnll_bg,
 
 # make sure crs matches env rasters
 bnll_bg_vect <- project(bnll_bg_vect, crs(env_rasters))
+crs(bnll_bg_vect)
 ```
 
 ## Extract environmental data to background points
@@ -64,15 +66,33 @@ bnll_bg_env <- terra::extract(env_rasters, bnll_bg_vect,
 # set as sf object
 bnll_bg_env_sf <- st_as_sf(bnll_bg_env, 
                            coords = c("longitude", "latitude")) %>% 
-  select(species, year, all_of(names(env_rasters)))
+  select(all_of(names(env_rasters)))
 
 # extract geometry columns as lon/lat
 bnll_bg_env_df <- bnll_bg_env_sf %>% 
   mutate(longitude = st_coordinates(bnll_bg_env_sf)[,1],
          latitude = st_coordinates(bnll_bg_env_sf)[,2], 
-         .before = "aet1991_2020_ave") %>% 
+         .before = 1) %>% 
   st_drop_geometry()
 ```
+
+## Save the data
+
+```{r}
+# save final background points with env data to CSV
+write_csv(bnll_bg_env_df, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/3_extract_bg_env_data/bnll_bg_env_data.csv"))
+
+# save SF object
+write_sf(bnll_bg_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/3_extract_bg_env_data/bnll_bg_env_data.shp"),
+         append = FALSE)
+```
+
+
+
+
+
+
+
 
 
 

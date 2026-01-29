@@ -1,0 +1,149 @@
+---
+title: "Extract environmental data to BNLL occurrences"
+author: "Maxwell Pepperdine"
+format: html
+editor: visual
+date: last-modified
+editor_options: 
+  chunk_output_type: console
+---
+
+## Overview
+
+This script extracts environmental data to BNLL occurrence points for use in MaxEnt modeling. The environmental data includes:
+
+-   BCM climate (AET, PPT)
+-   gSSURGO soil data (pH, % clay, EC)
+-   Slope
+
+We will also spatially thin the occurrence points by 1 km to reduce spatial autocorrelation.
+
+```{r}
+rm(list=ls())
+```
+
+## Load packages
+
+```{r}
+library(terra)      # for raster processing
+library(tidyverse)  # always
+library(sf)         # for spatial data processing
+library(here)       # for file paths
+library(spThin)     # for spatial thinning
+```
+
+## Load data
+
+#### Environmental rasters
+
+```{r}
+# load all env rasters
+env_rasters <- rast(list.files(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/keep_NAs"), 
+                               pattern = ".tif$", 
+                               full.names = TRUE))
+plot(env_rasters)
+```
+
+#### BNLL occurrences
+
+```{r}
+# load occurrence points
+bnll_occ <- read_csv("data/raw/occurrence_points/bnll/wallace/bnll_occur_wallace.csv")
+
+# convert occ points to SpatVector
+bnll_occ_vect <- vect(bnll_occ, 
+                      geom = c("longitude", "latitude"), 
+                      crs = "EPSG:4326")
+
+# make sure crs matches env rasters
+bnll_occ_vect <- project(bnll_occ_vect, crs(env_rasters))
+```
+
+#### Spatial thinning of occurrence points
+
+Thin occurrence points to 1 km minimum distance. This reduces spatial autocorrelation and sampling bias.
+
+```{r}
+# convert back to lat/lon for spThin (it requires decimal degrees)
+bnll_occ_latlon <- project(bnll_occ_vect, "EPSG:4326")
+bnll_occ_df <- as.data.frame(bnll_occ_latlon, geom = "XY")
+
+# run spatial thinning with 1 km distance
+# thin.par = 1 means 1 km minimum distance between points
+# reps = 100 means run 100 iterations to find best thinning solution
+# locs.thinned.list.return = TRUE returns all replicates
+# write.files = FALSE prevents writing files automatically
+thinned_data <- spThin::thin(
+  loc.data = bnll_occ_df,
+  lat.col = "y",  # latitude column
+  long.col = "x", # longitude column
+  spec.col = "scientific_name", 
+  thin.par = 1,   # thinning distance in km
+  reps = 100,     # number of replications
+  locs.thinned.list.return = TRUE,
+  write.files = FALSE,
+  write.log.file = FALSE
+)
+
+# select the thinned dataset with the most points
+# (spThin returns a list of different thinning solutions)
+max_points <- which.max(sapply(thinned_data, nrow))
+bnll_thinned_df <- thinned_data[[max_points]]
+
+# convert thinned points back to SpatVector and match original CRS
+bnll_thinned_vect <- vect(bnll_thinned_df, 
+                          geom = c("Longitude", "Latitude"), 
+                          crs = "EPSG:4326")
+
+# project to match env rasters
+bnll_thinned_vect <- project(bnll_thinned_vect, crs(env_rasters))
+crs(bnll_thinned_vect)  # check crs
+```
+
+## Extract environmental data to occurrence points
+
+```{r}
+# extract env data to occ points
+bnll_occ_env <- terra::extract(env_rasters, bnll_thinned_vect, 
+                               bind = TRUE)
+
+# set as sf object
+bnll_occ_env_sf <- st_as_sf(bnll_occ_env, 
+                            coords = c("longitude", "latitude"))
+
+# extract geometry columns as lat/lon
+bnll_occ_env_df <- bnll_occ_env_sf %>% 
+  mutate(longitude = st_coordinates(bnll_occ_env_sf)[,1],
+         latitude = st_coordinates(bnll_occ_env_sf)[,2], 
+         .before = "aet1991_2020_ave") %>%
+  st_drop_geometry()
+```
+
+## Save the data
+
+```{r}
+# save final occurrence points with env data to CSV
+write_csv(bnll_occ_env_df, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/1_extract_occ_env_data/bnll_occ_env_data.csv"))
+
+# save SF object
+write_sf(bnll_occ_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/1_extract_occ_env_data/bnll_occ_env_data.shp"),
+         append = FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
