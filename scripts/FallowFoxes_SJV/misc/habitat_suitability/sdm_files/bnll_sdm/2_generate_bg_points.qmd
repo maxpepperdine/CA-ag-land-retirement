@@ -79,9 +79,21 @@ options(gbif_pwd = "Pumbaason@20")
 options(gbif_email = "max.pepperdine@gmail.com")
 
 
+# # This works with occ_download and allows all three classes in one request
+# download_key <- occ_download(
+#   pred_in("taxonKey", c(359, 358, 131)),  # Mammalia, Reptilia, Amphibia
+#   pred("hasCoordinate", TRUE),
+#   pred("hasGeospatialIssue", FALSE),
+#   pred_gte("year", 1990),
+#   pred_lte("year", 2025),
+#   pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
+#   pred_lte("coordinateUncertaintyInMeters", 1000),
+#   pred_within(buffer_simplify_wkt)  # Your buffer
+# )
+
 # This works with occ_download and allows all three classes in one request
 download_key <- occ_download(
-  pred_in("taxonKey", c(359, 358, 131)),  # Mammalia, Reptilia, Amphibia
+  pred_in("taxonKey", 44),  # Vertebrata
   pred("hasCoordinate", TRUE),
   pred("hasGeospatialIssue", FALSE),
   pred_gte("year", 1990),
@@ -120,7 +132,7 @@ vertebrate_in_buffer <- st_intersection(vertebrate_sf, bnll_buffer_wgs84)
 vertebrate_unique <- vertebrate_in_buffer %>%
   distinct(geometry, .keep_all = TRUE) %>% 
   # save relevant columns only
-  select(gbifID, institutionCode, year, basisOfRecord, scientificName, class, 
+  dplyr::select(gbifID, institutionCode, year, basisOfRecord, scientificName, class, 
          classKey, species)
 
 # extract coordinates for MaxEnt and env data extraction

@@ -1,6 +1,10 @@
 ---
 title: "Processing Env Predictor Variables for SDMs"
 format: html
+editor: visual
+date: last-modified
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r}
@@ -409,6 +413,11 @@ writeRaster(ec_filled,
 # export slope raster
 writeRaster(slope_resampled, 
             filename = file.path(output_dir, "slope_deg_CA_270m.tif"), 
+            overwrite = TRUE)
+
+# export elevation raster
+writeRaster(elevation_ca, 
+            filename = file.path(output_dir, "elevation_CA_270m.tif"), 
             overwrite = TRUE)
 ```
 

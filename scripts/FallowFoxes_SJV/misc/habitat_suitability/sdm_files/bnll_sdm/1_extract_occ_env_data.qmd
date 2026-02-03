@@ -38,9 +38,13 @@ library(spThin)     # for spatial thinning
 
 ```{r}
 # load all env rasters
-env_rasters <- rast(list.files(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/keep_NAs"), 
+env_rasters <- rast(list.files(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline"), 
                                pattern = ".tif$", 
                                full.names = TRUE))
+# fix names
+names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
+                        "ec_dS_m_0_10cm", "elevation", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "slope")
 plot(env_rasters)
 ```
 
