@@ -1,0 +1,153 @@
+---
+title: "Extract environmental data to background points"
+format: html
+editor: visual
+date: last-modified
+editor_options: 
+  chunk_output_type: console
+---
+
+## Overview
+
+This script extracts environmental data to the BNLL background points (created in `2_generate_bg_points.qmd`) for use in MaxEnt modeling. The environmental data includes:
+
+-   BCM climate (AET, PPT)
+-   gSSURGO soil data (pH, % clay, EC)
+-   Slope
+
+```{r}
+rm(list=ls())
+```
+
+## Load packages
+
+```{r}
+library(terra)      # for raster processing
+library(tidyverse)  # always
+library(sf)         # for spatial data processing
+library(here)       # for file paths
+```
+
+## Load data
+
+#### Environmental rasters
+
+```{r}
+# load all env rasters
+env_rasters <- rast(list.files(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline"), 
+                               pattern = ".tif$", 
+                               full.names = TRUE))
+# fix names
+names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
+                        "ec_dS_m_0_10cm", "elevation", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "slope")
+plot(env_rasters)
+```
+
+#### BNLL background points (created in `2_generate_bg_points.qmd`)
+
+```{r}
+# load background points
+bnll_bg <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points/bnll_bg_points.csv"))
+
+# convert bg points to SpatVector
+bnll_bg_vect <- vect(bnll_bg, 
+                     geom = c("longitude", "latitude"), 
+                     crs = "EPSG:4326")
+
+# make sure crs matches env rasters
+bnll_bg_vect <- project(bnll_bg_vect, crs(env_rasters))
+crs(bnll_bg_vect)
+```
+
+#### Spatial thinning of background points (1 km)
+
+Thin background points by 1 km to reduce spatial autocorrelation.
+
+```{r}
+# convert back to lat/lon for spThin (it requires decimal degrees)
+bnll_bg_latlon <- project(bnll_bg_vect, "EPSG:4326")
+bnll_bg_df <- as.data.frame(bnll_bg_latlon, geom = "XY")
+# add species dummy column for spThin
+bnll_bg_df$species <- "background"
+
+# run spatial thinning with 1 km distance
+thinned_data <- spThin::thin(
+  loc.data = bnll_bg_df,
+  lat.col = "y",  # latitude column
+  long.col = "x", # longitude column
+  spec.col = "species", # dummy species column
+  thin.par = 1,   # thinning distance in km
+  reps = 10,     # number of replications
+  locs.thinned.list.return = TRUE,
+  write.files = FALSE,
+  write.log.file = FALSE
+)
+
+# select the thinned dataset with the most points
+max_points <- which.max(sapply(thinned_data, nrow))
+bnll_bg_thinned_df <- thinned_data[[max_points]]
+
+# convert thinned points back to SpatVector and match original CRS
+bnll_bg_thinned_vect <- vect(bnll_bg_thinned_df, 
+                             geom = c("Longitude", "Latitude"), 
+                             crs = "EPSG:4326")
+
+# project to match env rasters
+bnll_bg_thinned_vect <- project(bnll_bg_thinned_vect, crs(env_rasters))
+crs(bnll_bg_thinned_vect)  # check crs
+```
+
+## Extract environmental data to background points
+
+```{r}
+# extract env data to bg points
+bnll_bg_env <- terra::extract(env_rasters, bnll_bg_thinned_vect, 
+                              bind = TRUE)
+
+# set as sf object
+bnll_bg_env_sf <- st_as_sf(bnll_bg_env, 
+                           coords = c("longitude", "latitude")) %>% 
+  dplyr::select(all_of(names(env_rasters)))
+
+# extract geometry columns as lon/lat
+bnll_bg_env_df <- bnll_bg_env_sf %>% 
+  mutate(longitude = st_coordinates(bnll_bg_env_sf)[,1],
+         latitude = st_coordinates(bnll_bg_env_sf)[,2], 
+         .before = 1) %>% 
+  st_drop_geometry()
+```
+
+## Save the data
+
+```{r}
+# save final background points with env data to CSV
+write_csv(bnll_bg_env_df, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/3_extract_bg_env_data/bnll_bg_env_data.csv"))
+
+# save SF object
+write_sf(bnll_bg_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/3_extract_bg_env_data/bnll_bg_env_data.shp"),
+         append = FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

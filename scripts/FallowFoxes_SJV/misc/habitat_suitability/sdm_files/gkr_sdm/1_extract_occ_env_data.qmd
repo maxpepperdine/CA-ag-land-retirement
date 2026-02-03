@@ -1,5 +1,5 @@
 ---
-title: "Extract environmental data to BNLL occurrences"
+title: "Extract environmental data to GKR occurrences"
 author: "Maxwell Pepperdine"
 format: html
 editor: visual
@@ -10,7 +10,7 @@ editor_options:
 
 ## Overview
 
-This script extracts environmental data to blunt-nosed leopard lizard (BNLL) occurrence points for use in MaxEnt modeling. The environmental data includes:
+This script acquires giant kangaroo rat (GKR) occurrence points from GBIF using the `rgbif` package, and then extracts environmental data to the GKR occurrence points for use in MaxEnt modeling. The environmental data includes:
 
 -   BCM climate (AET, CWD, PPT)
 -   gSSURGO soil data (pH, % clay, EC)
@@ -30,6 +30,7 @@ library(tidyverse)  # always
 library(sf)         # for spatial data processing
 library(here)       # for file paths
 library(spThin)     # for spatial thinning
+library(rgbif)      # for GBIF data download
 ```
 
 ## Load data
@@ -48,19 +49,31 @@ names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave
 plot(env_rasters)
 ```
 
-#### BNLL occurrences
+#### GKR occurrences
 
 ```{r}
-# load occurrence points
-bnll_occ <- read_csv("data/raw/occurrence_points/bnll/wallace/bnll_occur_wallace.csv")
+# load occurrence points from GBIF
+gkr_occs <- occ_search(
+  taxonKey = 2439550,  # taxon key for Dipodomys ingens
+  hasCoordinate = TRUE,
+  hasGeospatialIssue = FALSE,
+  year = "1990,2025", 
+  basisOfRecord = "HUMAN_OBSERVATION;OBSERVATION;MACHINE_OBSERVATION",
+  limit = 10000
+)
+
+# convert to data frame
+gkr_occ_df <- gkr_occs$data %>%
+  dplyr::select(gbifID, decimalLongitude, decimalLatitude, institutionCode, year, 
+         basisOfRecord, scientificName)
 
 # convert occ points to SpatVector
-bnll_occ_vect <- vect(bnll_occ, 
-                      geom = c("longitude", "latitude"), 
-                      crs = "EPSG:4326")
+gkr_occ_vect <- vect(gkr_occ_df, 
+                     geom = c("decimalLongitude", "decimalLatitude"), 
+                     crs = "EPSG:4326")
 
 # make sure crs matches env rasters
-bnll_occ_vect <- project(bnll_occ_vect, crs(env_rasters))
+gkr_occ_vect <- project(gkr_occ_vect, crs(env_rasters))
 ```
 
 #### Spatial thinning of occurrence points
@@ -69,8 +82,8 @@ Thin occurrence points to 1 km minimum distance. This reduces spatial autocorrel
 
 ```{r}
 # convert back to lat/lon for spThin (it requires decimal degrees)
-bnll_occ_latlon <- project(bnll_occ_vect, "EPSG:4326")
-bnll_occ_df <- as.data.frame(bnll_occ_latlon, geom = "XY")
+gkr_occ_latlon <- project(gkr_occ_vect, "EPSG:4326")
+gkr_occ_df <- as.data.frame(gkr_occ_latlon, geom = "XY")
 
 # run spatial thinning with 1 km distance
 # thin.par = 1 means 1 km minimum distance between points
@@ -78,7 +91,7 @@ bnll_occ_df <- as.data.frame(bnll_occ_latlon, geom = "XY")
 # locs.thinned.list.return = TRUE returns all replicates
 # write.files = FALSE prevents writing files automatically
 thinned_data <- spThin::thin(
-  loc.data = bnll_occ_df,
+  loc.data = gkr_occ_df,
   lat.col = "y",  # latitude column
   long.col = "x", # longitude column
   spec.col = "scientific_name", 
@@ -92,33 +105,33 @@ thinned_data <- spThin::thin(
 # select the thinned dataset with the most points
 # (spThin returns a list of different thinning solutions)
 max_points <- which.max(sapply(thinned_data, nrow))
-bnll_thinned_df <- thinned_data[[max_points]]
+gkr_thinned_df <- thinned_data[[max_points]]
 
 # convert thinned points back to SpatVector and match original CRS
-bnll_thinned_vect <- vect(bnll_thinned_df, 
+gkr_thinned_vect <- vect(gkr_thinned_df, 
                           geom = c("Longitude", "Latitude"), 
                           crs = "EPSG:4326")
 
 # project to match env rasters
-bnll_thinned_vect <- project(bnll_thinned_vect, crs(env_rasters))
-crs(bnll_thinned_vect)  # check crs
+gkr_thinned_vect <- project(gkr_thinned_vect, crs(env_rasters))
+crs(gkr_thinned_vect)  # check crs
 ```
 
 ## Extract environmental data to occurrence points
 
 ```{r}
 # extract env data to occ points
-bnll_occ_env <- terra::extract(env_rasters, bnll_thinned_vect, 
+gkr_occ_env <- terra::extract(env_rasters, gkr_thinned_vect, 
                                bind = TRUE)
 
 # set as sf object
-bnll_occ_env_sf <- st_as_sf(bnll_occ_env, 
+gkr_occ_env_sf <- st_as_sf(gkr_occ_env, 
                             coords = c("longitude", "latitude"))
 
 # extract geometry columns as lat/lon
-bnll_occ_env_df <- bnll_occ_env_sf %>% 
-  mutate(longitude = st_coordinates(bnll_occ_env_sf)[,1],
-         latitude = st_coordinates(bnll_occ_env_sf)[,2], 
+gkr_occ_env_df <- gkr_occ_env_sf %>% 
+  mutate(longitude = st_coordinates(gkr_occ_env_sf)[,1],
+         latitude = st_coordinates(gkr_occ_env_sf)[,2], 
          .before = "aet1991_2020_ave") %>%
   st_drop_geometry()
 ```
@@ -127,27 +140,9 @@ bnll_occ_env_df <- bnll_occ_env_sf %>%
 
 ```{r}
 # save final occurrence points with env data to CSV
-write_csv(bnll_occ_env_df, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/1_extract_occ_env_data/bnll_occ_env_data.csv"))
+write_csv(gkr_occ_env_df, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data/gkr_occ_env_data.csv"))
 
 # save SF object
-write_sf(bnll_occ_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/1_extract_occ_env_data/bnll_occ_env_data.shp"),
+write_sf(gkr_occ_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data/gkr_occ_env_data.shp"),
          append = FALSE)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
