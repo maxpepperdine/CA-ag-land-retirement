@@ -146,3 +146,9 @@ write_csv(gkr_occ_env_df, here("data/intermediate/misc/habitat_suitability/sdm_f
 write_sf(gkr_occ_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data/gkr_occ_env_data.shp"),
          append = FALSE)
 ```
+
+
+
+
+
+

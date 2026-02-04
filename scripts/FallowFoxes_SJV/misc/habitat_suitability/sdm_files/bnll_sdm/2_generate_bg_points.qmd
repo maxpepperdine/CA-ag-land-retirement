@@ -91,7 +91,7 @@ options(gbif_email = "max.pepperdine@gmail.com")
 #   pred_within(buffer_simplify_wkt)  # Your buffer
 # )
 
-# This works with occ_download and allows all three classes in one request
+# use rgbif::occ_download to acquire background points
 download_key <- occ_download(
   pred_in("taxonKey", 44),  # Vertebrata
   pred("hasCoordinate", TRUE),
@@ -99,7 +99,7 @@ download_key <- occ_download(
   pred_gte("year", 1990),
   pred_lte("year", 2025),
   pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
-  pred_lte("coordinateUncertaintyInMeters", 1000),
+  pred_lte("coordinateUncertaintyInMeters", 2000),
   pred_within(buffer_simplify_wkt)  # Your buffer
 )
 
@@ -153,7 +153,6 @@ Save the data
 # save SF to test
 write_sf(vertebrate_unique, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points/bnll_bg_points.shp"),
          append = FALSE)
-
 
 # save final background points to CSV
 write_csv(background_df, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points/bnll_bg_points.csv"))

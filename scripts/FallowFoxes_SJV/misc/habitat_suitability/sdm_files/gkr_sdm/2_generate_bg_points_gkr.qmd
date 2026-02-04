@@ -1,5 +1,5 @@
 ---
-title: "Generate BNLL background points"
+title: "Generate GKR background points"
 author: "Maxwell Pepperdine"
 format: html
 editor: visual
@@ -15,7 +15,7 @@ rm(list = ls())
 
 ## Overview
 
-This script generates the bg data for habitat suitability modeling for the blunt-nosed leopard lizard (Gambelia sila) in the San Joaquin Valley, CA. It will load our BNLL occurrence data, generate a 50 km buffer around each occurrence point, and then find all geographically unique vertebrate (phylum Vertebrata) occurrence points within that buffer. These will be the background points for the BNLL MaxEnt model.
+This script generates the bg data for habitat suitability modeling for the giant kangaroo rat (*Dipodomys ingens*) in the San Joaquin Valley, CA. It will load our GKR occurrence data, generate a 50 km buffer around each occurrence point, and then find all geographically unique vertebrate (phylum Vertebrata) occurrence points within that buffer. These will be the background points for the GKR MaxEnt model.
 
 ## Load packages
 
@@ -29,43 +29,43 @@ library(sf)         # for spatial data processing
 ## Load data
 
 ```{r}
-# Load BNLL occurrence data
-bnll_occs <- read_csv(here("data/raw/occurrence_points/bnll/wallace/bnll_occur_wallace.csv"))
+# Load GKR occurrence data
+gkr_occs <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data/gkr_occ_env_data.csv"))
 ```
 
 ## Data processing
 
-#### Create 50 km buffer around BNLL occ points
+#### Create 50 km buffer around GKR occ points
 
 ```{r}
-# convert BNLL occ data to sf object
-bnll_sf <- st_as_sf(bnll_occs, 
+# convert GKR occ data to sf object
+gkr_sf <- st_as_sf(gkr_occs, 
                     coords = c("longitude", "latitude"), 
                     crs = 4326)
 
 # transform to projected CRS for buffering (EPSG:3310 - NAD83 / California Albers)
-bnll_sf_proj <- st_transform(bnll_sf, crs = 3310)
+gkr_sf_proj <- st_transform(gkr_sf, crs = 3310)
 
 # create 50 km buffer around each occurrence point
-bnll_buffer <- st_buffer(bnll_sf_proj, dist = 50000)
+gkr_buffer <- st_buffer(gkr_sf_proj, dist = 50000)
 
 # combine buffers into a single polygon
-bnll_buffer_union <- st_union(bnll_buffer)
+gkr_buffer_union <- st_union(gkr_buffer)
 
 # transform buffer back to WGS84
-bnll_buffer_wgs84 <- st_transform(bnll_buffer_union, crs = 4326)
+gkr_buffer_wgs84 <- st_transform(gkr_buffer_union, crs = 4326)
 
 # # save buffer to file for testing
-# write_sf(bnll_buffer_wgs84, here("data/intermediate/misc/habitat_suitability/vertebrate_bg_points/bnll_50km_buffer.shp"))
+# write_sf(gkr_buffer_wgs84, here("data/intermediate/misc/habitat_suitability/vertebrate_bg_points/gkr_50km_buffer.shp"))
 ```
 
 ```{r}
 # set buffer to WKT format for rgbif::occ_download()
-bnll_buffer_wkt <- st_as_text(st_geometry(bnll_buffer_wgs84)[[1]])
-nchar(bnll_buffer_wkt)  # check length of WKT string
+gkr_buffer_wkt <- st_as_text(st_geometry(gkr_buffer_wgs84)[[1]])
+nchar(gkr_buffer_wkt)  # check length of WKT string
 
 # buffer is too long for rgbif, so simplify it
-buffer_simplify <- st_simplify(bnll_buffer_wgs84, dTolerance = 500)
+buffer_simplify <- st_simplify(gkr_buffer_wgs84, dTolerance = 500)
 buffer_simplify_wkt <- st_as_text(st_geometry(buffer_simplify)[[1]])
 nchar(buffer_simplify_wkt)  # check length of WKT string
 ```
@@ -78,20 +78,7 @@ options(gbif_user = "mpepperdine")
 options(gbif_pwd = "Pumbaason@20")
 options(gbif_email = "max.pepperdine@gmail.com")
 
-
-# # This works with occ_download and allows all three classes in one request
-# download_key <- occ_download(
-#   pred_in("taxonKey", c(359, 358, 131)),  # Mammalia, Reptilia, Amphibia
-#   pred("hasCoordinate", TRUE),
-#   pred("hasGeospatialIssue", FALSE),
-#   pred_gte("year", 1990),
-#   pred_lte("year", 2025),
-#   pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
-#   pred_lte("coordinateUncertaintyInMeters", 1000),
-#   pred_within(buffer_simplify_wkt)  # Your buffer
-# )
-
-# This works with occ_download and allows all three classes in one request
+# use rgbif::occ_download to acquire background points
 download_key <- occ_download(
   pred_in("taxonKey", 44),  # Vertebrata
   pred("hasCoordinate", TRUE),
@@ -99,10 +86,9 @@ download_key <- occ_download(
   pred_gte("year", 1990),
   pred_lte("year", 2025),
   pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
+  pred_lte("coordinateUncertaintyInMeters", 500),
   pred_within(buffer_simplify_wkt)  # Your buffer
 )
-
-# pred_lte("coordinateUncertaintyInMeters", 500),
 
 # check download status
 cat("Download key:", download_key, "\n")
@@ -121,13 +107,13 @@ vertebrate_data <- occ_download_import(download_file)
 vertebrate_sf <- st_as_sf(vertebrate_data,
                           coords = c("decimalLongitude", "decimalLatitude"),
                           crs = 4326) %>% 
-  # remove all BNLL occ points
-  filter(species != "Gambelia sila")
+  # remove all GKR occ points
+  filter(species != "Dipodomys ingens")
 
 
 # intersect occ points with the original precise buffer
-# this keeps only points within 50 km of BNLL occs
-vertebrate_in_buffer <- st_intersection(vertebrate_sf, bnll_buffer_wgs84)
+# this keeps only points within 50 km of GKR occs
+vertebrate_in_buffer <- st_intersection(vertebrate_sf, gkr_buffer_wgs84)
 
 # remove duplicates
 vertebrate_unique <- vertebrate_in_buffer %>%
@@ -151,13 +137,16 @@ Save the data
 
 ```{r}
 # save SF to test
-write_sf(vertebrate_unique, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points/bnll_bg_points.shp"),
+write_sf(vertebrate_unique, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/2_generate_bg_points/gkr_bg_points.shp"),
          append = FALSE)
 
 
 # save final background points to CSV
-write_csv(background_df, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points/bnll_bg_points.csv"))
+write_csv(background_df, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/2_generate_bg_points/gkr_bg_points.csv"))
 ```
+
+
+
 
 
 

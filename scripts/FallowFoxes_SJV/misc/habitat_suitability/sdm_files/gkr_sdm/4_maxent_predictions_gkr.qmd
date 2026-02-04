@@ -1,5 +1,5 @@
 ---
-title: "BNLL MaxEnt prediction generation"
+title: "GKR MaxEnt prediction generation"
 author: "Maxwell Pepperdine"
 format: html
 editor: visual
@@ -10,7 +10,7 @@ editor_options:
 
 ## Overview
 
-This script reads in the prepared BNLL occurrence records (produced in `1_extract_occ_env_data.qmd`) and background points (produced in `2_generate_bg_points.qmd` and `3_extract_bg_env_data.qmd`) to evaluate and generate MaxEnt models using the `dismo` package.
+This script reads in the prepared GKR occurrence records (produced in `1_extract_occ_env_data_gkr.qmd`) and background points (produced in `2_generate_bg_points_gkr.qmd` and `3_extract_bg_env_data_gkr.qmd`) to evaluate and generate MaxEnt models using the `dismo` package.
 
 ```{r}
 rm(list = ls())
@@ -37,10 +37,10 @@ library(kableExtra) # for nice tables
 
 ```{r}
 # load occurrence data with env data extracted
-occ_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/1_extract_occ_env_data/bnll_occ_env_data.csv"))
+occ_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data/gkr_occ_env_data.csv"))
 
 # load background data with env data extracted
-bg_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/3_extract_bg_env_data/bnll_bg_env_data.csv"))
+bg_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/3_extract_bg_env_data/gkr_bg_env_data.csv"))
 ```
 
 ```{r}
@@ -106,12 +106,6 @@ Using the `ENMevaluate()` function from the `ENMeval` package, we can evaluate t
 After selecting the best model, we can use the `maxent()` function from the `dismo` package to run the model with the selected feature class and regularization multiplier. In this step, we'll use the `jacknife` partition argument to assess the importance of each environmental variable in the model.
 
 ```{r}
-# remoce CWD from occ and bg data
-occ_data <- occ_data %>%
-  dplyr::select(-cwd1991_2020_ave)
-bg_data <- bg_data %>%
-  dplyr::select(-cwd1991_2020_ave)
-
 # set up the block for spatial partitioning
 block <- ENMeval::get.block(occ_data, bg_data, 
                             orientation = "lat_lon")
@@ -120,7 +114,7 @@ table(block$occs.grp)
 
 
 ## Evaluating the model
-max.eval.bnll <- ENMeval::ENMevaluate(occs = occ_data, 
+max.eval.gkr <- ENMeval::ENMevaluate(occs = occ_data, 
                                       bg = bg_data, 
                                       tune.args = list(fc = c("L", "LQ", "P"), 
                                                       rm = seq(0.5, 3, 0.5)),
@@ -130,13 +124,13 @@ max.eval.bnll <- ENMeval::ENMevaluate(occs = occ_data,
 
 ```{r}
 # examine the model results
-max.eval.bnll
-eval.results(max.eval.bnll) # model evaluation results
-eval.tune.settings(max.eval.bnll) # extract the tuning parameter settings 
-eval.results.partitions(max.eval.bnll) # assess model performance for each partition
+max.eval.gkr
+eval.results(max.eval.gkr) # model evaluation results
+eval.tune.settings(max.eval.gkr) # extract the tuning parameter settings 
+eval.results.partitions(max.eval.gkr) # assess model performance for each partition
 
 # clean results
-results <- eval.results(max.eval.bnll) %>%
+results <- eval.results(max.eval.gkr) %>%
   dplyr::select(fc, rm, tune.args, auc.train, auc.val.avg, AICc, delta.AICc, 
                 or.10p.avg, or.mtp.avg, cbi.val.avg) %>% 
   arrange(AICc) %>% 
@@ -150,7 +144,7 @@ kable(results, row.names = FALSE) %>%
 
 
 # plot stat results across values of the tuning parameters
-evalplot.stats(e = max.eval.bnll, 
+evalplot.stats(e = max.eval.gkr, 
                # or.mtp me
                stats = c("or.mtp", "auc.val"), 
                facet.labels = c("or.mtp" = "OR (mtp)", 
@@ -160,8 +154,8 @@ evalplot.stats(e = max.eval.bnll,
                error.bars = FALSE)
 
 # removing delta.AICc for plotting because it gets included with AIC by default
-max.eval.filtered <- max.eval.bnll
-max.eval.filtered@results <- max.eval.bnll@results[, !colnames(max.eval.bnll@results) %in% "delta.AICc"]
+max.eval.filtered <- max.eval.gkr
+max.eval.filtered@results <- max.eval.gkr@results[, !colnames(max.eval.gkr@results) %in% "delta.AICc"]
 
 evalplot.stats(e = max.eval.filtered,
                stats = c("AICc", "auc.train"),
@@ -178,22 +172,22 @@ evalplot.stats(e = max.eval.filtered,
 
 
 # save the evaluation results to avoid re-running the model
-save(max.eval.bnll, 
-     file = here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/max_eval_bnll.rda"))
+save(max.eval.gkr, 
+     file = here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions/max_eval_gkr.rda"))
 
 # load the evaluation results
-load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/max_eval_bnll.rda"))
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions/max_eval_gkr.rda"))
 ```
 
 ## Running MaxEnt & generating predictions
 
-After identifying the best model based on the evaluation results, we'll run the model using the `dismo::maxent()` function. This generates a model object that can be used to predict baseline (historical) and future BNLL occurrence probability under projected environmental data using the `dismo::predict()` function.
+After identifying the best model based on the evaluation results, we'll run the model using the `dismo::maxent()` function. This generates a model object that can be used to predict baseline (historical) and future GKR occurrence probability under projected environmental data using the `dismo::predict()` function.
 
 #### Run MaxEnt with the selected model
 
 This section generates a MaxEnt model using the selected feature class and regularization multiplier from the evaluation results above that produced the highest performing models (`fc.LQ_rm.0.5`).
 
-These model objects are then used to predict baseline (historical) and future BNLL occurrence probabilities.
+These model objects are then used to predict baseline (historical) and future GKR occurrence probabilities.
 
 #### Baseline (fc LQ and rm 0.5)
 
@@ -231,27 +225,27 @@ args <- c("jackknife=TRUE",      # assess variable importance
           "betamultiplier=0.5")  # this is the rm coefficient from ENMevaluate()
 
 # path to save results
-path <- here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/")
+path <- here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions/")
 
 
 ## final model run
-maxent_bnll <- maxent(x = x, 
+maxent_gkr <- maxent(x = x, 
                       p = p, 
                       args = args, 
                       path = path)
 
 # save model object for prediction rasters
-save(maxent_bnll, 
-     file = here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+save(maxent_gkr, 
+     file = here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions/maxent_prediction_gkr_sdm.rda"))
 ```
 
-#### Predict baseline (historical) BNLL occurrence probability
+#### Predict baseline (historical) GKR occurrence probability
 
 ```{r}
 #### set up the prediction parameters
 
 ## load the model object
-load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions/maxent_prediction_gkr_sdm.rda"))
 
 
 ## load the environmental data as a raster stack 
@@ -267,12 +261,9 @@ x_stack <- raster::stack(env_files)
 # check the layer names; need to match pred var names in SWD data
 names(x_stack)
 # match the layer names to the predictor variable names in the SWD data
-# change if needed
 names(x_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
                     "ec_dS_m_0_10cm", "elevation", "pH_0_10cm", "ppt1991_2020_ave", 
                     "slope")
-# get rid of cwd layer since it was not used in the model
-x_stack <- dropLayer(x_stack, "cwd1991_2020_ave")
 
 # make sure the raster stack is in EPSG:3310
 x_stack <- projectRaster(x_stack, crs = crs(env_raster))
@@ -296,20 +287,19 @@ stewart_bnll_ext <- extent(stewart_bnll_ext)
 
 
 ## define the filename path for the prediction raster
-filename_bnll <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_fillNAs.tif")
+filename_gkr <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions/maxent_gkr_pred_fillNAs.tif")
 
 
 ## predict current HEC 
-dismo::predict(object = maxent_bnll, 
+dismo::predict(object = maxent_gkr, 
                x = x_stack, 
                ext = stewart_bnll_ext,
-               filename = filename_bnll, 
+               filename = filename_gkr, 
                overwrite = TRUE)
 
 ## plot the prediction raster!!
-pred_rast_bnll <- rast(filename_bnll)
-plot(pred_rast_bnll, 
-     main = "MaxEnt Predicted Habitat Suitability for Blunt-nosed Leopard Lizard (Gambelia sila)")
+pred_rast_gkr <- rast(filename_gkr)
+plot(pred_rast_gkr)
 ```
 
 ## Mask lakes from prediction raster
@@ -320,32 +310,21 @@ ca_lakes_vect <- vect(ca_lakes)
 
 # rasterize the lakes
 ca_lakes_rast <- rasterize(ca_lakes_vect, 
-                           pred_rast_bnll, 
+                           pred_rast_gkr, 
                            field = 1)
 plot(ca_lakes_rast)
 
 # mask the lakes from the prediction raster; set lake pixels to 0
-bnll_habitat_masked <- pred_rast_bnll
-bnll_habitat_masked[ca_lakes_rast] <- 0
+gkr_habitat_masked <- pred_rast_gkr
+gkr_habitat_masked[ca_lakes_rast] <- 0
 
-plot(bnll_habitat_masked)
+plot(gkr_habitat_masked)
 
 # save the masked raster
-writeRaster(bnll_habitat_masked, 
-            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_masked_lakes.tif"),
+writeRaster(gkr_habitat_masked, 
+            here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions/maxent_gkr_pred_masked_lakes.tif"),
             overwrite = TRUE)
 ```
-
-
-
-
-
-
-
-
-
-
-
 
 
 

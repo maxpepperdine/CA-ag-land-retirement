@@ -1,5 +1,5 @@
 ---
-title: "3_hab_suit_diff"
+title: "GKR habitat suitability prediction plotting"
 format: html
 editor_options: 
   chunk_output_type: console
@@ -12,7 +12,7 @@ rm(list = ls())
 
 ## Overview/Purpose
 
-This script compares habitat suitability estimates for various species, finding the difference in values of habitat suitability between different models. This will allow an easy visual comparison of differences in where one model is predicting high/low suitability versus another.
+This script generates maps of the GKR habitat suitability predictions.
 
 ## Setup
 
@@ -30,16 +30,13 @@ library(sf)
 ###### Habitat suitability
 
 ```{r}
-##### Blunt-nosed leopard lizard habitat suitability rasters #####
+##### giant kangaroo rat habitat suitability rasters #####
 
 # Stewart et al. (2019) model
 bnll_stewart <- rast(here("data/raw/habitat_suitability/stewart_2019/G_sila_cont_suit.tif"))
 
 # Fallow SJV model
 bnll_fallowSJV <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_masked_lakes.tif"))
-
-
-##### Giant kangaroo rat habitat suitability rasters #####
 ```
 
 ###### Misc
