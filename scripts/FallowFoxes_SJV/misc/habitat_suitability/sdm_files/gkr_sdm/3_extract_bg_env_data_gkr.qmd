@@ -40,7 +40,7 @@ env_rasters <- rast(list.files(here("data/intermediate/misc/habitat_suitability/
 # fix names
 names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
                         "ec_dS_m_0_10cm", "elevation", "pH_0_10cm", "ppt1991_2020_ave", 
-                        "slope")
+                        "sand_pct_0_10cm", "silt_pct_0_10cm", "slope")
 plot(env_rasters)
 ```
 
@@ -48,7 +48,7 @@ plot(env_rasters)
 
 ```{r}
 # load background points
-gkr_bg <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/2_generate_bg_points/gkr_bg_points.csv"))
+gkr_bg <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/2_generate_bg_points_gkr/gkr_bg_points.csv"))
 
 # convert bg points to SpatVector
 gkr_bg_vect <- vect(gkr_bg, 
@@ -65,33 +65,77 @@ crs(gkr_bg_vect)
 Thin background points by 1 km to reduce spatial autocorrelation.
 
 ```{r}
-# convert back to lat/lon for spThin (it requires decimal degrees)
+# # convert back to lat/lon for spThin (it requires decimal degrees)
+# gkr_bg_latlon <- project(gkr_bg_vect, "EPSG:4326")
+# gkr_bg_df <- as.data.frame(gkr_bg_latlon, geom = "XY")
+# # add species dummy column for spThin
+# gkr_bg_df$species <- "background"
+# 
+# # run spatial thinning with 1 km distance
+# thinned_data <- spThin::thin(
+#   loc.data = gkr_bg_df,
+#   lat.col = "y",  # latitude column
+#   long.col = "x", # longitude column
+#   spec.col = "species", # dummy species column
+#   thin.par = 1,   # thinning distance in km
+#   reps = 10,     # number of replications
+#   locs.thinned.list.return = TRUE,
+#   write.files = FALSE,
+#   write.log.file = FALSE
+# )
+# 
+# # select the thinned dataset with the most points
+# max_points <- which.max(sapply(thinned_data, nrow))
+# gkr_bg_thinned_df <- thinned_data[[max_points]]
+# 
+# # convert thinned points back to SpatVector and match original CRS
+# gkr_bg_thinned_vect <- vect(gkr_bg_thinned_df, 
+#                              geom = c("Longitude", "Latitude"), 
+#                              crs = "EPSG:4326")
+# 
+# # project to match env rasters
+# gkr_bg_thinned_vect <- project(gkr_bg_thinned_vect, crs(env_rasters))
+# crs(gkr_bg_thinned_vect)  # check crs
+```
+
+Having RAM issues when using spThin on larger datasets, so using grid-based thinning instead. 
+
+```{r}
+# convert back to lat/lon
 gkr_bg_latlon <- project(gkr_bg_vect, "EPSG:4326")
 gkr_bg_df <- as.data.frame(gkr_bg_latlon, geom = "XY")
-# add species dummy column for spThin
-gkr_bg_df$species <- "background"
 
-# run spatial thinning with 1 km distance
-thinned_data <- spThin::thin(
-  loc.data = gkr_bg_df,
-  lat.col = "y",  # latitude column
-  long.col = "x", # longitude column
-  spec.col = "species", # dummy species column
-  thin.par = 1,   # thinning distance in km
-  reps = 10,     # number of replications
-  locs.thinned.list.return = TRUE,
-  write.files = FALSE,
-  write.log.file = FALSE
-)
+# convert to sf object
+gkr_bg_sf <- st_as_sf(gkr_bg_df, 
+                      coords = c("x", "y"), 
+                      crs = 4326)
 
-# select the thinned dataset with the most points
-max_points <- which.max(sapply(thinned_data, nrow))
-gkr_bg_thinned_df <- thinned_data[[max_points]]
+# project to EPSG 3310 for distance calculations
+gkr_bg_projected <- st_transform(gkr_bg_sf, crs = 3310)
+
+# create a grid ID based on 1km cells
+grid_size <- 1000  # 1 km in meters
+
+gkr_bg_projected <- gkr_bg_projected %>%
+  mutate(
+    grid_x = floor(st_coordinates(.)[,1] / grid_size),
+    grid_y = floor(st_coordinates(.)[,2] / grid_size),
+    grid_id = paste(grid_x, grid_y, sep = "_")
+  )
+
+# keep one random point per grid cell
+set.seed(123)  # for reproducibility
+gkr_bg_thinned_sf <- gkr_bg_projected %>%
+  group_by(grid_id) %>%
+  slice_sample(n = 1) %>%
+  ungroup() %>%
+  dplyr::select(-grid_x, -grid_y, -grid_id)
+
+# transform back to WGS84
+gkr_bg_thinned_sf <- st_transform(gkr_bg_thinned_sf, crs = 4326)
 
 # convert thinned points back to SpatVector and match original CRS
-gkr_bg_thinned_vect <- vect(gkr_bg_thinned_df, 
-                             geom = c("Longitude", "Latitude"), 
-                             crs = "EPSG:4326")
+gkr_bg_thinned_vect <- vect(gkr_bg_thinned_sf)
 
 # project to match env rasters
 gkr_bg_thinned_vect <- project(gkr_bg_thinned_vect, crs(env_rasters))
@@ -122,27 +166,9 @@ gkr_bg_env_df <- gkr_bg_env_sf %>%
 
 ```{r}
 # save final background points with env data to CSV
-write_csv(gkr_bg_env_df, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/3_extract_bg_env_data/gkr_bg_env_data.csv"))
+write_csv(gkr_bg_env_df, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/3_extract_bg_env_data_gkr/gkr_bg_env_data.csv"))
 
 # save SF object
-write_sf(gkr_bg_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/3_extract_bg_env_data/gkr_bg_env_data.shp"),
+write_sf(gkr_bg_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/3_extract_bg_env_data_gkr/gkr_bg_env_data.shp"),
          append = FALSE)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

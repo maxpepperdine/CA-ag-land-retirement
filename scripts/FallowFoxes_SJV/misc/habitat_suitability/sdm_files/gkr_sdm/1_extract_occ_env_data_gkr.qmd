@@ -45,7 +45,7 @@ env_rasters <- rast(list.files(here("data/intermediate/misc/habitat_suitability/
 # fix names
 names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
                         "ec_dS_m_0_10cm", "elevation", "pH_0_10cm", "ppt1991_2020_ave", 
-                        "slope")
+                        "sand_pct_0_10cm", "silt_pct_0_10cm", "slope")
 plot(env_rasters)
 ```
 
@@ -94,7 +94,7 @@ thinned_data <- spThin::thin(
   loc.data = gkr_occ_df,
   lat.col = "y",  # latitude column
   long.col = "x", # longitude column
-  spec.col = "scientific_name", 
+  spec.col = "scientificName", 
   thin.par = 1,   # thinning distance in km
   reps = 100,     # number of replications
   locs.thinned.list.return = TRUE,
@@ -140,14 +140,12 @@ gkr_occ_env_df <- gkr_occ_env_sf %>%
 
 ```{r}
 # save final occurrence points with env data to CSV
-write_csv(gkr_occ_env_df, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data/gkr_occ_env_data.csv"))
+write_csv(gkr_occ_env_df, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data_gkr/gkr_occ_env_data.csv"))
 
 # save SF object
-write_sf(gkr_occ_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data/gkr_occ_env_data.shp"),
+write_sf(gkr_occ_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data_gkr/gkr_occ_env_data.shp"),
          append = FALSE)
 ```
-
-
 
 
 

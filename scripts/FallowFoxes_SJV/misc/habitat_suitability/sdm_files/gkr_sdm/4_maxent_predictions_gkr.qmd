@@ -37,10 +37,10 @@ library(kableExtra) # for nice tables
 
 ```{r}
 # load occurrence data with env data extracted
-occ_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data/gkr_occ_env_data.csv"))
+occ_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data_gkr/gkr_occ_env_data.csv"))
 
 # load background data with env data extracted
-bg_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/3_extract_bg_env_data/gkr_bg_env_data.csv"))
+bg_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/3_extract_bg_env_data_gkr/gkr_bg_env_data.csv"))
 ```
 
 ```{r}
@@ -82,7 +82,7 @@ Assessing the correlation between environmental variables for MaxEnt. A Pearson 
 ```{r}
 # select only the environmental variables
 env_data_corr <- full_data %>%
-  dplyr::select(4:11)
+  dplyr::select(4:13)
 
 # create a correlation matrix
 cor_matrix <- cor(env_data_corr, # binded occ & bg data with only env variables
@@ -173,10 +173,10 @@ evalplot.stats(e = max.eval.filtered,
 
 # save the evaluation results to avoid re-running the model
 save(max.eval.gkr, 
-     file = here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions/max_eval_gkr.rda"))
+     file = here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/max_eval_gkr.rda"))
 
 # load the evaluation results
-load(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions/max_eval_gkr.rda"))
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/max_eval_gkr.rda"))
 ```
 
 ## Running MaxEnt & generating predictions
@@ -325,22 +325,3 @@ writeRaster(gkr_habitat_masked,
             here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions/maxent_gkr_pred_masked_lakes.tif"),
             overwrite = TRUE)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

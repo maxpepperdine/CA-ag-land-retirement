@@ -137,7 +137,7 @@ eval.results.partitions(max.eval.bnll) # assess model performance for each parti
 
 # clean results
 results <- eval.results(max.eval.bnll) %>%
-  dplyr::select(fc, rm, tune.args, auc.train, auc.val.avg, AICc, delta.AICc, 
+  dplyr::select(fc, rm, auc.train, auc.val.avg, AICc, delta.AICc, 
                 or.10p.avg, or.mtp.avg, cbi.val.avg) %>% 
   arrange(AICc) %>% 
   mutate(across(where(is.numeric), \(x) round(x, digits = 3)))
@@ -334,33 +334,3 @@ writeRaster(bnll_habitat_masked,
             here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_masked_lakes.tif"),
             overwrite = TRUE)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

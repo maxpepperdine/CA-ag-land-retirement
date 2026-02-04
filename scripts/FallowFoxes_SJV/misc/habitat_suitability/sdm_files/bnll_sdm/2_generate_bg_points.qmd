@@ -56,7 +56,7 @@ bnll_buffer_union <- st_union(bnll_buffer)
 bnll_buffer_wgs84 <- st_transform(bnll_buffer_union, crs = 4326)
 
 # # save buffer to file for testing
-# write_sf(bnll_buffer_wgs84, here("data/intermediate/misc/habitat_suitability/vertebrate_bg_points/bnll_50km_buffer.shp"))
+# write_sf(bnll_buffer_wgs84, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points/bnll_50km_buffer.shp"))
 ```
 
 ```{r}
@@ -75,8 +75,8 @@ nchar(buffer_simplify_wkt)  # check length of WKT string
 ```{r}
 # set up GBIF credentials (one-time setup)
 options(gbif_user = "mpepperdine")
-options(gbif_pwd = "Pumbaason@20")
-options(gbif_email = "max.pepperdine@gmail.com")
+options(gbif_pwd = " ")
+options(gbif_email = " ")
 
 
 # # This works with occ_download and allows all three classes in one request
@@ -157,13 +157,3 @@ write_sf(vertebrate_unique, here("data/intermediate/misc/habitat_suitability/sdm
 # save final background points to CSV
 write_csv(background_df, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points/bnll_bg_points.csv"))
 ```
-
-
-
-
-
-
-
-
-
-

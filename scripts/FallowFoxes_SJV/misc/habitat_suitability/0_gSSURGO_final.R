@@ -3,10 +3,12 @@
 # =============================================================================
 # 
 # Purpose: Extract and process gSSURGO data to generate 270m resolution rasters
-#          for three soil properties across the San Joaquin Valley:
+#          for five soil properties across the San Joaquin Valley:
 #               (1) Clay content (%)
-#               (2) pH (1:1 H₂O method)
-#               (3) Electrical conductivity (dS/m)
+#               (2) Sand content (%)
+#               (3) Silt content (%)
+#               (4) pH (1:1 H₂O method)
+#               (5) Electrical conductivity (dS/m)
 #
 # Methodology:
 #   - Spatial unit: gSSURGO map unit raster (10m native resolution)
@@ -22,6 +24,12 @@
 #   3. Block mean aggregation preserves spatial average at coarser resolution
 #
 # Data Source: USDA-NRCS gSSURGO (Gridded Soil Survey Geographic Database)
+#
+# Particle Size Variables:
+#   - sandtotal_r: Mineral particles 0.05–2.0 mm (% of <2mm fraction)
+#   - silttotal_r: Mineral particles 0.002–0.05 mm (% of <2mm fraction)
+#   - claytotal_r: Mineral particles <0.002 mm (% of <2mm fraction)
+#   Note: Sand + Silt + Clay should sum to ~100%
 #
 # =============================================================================
 
@@ -59,7 +67,7 @@ dominant_comp <- component %>%
   group_by(mukey) %>%
   slice_max(comppct_r, n = 1, with_ties = FALSE) %>%
   ungroup() %>%
-  select(mukey, cokey, compname, comppct_r)
+  dplyr::select(mukey, cokey, compname, comppct_r)
 
 
 # =============================================================================
@@ -86,6 +94,8 @@ surface_dw <- surface_0_10 %>%
   summarise(
     # weighted.mean() handles NA values appropriately with na.rm = TRUE
     clay = weighted.mean(claytotal_r, thickness, na.rm = TRUE),
+    sand = weighted.mean(sandtotal_r, thickness, na.rm = TRUE),
+    silt = weighted.mean(silttotal_r, thickness, na.rm = TRUE),
     ph = weighted.mean(ph1to1h2o_r, thickness, na.rm = TRUE),
     ec = weighted.mean(ec_r, thickness, na.rm = TRUE),
     .groups = "drop"
@@ -101,7 +111,7 @@ surface_dw <- surface_0_10 %>%
 lookup <- dominant_comp %>%
   left_join(surface_dw, by = "cokey") %>%
   mutate(mukey = as.numeric(mukey)) %>%
-  select(mukey, clay, ph, ec)
+  dplyr::select(mukey, clay, sand, silt, ph, ec)
 
 # make sure there are no duplicate mukeys
 lookup <- lookup %>%
@@ -110,6 +120,11 @@ lookup <- lookup %>%
 # check it
 head(lookup)
 summary(lookup)
+
+# verify particle size fractions sum to ~100%
+lookup %>%
+  mutate(total = clay + sand + silt) %>%
+  summary()
 
 
 # =============================================================================
@@ -176,11 +191,15 @@ max_mukey <- max(lookup$mukey, na.rm = TRUE)
 # create empty vectors
 ph_vec <- rep(NA_real_, max_mukey)
 clay_vec <- rep(NA_real_, max_mukey)
+sand_vec <- rep(NA_real_, max_mukey)
+silt_vec <- rep(NA_real_, max_mukey)
 ec_vec <- rep(NA_real_, max_mukey)
 
 # fill in values at mukey positions
 ph_vec[lookup$mukey] <- lookup$ph
 clay_vec[lookup$mukey] <- lookup$clay
+sand_vec[lookup$mukey] <- lookup$sand
+silt_vec[lookup$mukey] <- lookup$silt
 ec_vec[lookup$mukey] <- lookup$ec
 
 # read raster values, reclassify, and write out
@@ -188,16 +207,22 @@ ec_vec[lookup$mukey] <- lookup$ec
 
 ph_rast <- app(mukey_rast, fun = function(x) ph_vec[x])
 clay_rast <- app(mukey_rast, fun = function(x) clay_vec[x])
+sand_rast <- app(mukey_rast, fun = function(x) sand_vec[x])
+silt_rast <- app(mukey_rast, fun = function(x) silt_vec[x])
 ec_rast <- app(mukey_rast, fun = function(x) ec_vec[x])
 
 # rename layers
 names(ph_rast) <- "pH_0_10cm"
 names(clay_rast) <- "clay_pct_0_10cm"
+names(sand_rast) <- "sand_pct_0_10cm"
+names(silt_rast) <- "silt_pct_0_10cm"
 names(ec_rast) <- "ec_dS_m_0_10cm"
 
 
 # plot to check
 plot(clay_rast, main = "Clay Content (%) 0-10 cm")
+plot(sand_rast, main = "Sand Content (%) 0-10 cm")
+plot(silt_rast, main = "Silt Content (%) 0-10 cm")
 plot(ph_rast, main = "pH (1:1 H2O) 0-10 cm")
 plot(ec_rast, main = "Electrical Conductivity (dS/m) 0-10 cm")
 
@@ -227,6 +252,14 @@ clay_270m <- aggregate(clay_rast,
                        fact = fact, 
                        fun = "mean", 
                        na.rm = TRUE)
+sand_270m <- aggregate(sand_rast,
+                       fact = fact,
+                       fun = "mean",
+                       na.rm = TRUE)
+silt_270m <- aggregate(silt_rast,
+                       fact = fact,
+                       fun = "mean",
+                       na.rm = TRUE)
 ph_270m <- aggregate(ph_rast,
                      fact = fact, 
                      fun = "mean", 
@@ -238,16 +271,22 @@ ec_270m <- aggregate(ec_rast,
 
 # plot to check
 plot(clay_270m, main = "Clay Content (%) 0-10 cm at 270m")
+plot(sand_270m, main = "Sand Content (%) 0-10 cm at 270m")
+plot(silt_270m, main = "Silt Content (%) 0-10 cm at 270m")
 plot(ph_270m, main = "pH (1:1 H2O) 0-10 cm at 270m")
 plot(ec_270m, main = "Electrical Conductivity (dS/m) 0-10 cm at 270m")
 
 
 # write final rasters
 clay_file <- here("data/raw/gssurgo/processed/clay_pct_0_10cm_CA_270m.tif")
+sand_file <- here("data/raw/gssurgo/processed/sand_pct_0_10cm_CA_270m.tif")
+silt_file <- here("data/raw/gssurgo/processed/silt_pct_0_10cm_CA_270m.tif")
 ph_file <- here("data/raw/gssurgo/processed/pH_0_10cm_CA_270m.tif")
 ec_file <- here("data/raw/gssurgo/processed/ec_dS_m_0_10cm_CA_270m.tif")
 
 writeRaster(clay_270m, clay_file, overwrite = TRUE)
+writeRaster(sand_270m, sand_file, overwrite = TRUE)
+writeRaster(silt_270m, silt_file, overwrite = TRUE)
 writeRaster(ph_270m, ph_file, overwrite = TRUE)
 writeRaster(ec_270m, ec_file, overwrite = TRUE)
 

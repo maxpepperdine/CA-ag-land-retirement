@@ -38,6 +38,8 @@ bnll_fallowSJV <- rast(here("data/intermediate/misc/habitat_suitability/sdm_file
 
 # Stewart et al. (2019) model
 bnll_stewart <- rast(here("data/raw/habitat_suitability/stewart_2019/G_sila_cont_suit.tif"))
+
+
 ```
 
 ###### Misc
@@ -85,7 +87,7 @@ crs(sjv_boundary)
 sjv_vect <- vect(sjv_boundary)
 ```
 
-## Plotting
+## Plotting our model and the Stewart et al. (2019) model
 
 #### Continuous (raw data) comparisons
 
@@ -125,7 +127,7 @@ diff_continuous <- bnll_stewart - bnll_fallowSJV
 map_diff_cont <- tm_shape(diff_continuous) +
   tm_raster(col.scale = tm_scale_continuous(values = "RdBu",
                                              midpoint = 0),
-            col.legend = tm_legend(title = "Difference\n(Stewart - FallowSJV)")) +
+            col.legend = tm_legend(title = "Continuous difference\n(Stewart - FallowSJV)")) +
   tm_layout(legend.position = c("left", "bottom"))
 map_diff_cont
 ```
@@ -136,8 +138,8 @@ Threshold: >= 0.8 is classified as suitable (1), < 0.8 is unsuitable (0).
 
 ```{r}
 # define the reclass matrix
-reclass_matrix <- matrix(c(0, 0.8, 0,      # [0, 0.8) -> 0 (unsuitable)
-                           0.8, 1, 1),     # [0.8, 1] -> 1 (suitable)
+reclass_matrix <- matrix(c(0, 0.7, 0,      # [0, 0.7) -> 0 (unsuitable)
+                           0.7, 1, 1),     # [0.7, 1] -> 1 (suitable)
                            ncol = 3, byrow = TRUE)
 
 # reclassify rasters
@@ -194,10 +196,8 @@ labels_diff_bin <- c("-1 (fallowSJV only)",
 map_diff_bin <- tm_shape(diff_binary) +
   tm_raster(col.scale = tm_scale_categorical(values = palette_diff_bin,
                                               labels = labels_diff_bin),
-            col.legend = tm_legend(title = "Binary Difference\n(Stewart - FallowSJV)")) +
-  tm_layout(legend.position = c("left", "bottom"),
-            main.title = "Binary suitability (>= 0.8): model disagreement",
-            main.title.size = 1)
+            col.legend = tm_legend(title = "Binary difference\n(Stewart - FallowSJV)")) +
+  tm_layout(legend.position = c("left", "bottom"))
 
 map_diff_bin
 ```

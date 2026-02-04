@@ -30,7 +30,10 @@ library(sf)         # for spatial data processing
 
 ```{r}
 # Load GKR occurrence data
-gkr_occs <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data/gkr_occ_env_data.csv"))
+gkr_occs <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data_gkr/gkr_occ_env_data.csv"))
+
+# CA boundary
+ca_boundary <- read_sf(here("data/raw/ca_state/ca_state_boundary_no_islands.shp"))
 ```
 
 ## Data processing
@@ -41,22 +44,24 @@ gkr_occs <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/
 # convert GKR occ data to sf object
 gkr_sf <- st_as_sf(gkr_occs, 
                     coords = c("longitude", "latitude"), 
-                    crs = 4326)
+                    crs = 3310)
 
-# transform to projected CRS for buffering (EPSG:3310 - NAD83 / California Albers)
-gkr_sf_proj <- st_transform(gkr_sf, crs = 3310)
-
-# create 50 km buffer around each occurrence point
-gkr_buffer <- st_buffer(gkr_sf_proj, dist = 50000)
+# create 100 km buffer around each occurrence point
+gkr_buffer <- st_buffer(gkr_sf, dist = 100000)
 
 # combine buffers into a single polygon
 gkr_buffer_union <- st_union(gkr_buffer)
+
+# clip to CA boundary to remove ocean areas
+gkr_buffer_union <- st_intersection(gkr_buffer_union, 
+                                    st_transform(ca_boundary, crs = 3310))
 
 # transform buffer back to WGS84
 gkr_buffer_wgs84 <- st_transform(gkr_buffer_union, crs = 4326)
 
 # # save buffer to file for testing
-# write_sf(gkr_buffer_wgs84, here("data/intermediate/misc/habitat_suitability/vertebrate_bg_points/gkr_50km_buffer.shp"))
+# write_sf(gkr_buffer_wgs84, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/2_generate_bg_points_gkr/gkr_100km_buffer.shp"), 
+#          append = FALSE)
 ```
 
 ```{r}
@@ -65,7 +70,7 @@ gkr_buffer_wkt <- st_as_text(st_geometry(gkr_buffer_wgs84)[[1]])
 nchar(gkr_buffer_wkt)  # check length of WKT string
 
 # buffer is too long for rgbif, so simplify it
-buffer_simplify <- st_simplify(gkr_buffer_wgs84, dTolerance = 500)
+buffer_simplify <- st_simplify(gkr_buffer_wgs84, dTolerance = 1000)
 buffer_simplify_wkt <- st_as_text(st_geometry(buffer_simplify)[[1]])
 nchar(buffer_simplify_wkt)  # check length of WKT string
 ```
@@ -108,7 +113,8 @@ vertebrate_sf <- st_as_sf(vertebrate_data,
                           coords = c("decimalLongitude", "decimalLatitude"),
                           crs = 4326) %>% 
   # remove all GKR occ points
-  filter(species != "Dipodomys ingens")
+  filter(species != "Dipodomys ingens") %>% 
+  filter(taxonKey != 2439550)
 
 
 # intersect occ points with the original precise buffer
@@ -137,23 +143,10 @@ Save the data
 
 ```{r}
 # save SF to test
-write_sf(vertebrate_unique, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/2_generate_bg_points/gkr_bg_points.shp"),
+write_sf(vertebrate_unique, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/2_generate_bg_points_gkr/gkr_bg_points.shp"),
          append = FALSE)
 
 
 # save final background points to CSV
-write_csv(background_df, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/2_generate_bg_points/gkr_bg_points.csv"))
+write_csv(background_df, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/2_generate_bg_points_gkr/gkr_bg_points.csv"))
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-

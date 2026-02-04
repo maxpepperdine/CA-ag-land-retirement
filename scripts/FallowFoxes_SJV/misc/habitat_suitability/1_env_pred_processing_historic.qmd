@@ -67,18 +67,23 @@ crs(cwd_rast) # EPSG:3310
 # gSSURGO
 # ==============================================================================
 
-## % clay
-# file path for gSSURGO % clay raster
+# % clay
 clay_path <- here("data/raw/gssurgo/processed/clay_pct_0_10cm_CA_270m.tif")
 clay_rast <- rast(clay_path)
 
-## pH
-# file path for gSSURGO pH raster
+# % sand
+sand_path <- here("data/raw/gssurgo/processed/sand_pct_0_10cm_CA_270m.tif")
+sand_rast <- rast(sand_path)
+
+# % silt
+silt_path <- here("data/raw/gssurgo/processed/silt_pct_0_10cm_CA_270m.tif")
+silt_rast <- rast(silt_path)
+
+# pH
 ph_path <- here("data/raw/gssurgo/processed/pH_0_10cm_CA_270m.tif")
 ph_rast <- rast(ph_path)
 
 # EC
-# file path for gSSURGO EC raster
 ec_path <- here("data/raw/gssurgo/processed/ec_dS_m_0_10cm_CA_270m.tif")
 ec_rast <- rast(ec_path)
 ```
@@ -267,6 +272,12 @@ Resample gSSURGO rasters to match AET `ext`, `res`, and `crs`.
 clay_resampled <- resample(clay_rast, 
                            aet_ca_filled, 
                            method = "mean")
+sand_resampled <- resample(sand_rast, 
+                           aet_ca_filled, 
+                           method = "mean")
+silt_resampled <- resample(silt_rast, 
+                           aet_ca_filled, 
+                           method = "mean")
 ph_resampled <- resample(ph_rast, 
                          aet_ca_filled, 
                          method = "mean")
@@ -276,14 +287,20 @@ ec_resampled <- resample(ec_rast,
 
 # confirm all rasters have the same extent and resolution
 crs(clay_resampled) == crs(aet_ca_filled)
+crs(sand_resampled) == crs(aet_ca_filled)
+crs(silt_resampled) == crs(aet_ca_filled)
 crs(ph_resampled) == crs(aet_ca_filled)
 crs(ec_resampled) == crs(aet_ca_filled)
 
 ext(clay_resampled) == ext(aet_ca_filled)
+ext(sand_resampled) == ext(aet_ca_filled)
+ext(silt_resampled) == ext(aet_ca_filled)
 ext(ph_resampled) == ext(aet_ca_filled)
 ext(ec_resampled) == ext(aet_ca_filled)
 
 res(clay_resampled) == res(aet_ca_filled)
+res(sand_resampled) == res(aet_ca_filled)
+res(silt_resampled) == res(aet_ca_filled)
 res(ph_resampled) == res(aet_ca_filled)
 res(ec_resampled) == res(aet_ca_filled)
 ```
@@ -293,11 +310,19 @@ The gSSURGO data has a lot of NA values in some areas. This causes errors in `Wa
 ```{r}
 # apply fill NA function to gSSURGO rasters
 clay_filled <- fill_all_na(clay_resampled)
+sand_filled <- fill_all_na(sand_resampled)
+silt_filled <- fill_all_na(silt_resampled)
 ph_filled <- fill_all_na(ph_resampled)
 ec_filled <- fill_all_na(ec_resampled)
 
 # crop to aet raster to ensure no edge effects
 clay_filled <- clay_filled %>% 
+  crop(aet_ca_filled) %>%
+  mask(aet_ca_filled)
+sand_filled <- sand_filled %>% 
+  crop(aet_ca_filled) %>%
+  mask(aet_ca_filled)
+silt_filled <- silt_filled %>%
   crop(aet_ca_filled) %>%
   mask(aet_ca_filled)
 ph_filled <- ph_filled %>% 
@@ -309,19 +334,27 @@ ec_filled <- ec_filled %>%
 
 # make sure all rasters have the same extent and resolution
 crs(clay_filled) == crs(aet_ca_filled)
+crs(sand_filled) == crs(aet_ca_filled)
+crs(silt_filled) == crs(aet_ca_filled)
 crs(ph_filled) == crs(aet_ca_filled)
 crs(ec_filled) == crs(aet_ca_filled)
 
 ext(clay_filled) == ext(aet_ca_filled)
+ext(sand_filled) == ext(aet_ca_filled)
+ext(silt_filled) == ext(aet_ca_filled)
 ext(ph_filled) == ext(aet_ca_filled)
 ext(ec_filled) == ext(aet_ca_filled)
 
 res(clay_filled) == res(aet_ca_filled)
+res(sand_filled) == res(aet_ca_filled)
+res(silt_filled) == res(aet_ca_filled)
 res(ph_filled) == res(aet_ca_filled)
 res(ec_filled) == res(aet_ca_filled)
 
 # plot filled gSSURGO rasters
 plot(clay_filled, main = "% Clay (filled NA values)")
+plot(sand_filled, main = "% Sand (filled NA values)")
+plot(silt_filled, main = "% Silt (filled NA values)")
 plot(ph_filled, main = "pH (filled NA values)")
 plot(ec_filled, main = "EC (filled NA values)")
 ```
@@ -402,6 +435,12 @@ writeRaster(cwd_ca_filled,
 writeRaster(clay_filled, 
             filename = file.path(output_dir, "clay_pct_0_10cm_CA_270m.tif"), 
             overwrite = TRUE)
+writeRaster(sand_filled, 
+            filename = file.path(output_dir, "sand_pct_0_10cm_CA_270m.tif"), 
+            overwrite = TRUE)
+writeRaster(silt_filled, 
+            filename = file.path(output_dir, "silt_pct_0_10cm_CA_270m.tif"), 
+            overwrite = TRUE)
 writeRaster(ph_filled, 
             filename = file.path(output_dir, "ph_0_10cm_CA_270m.tif"), 
             overwrite = TRUE)
@@ -421,7 +460,7 @@ writeRaster(elevation_ca,
             overwrite = TRUE)
 ```
 
-#### WGS84, ~0.00242 degree resolution at equator, SJV extent
+#### WGS84, \~0.00242 degree resolution at equator, SJV extent
 
 Reproject all rasters to WGS 84 (`EPSG:4326`) for use in Wallace.
 
@@ -488,13 +527,3 @@ writeRaster(slope_wgs84,
             filename = file.path(output_dir, "WGS84/slope_deg_CA_wgs84.tif"), 
             overwrite = TRUE)
 ```
-
-
-
-
-
-
-
-
-
-
