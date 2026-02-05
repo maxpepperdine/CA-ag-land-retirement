@@ -58,6 +58,20 @@ crs(cwd_rast) <- "EPSG:3310" # assign correct CRS
 # QC resolution & crs
 res(cwd_rast) # 270m resolution
 crs(cwd_rast) # EPSG:3310
+
+## TMX
+tmx_rast <- rast(here("data/raw/bcm/BCMv8_1991_2020_aves/tmx1991_2020_ave.asc"))
+crs(tmx_rast) <- "EPSG:3310" # assign correct CRS
+# QC resolution & crs
+res(tmx_rast) # 270m resolution
+crs(tmx_rast) # EPSG:3310
+
+## TMN
+tmn_rast <- rast(here("data/raw/bcm/BCMv8_1991_2020_aves/tmn1991_2020_ave.asc"))
+crs(tmn_rast) <- "EPSG:3310" # assign correct CRS
+# QC resolution & crs
+res(tmn_rast) # 270m resolution
+crs(tmn_rast) # EPSG:3310
 ```
 
 ###### gSSURGO
@@ -194,10 +208,32 @@ summary(values(cwd_ca))
 values(cwd_ca)[values(cwd_ca) == -9999] <- NA
 
 
+# crop TMN raster to CA boundary
+tmn_ca <- tmn_rast %>%
+  crop(ca_state) %>%
+  mask(ca_state)
+# view range of TMN values in CA
+summary(values(tmn_ca))
+# -9999 indicates no data values -- these should be NA
+values(tmn_ca)[values(tmn_ca) == -9999] <- NA
+
+
+# crop TMX raster to CA boundary
+tmx_ca <- tmx_rast %>%
+  crop(ca_state) %>%
+  mask(ca_state)
+# view range of TMX values in CA
+summary(values(tmx_ca))
+# -9999 indicates no data values -- these should be NA
+values(tmx_ca)[values(tmx_ca) == -9999] <- NA
+
+
 # plot cropped rasters
 plot(aet_ca, main = "AET (CA Boundary)")
 plot(ppt_ca, main = "PPT (CA Boundary)")
 plot(cwd_ca, main = "CWD (CA Boundary)")
+plot(tmn_ca, main = "TMN (CA Boundary)")
+plot(tmx_ca, main = "TMX (CA Boundary)")
 ```
 
 ###### Fill NA values in AET raster
@@ -249,6 +285,29 @@ cwd_ca_filled <- resample(cwd_ca_filled,
                           method = "mean")
 
 
+## TMN
+# crop to PPT to ensure no edge effects
+tmn_ca <- tmn_ca %>%
+  crop(ppt_ca) %>%
+  mask(ppt_ca)
+
+# resample to match aet extent
+tmn_ca <- resample(tmn_ca, 
+                   aet_ca_filled, 
+                   method = "mean")
+
+## TMX
+# crop to PPT to ensure no edge effects
+tmx_ca <- tmx_ca %>%
+  crop(ppt_ca) %>%
+  mask(ppt_ca)
+
+# resample to match aet extent
+tmx_ca <- resample(tmx_ca, 
+                   aet_ca_filled, 
+                   method = "mean")
+
+
 # QC make sure aet, cwd and ppt have same extent and resolution
 crs(aet_ca_filled) == crs(ppt_ca)
 ext(aet_ca_filled) == ext(ppt_ca)
@@ -257,6 +316,14 @@ res(aet_ca_filled) == res(ppt_ca)
 crs(aet_ca_filled) == crs(cwd_ca_filled)
 ext(aet_ca_filled) == ext(cwd_ca_filled)
 res(aet_ca_filled) == res(cwd_ca_filled)
+
+crs(aet_ca_filled) == crs(tmn_ca)
+ext(aet_ca_filled) == ext(tmn_ca)
+res(aet_ca_filled) == res(tmn_ca)
+
+crs(aet_ca_filled) == crs(tmx_ca)
+ext(aet_ca_filled) == ext(tmx_ca)
+res(aet_ca_filled) == res(tmx_ca)
 
 # plot final AET & CWD raster
 plot(aet_ca_filled, main = "Mean AET (filled NA values)")
@@ -428,6 +495,16 @@ writeRaster(ppt_ca,
 # export CWD raster
 writeRaster(cwd_ca_filled,
             filename = file.path(output_dir, "cwd1991_2020_ave_CA_270m.tif"), 
+            overwrite = TRUE)
+
+# export TMN raster
+writeRaster(tmn_ca,
+            filename = file.path(output_dir, "tmn1991_2020_ave_CA_270m.tif"), 
+            overwrite = TRUE)
+
+# export TMX raster
+writeRaster(tmx_ca,
+            filename = file.path(output_dir, "tmx1991_2020_ave_CA_270m.tif"), 
             overwrite = TRUE)
 
 
