@@ -82,7 +82,7 @@ Assessing the correlation between environmental variables for MaxEnt. A Pearson 
 ```{r}
 # select only the environmental variables
 env_data_corr <- full_data %>%
-  dplyr::select(4:13)
+  dplyr::select(4:11)
 
 # create a correlation matrix
 cor_matrix <- cor(env_data_corr, # binded occ & bg data with only env variables
@@ -262,8 +262,8 @@ x_stack <- raster::stack(env_files)
 names(x_stack)
 # match the layer names to the predictor variable names in the SWD data
 names(x_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
-                    "ec_dS_m_0_10cm", "elevation", "pH_0_10cm", "ppt1991_2020_ave", 
-                    "slope")
+                    "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                    "silt_pct_0_10cm", "slope")
 
 # make sure the raster stack is in EPSG:3310
 x_stack <- projectRaster(x_stack, crs = crs(env_raster))

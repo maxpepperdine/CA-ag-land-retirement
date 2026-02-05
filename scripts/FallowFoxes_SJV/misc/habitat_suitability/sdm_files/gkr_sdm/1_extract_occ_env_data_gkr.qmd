@@ -13,8 +13,8 @@ editor_options:
 This script acquires giant kangaroo rat (GKR) occurrence points from GBIF using the `rgbif` package, and then extracts environmental data to the GKR occurrence points for use in MaxEnt modeling. The environmental data includes:
 
 -   BCM climate (AET, CWD, PPT)
--   gSSURGO soil data (pH, % clay, EC)
--   Slope and elevation from USGS Open Topography
+-   gSSURGO soil data (pH, % clay, % silt, EC)
+-   Slope from USGS Open Topography
 
 We will also spatially thin the occurrence points by 1 km to reduce spatial autocorrelation.
 
@@ -44,8 +44,8 @@ env_rasters <- rast(list.files(here("data/intermediate/misc/habitat_suitability/
                                full.names = TRUE))
 # fix names
 names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
-                        "ec_dS_m_0_10cm", "elevation", "pH_0_10cm", "ppt1991_2020_ave", 
-                        "sand_pct_0_10cm", "silt_pct_0_10cm", "slope")
+                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "silt_pct_0_10cm", "slope")
 plot(env_rasters)
 ```
 
@@ -146,7 +146,3 @@ write_csv(gkr_occ_env_df, here("data/intermediate/misc/habitat_suitability/sdm_f
 write_sf(gkr_occ_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data_gkr/gkr_occ_env_data.shp"),
          append = FALSE)
 ```
-
-
-
-

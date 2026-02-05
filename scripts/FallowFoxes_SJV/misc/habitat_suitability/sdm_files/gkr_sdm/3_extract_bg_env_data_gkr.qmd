@@ -12,8 +12,8 @@ editor_options:
 This script extracts environmental data to the GKR background points (created in `2_generate_bg_points_gkr.qmd`) for use in MaxEnt modeling. The environmental data includes:
 
 -   BCM climate (AET, CWD, PPT)
--   gSSURGO soil data (pH, % clay, EC)
--   Slope and elevation from USGS Open Topography
+-   gSSURGO soil data (pH, % clay, % silt, EC)
+-   Slope from USGS Open Topography
 
 ```{r}
 rm(list=ls())
@@ -39,8 +39,8 @@ env_rasters <- rast(list.files(here("data/intermediate/misc/habitat_suitability/
                                full.names = TRUE))
 # fix names
 names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
-                        "ec_dS_m_0_10cm", "elevation", "pH_0_10cm", "ppt1991_2020_ave", 
-                        "sand_pct_0_10cm", "silt_pct_0_10cm", "slope")
+                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "silt_pct_0_10cm", "slope")
 plot(env_rasters)
 ```
 
@@ -98,7 +98,7 @@ Thin background points by 1 km to reduce spatial autocorrelation.
 # crs(gkr_bg_thinned_vect)  # check crs
 ```
 
-Having RAM issues when using spThin on larger datasets, so using grid-based thinning instead. 
+Having RAM issues when using `spThin` on larger datasets, so using grid-based thinning instead.
 
 ```{r}
 # convert back to lat/lon

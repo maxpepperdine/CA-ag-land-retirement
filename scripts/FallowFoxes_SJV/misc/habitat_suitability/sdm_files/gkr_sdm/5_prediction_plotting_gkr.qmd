@@ -32,11 +32,7 @@ library(sf)
 ```{r}
 ##### giant kangaroo rat habitat suitability rasters #####
 
-# Stewart et al. (2019) model
-bnll_stewart <- rast(here("data/raw/habitat_suitability/stewart_2019/G_sila_cont_suit.tif"))
 
-# Fallow SJV model
-bnll_fallowSJV <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_masked_lakes.tif"))
 ```
 
 ###### Misc
@@ -51,17 +47,10 @@ sjv_boundary <- read_sf(here("data/raw/sjv_counties/sjv_counties.shp"))
 Raster math requires matching CRS, extent, and resolution.
 
 ```{r}
-stopifnot(
-  "CRS mismatch — reproject one raster to match the other" =
-    crs(bnll_stewart) == crs(bnll_fallowSJV),
-  "Extent mismatch — crop/align before proceeding" =
-    identical(ext(bnll_stewart), ext(bnll_fallowSJV)),
-  "Resolution mismatch — resample one raster to match the other" =
-    identical(res(bnll_stewart), res(bnll_fallowSJV))
-)
+
 ```
 
-#### Make sure all are in `EPSG:3310`
+#### Make sure SJV is in `EPSG:3310`
 
 ```{r}
 # transform SJV boundary to EPSG:3310
@@ -69,11 +58,6 @@ sjv_boundary <- st_transform(sjv_boundary, crs = crs(bnll_fallowSJV))
 crs(sjv_boundary)
 # convert to terra vector
 sjv_vect <- vect(sjv_boundary)
-
-##### reproject habitat suitability rasters to EPSG:3310 #####
-
-# blunt-nosed leopard lizard
-bnll_stewart <- project(bnll_stewart, crs(bnll_fallowSJV))
 ```
 
 ## Plotting
@@ -83,131 +67,34 @@ bnll_stewart <- project(bnll_stewart, crs(bnll_fallowSJV))
 Side-by-side plot of the two raw models
 
 ```{r}
-# Stewart et al. (2019) model
-map_stewart <- tm_raster(bnll_stewart, 
-                         title = "Stewart et al. (2019) model", 
-                         style = "cont", 
-                         palette = "viridis", 
-                         breaks = seq(0, 1, by = 0.25)) +
-  tm_layout(legend.outside = TRUE, 
-            legend.outside.position = "right")
 
-# Fallow SJV (our) model
-map_fallowSJV <- tm_raster(bnll_fallowSJV, 
-                           title = "Fallow SJV model", 
-                           style = "cont", 
-                           palette = "viridis", 
-                           breaks = seq(0, 1, by = 0.25)) +
-  tm_layout(legend.outside = TRUE, 
-            legend.outside.position = "right")
-
-# combine maps side-by-side
-tmarrange(map_stewart, map_fallowSJV, ncol = 2)
 ```
 
 Difference raster map. 
 
-Interpretation:
-- **Positive** --> stewart predict higher suitability
-- **Negative** --> fallowSJV predict higher suitability
-- **~Zero** --> models agree
-
 ```{r}
-# calculate difference raster
-diff_continuous <- bnll_stewart - bnll_fallowSJV
 
-# plot difference raster
-map_diff_cont <- tm_raster(diff_continuous,
-                           title   = "Difference\n(Stewart - FallowSJV)",
-                           style   = "cont",
-                           palette = "RdBu",
-                           midpoint = 0) +
-  tm_layout(legend.outside = TRUE,
-            legend.outside.position = "right",
-            main.title = "Continuous suitability: model difference",
-            main.title.size = 1)
-map_diff_cont
 ```
 
 #### Reclassified comparisons
 
-Threshold: >= 0.8 is classified as suitable (1), < 0.8 is unsuitable (0).
+Threshold: 
 
 ```{r}
-# define the reclass matrix
-reclass_matrix <- matrix(c(0, 0.8, 0,      # [0, 0.8) -> 0 (unsuitable)
-                           0.8, 1, 1),     # [0.8, 1] -> 1 (suitable)
-                           ncol = 3, byrow = TRUE)
 
-# reclassify rasters
-bnll_stewart_bin <- classify(bnll_stewart, reclass_matrix)
-bnll_fallowSJV_bin <- classify(bnll_fallowSJV, reclass_matrix)
 ```
 
 Side-by-side plot of the two binary models
 
 ```{r}
-# define palettes 
-palette_binary <- c("grey70", "green4")  # grey = not suitable, green = suitable
-labels_binary  <- c("Not Suitable", "Suitable")
 
-map_stewart_bin <- tm_raster(bnll_stewart_bin,
-                             title   = "Stewart et al. (2019) model",
-                             style   = "cat",
-                             palette = palette_binary,
-                             labels  = labels_binary) +
-  tm_layout(legend.outside = TRUE,
-            legend.outside.position = "right")
-
-map_fallowSJV_bin <- tm_raster(bnll_fallowSJV_bin,
-                               title   = "FallowSJV model",
-                               style   = "cat",
-                               palette = palette_binary,
-                               labels  = labels_binary) +
-  tm_layout(legend.outside = TRUE,
-            legend.outside.position = "right")
-
-tmarrange(map_stewart_bin, map_fallowSJV_bin, ncol = 2)
 ```
 
 Difference raster map (binary).
 
-Interpretation:
-- **1** --> Stewart suitable, FallowSJV not suitable (stewart-only)
-- **-1** --> FallowSJV suitable, Stewart not suitable (fallowSJV-only)
-- **0** --> both models agree (both suitable OR both not suitable)
-
 ```{r}
-# calculate difference raster
-diff_binary <- bnll_stewart_bin - bnll_fallowSJV_bin
 
-# plot difference raster
-palette_diff_bin <- c("#3182bd",   # -1  fallowSJV only
-                      "#f0f0f0",   #  0  agreement
-                      "#e6550d")   #  1  stewart only
-
-labels_diff_bin <- c("FallowSJV only",
-                     "Both agree",
-                     "Stewart only")
-
-map_diff_bin <- tm_raster(diff_binary,
-                          title   = "Binary Difference\n(Stewart - FallowSJV)",
-                          style   = "cat",
-                          palette = palette_diff_bin,
-                          labels  = labels_diff_bin) +
-  tm_layout(legend.outside = TRUE,
-            legend.outside.position = "right",
-            main.title = "Binary suitability (>= 0.8): model disagreement",
-            main.title.size = 1)
-
-map_diff_bin
 ```
-
-```{r}
-# plot the difference rasters side-by-side
-tmarrange(map_diff_cont, map_diff_bin, ncol = 2)
-```
-
 
 
 
