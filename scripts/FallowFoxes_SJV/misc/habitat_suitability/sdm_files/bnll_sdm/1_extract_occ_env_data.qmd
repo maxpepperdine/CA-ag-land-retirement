@@ -43,8 +43,9 @@ env_rasters <- rast(list.files(here("data/intermediate/misc/habitat_suitability/
                                full.names = TRUE))
 # fix names
 names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
-                        "ec_dS_m_0_10cm", "elevation", "pH_0_10cm", "ppt1991_2020_ave", 
-                        "slope")
+                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "sand_pct_0_10cm", "silt_pct_0_10cm", "slope", 
+                        "tmn1991_2020_ave", "tmx1991_2020_ave")
 plot(env_rasters)
 ```
 
@@ -129,25 +130,10 @@ bnll_occ_env_df <- bnll_occ_env_sf %>%
 # save final occurrence points with env data to CSV
 write_csv(bnll_occ_env_df, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/1_extract_occ_env_data/bnll_occ_env_data.csv"))
 
-# save SF object
-write_sf(bnll_occ_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/1_extract_occ_env_data/bnll_occ_env_data.shp"),
-         append = FALSE)
+# # save SF object
+# write_sf(bnll_occ_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/1_extract_occ_env_data/bnll_occ_env_data.shp"),
+#          append = FALSE)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

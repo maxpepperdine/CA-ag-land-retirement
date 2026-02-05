@@ -82,7 +82,7 @@ Assessing the correlation between environmental variables for MaxEnt. A Pearson 
 ```{r}
 # select only the environmental variables
 env_data_corr <- full_data %>%
-  dplyr::select(4:11)
+  dplyr::select(4:14)
 
 # create a correlation matrix
 cor_matrix <- cor(env_data_corr, # binded occ & bg data with only env variables
@@ -106,11 +106,13 @@ Using the `ENMevaluate()` function from the `ENMeval` package, we can evaluate t
 After selecting the best model, we can use the `maxent()` function from the `dismo` package to run the model with the selected feature class and regularization multiplier. In this step, we'll use the `jacknife` partition argument to assess the importance of each environmental variable in the model.
 
 ```{r}
-# remoce CWD from occ and bg data
+# remove CWD from occ and bg data
 occ_data <- occ_data %>%
-  dplyr::select(-cwd1991_2020_ave)
+  dplyr::select(-c(cwd1991_2020_ave, sand_pct_0_10cm, silt_pct_0_10cm, 
+                   tmn1991_2020_ave, tmx1991_2020_ave))
 bg_data <- bg_data %>%
-  dplyr::select(-cwd1991_2020_ave)
+  dplyr::select(-c(cwd1991_2020_ave, sand_pct_0_10cm, silt_pct_0_10cm, 
+                   tmn1991_2020_ave, tmx1991_2020_ave))
 
 # set up the block for spatial partitioning
 block <- ENMeval::get.block(occ_data, bg_data, 
@@ -204,8 +206,9 @@ These model objects are then used to predict baseline (historical) and future BN
 x <- full_data %>% 
   na.omit() %>%
   # select only the environmental variables
-  dplyr::select(4:11) %>% 
-  dplyr::select(-cwd1991_2020_ave)
+  dplyr::select(4:14) %>% 
+  dplyr::select(-c(cwd1991_2020_ave, sand_pct_0_10cm, silt_pct_0_10cm, 
+                   tmn1991_2020_ave, tmx1991_2020_ave))
 
 # # examine how many presence and absence points were lost from NA removal
 # x_summary <- x %>%
@@ -268,14 +271,18 @@ x_stack <- raster::stack(env_files)
 names(x_stack)
 # match the layer names to the predictor variable names in the SWD data
 names(x_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
-                    "ec_dS_m_0_10cm", "elevation", "pH_0_10cm", "ppt1991_2020_ave", 
-                    "slope")
+                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "sand_pct_0_10cm", "silt_pct_0_10cm", "slope", 
+                        "tmn1991_2020_ave", "tmx1991_2020_ave")
 # get rid of cwd layer since it was not used in the model
-x_stack <- dropLayer(x_stack, "cwd1991_2020_ave")
+layers_to_drop <- c("cwd1991_2020_ave", "sand_pct_0_10cm", "silt_pct_0_10cm", 
+                    "tmn1991_2020_ave", "tmx1991_2020_ave")
+x_stack <- dropLayer(x_stack, layers_to_drop)
 
 # make sure the raster stack is in EPSG:3310
 x_stack <- projectRaster(x_stack, crs = crs(env_raster))
 crs(x_stack)
+plot(x_stack)
 
 
 
