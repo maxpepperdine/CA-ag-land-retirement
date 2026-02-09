@@ -318,7 +318,7 @@ plot(pred_rast_bnll,
      main = "MaxEnt Predicted Habitat Suitability for Blunt-nosed Leopard Lizard (Gambelia sila)")
 ```
 
-## Mask lakes from prediction raster
+#### Mask lakes from prediction raster
 
 ```{r}
 # convert lakes sf object to SpatVector
@@ -341,3 +341,320 @@ writeRaster(bnll_habitat_masked,
             here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_masked_lakes.tif"),
             overwrite = TRUE)
 ```
+
+## Predict future BNLL occurrence probability under projected environmental data
+
+Transfer the model to future environmental data under `RCP4.5` and `RCP8.5` for two time periods (`2020-2049` and `2040-2069`) to predict future BNLL occurrence probability under projected environmental conditions.
+
+Produce 4 future prediction rasters for each RCP and time period combination.
+
+#### RCP45 -- 2020-2049
+
+```{r}
+#### set up the prediction parameters
+
+## load the model object trained with the baseline data
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+
+
+## load the environmental data as a raster stack
+
+env_fut_folder <- here("data/intermediate/misc/habitat_suitability/env_predictors/future/maxent_ready/bnll/rcp45_2020_2049")
+
+# define the path to the predictor variable rasters for RCP4.5 and 2020-2049
+env_fut_files <- list.files(path = env_fut_folder, 
+                            pattern = ".tif$", 
+                            full.names = TRUE)
+
+# get a raster stack of the future predictor variable files
+x_fut_stack <- raster::stack(env_fut_files)
+# check the layer names; need to match pred var names in SWD data
+names(x_fut_stack)
+
+# match the layer names to the predictor variable names in the SWD data
+names(x_fut_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", 
+                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "slope")
+
+# make sure the raster stack is in EPSG:3310
+x_fut_stack <- projectRaster(x_fut_stack, crs = crs(env_raster))
+crs(x_fut_stack)
+plot(x_fut_stack)
+
+## define the extent as the extent from the Stewart SDM
+
+# load the Stewart BNLL extent shapefile
+stewart_bnll_ext_path <- here("data/raw/extent_range_boundaries/stewart_sdm_ext/stewart_sdm_ext.shp")
+
+stewart_bnll_ext <- read_sf(stewart_bnll_ext_path) %>% 
+  sf::st_make_valid() # make sure the geometry is valid
+
+# assign the correct CRS
+stewart_bnll_ext <- st_transform(stewart_bnll_ext, crs(x_stack))
+
+# extent object required for dismo
+stewart_bnll_ext <- extent(stewart_bnll_ext)
+
+## define the filename path for the future prediction raster
+filename_bnll_rcp45_2020_2049 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2020_2049.tif")
+
+## predict future HEC under RCP4.5 and 2020-2049
+dismo::predict(object = maxent_bnll,
+               x = x_fut_stack,
+               ext = stewart_bnll_ext,
+               filename = filename_bnll_rcp45_2020_2049,
+               overwrite = TRUE)
+
+## mask lakes from the future prediction raster
+
+# load the future prediction raster
+pred_rast_bnll_rcp45_2020_2049 <- rast(filename_bnll_rcp45_2020_2049)
+
+# set lake pixels to 0
+bnll_habitat_masked_rcp45_2020_2049 <- pred_rast_bnll_rcp45_2020_2049
+bnll_habitat_masked_rcp45_2020_2049[ca_lakes_rast] <- 0
+
+plot(bnll_habitat_masked_rcp45_2020_2049, 
+     main = "BNLL habitat suitability; RCP4.5 (2020-2049)")
+
+
+# save the masked future prediction raster
+writeRaster(bnll_habitat_masked_rcp45_2020_2049, 
+            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2020_2049_masked_lakes.tif"),
+            overwrite = TRUE)
+```
+
+#### RCP45 -- 2040-2069
+
+```{r}
+#### set up the prediction parameters
+
+## load the model object trained with the baseline data
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+
+
+## load the environmental data as a raster stack
+
+env_fut_folder <- here("data/intermediate/misc/habitat_suitability/env_predictors/future/maxent_ready/bnll/rcp45_2040_2069")
+
+# define the path to the predictor variable rasters for RCP4.5 and 2040-2069
+env_fut_files <- list.files(path = env_fut_folder, 
+                            pattern = ".tif$", 
+                            full.names = TRUE)
+
+# get a raster stack of the future predictor variable files
+x_fut_stack <- raster::stack(env_fut_files)
+# check the layer names; need to match pred var names in SWD data
+names(x_fut_stack)
+
+# match the layer names to the predictor variable names in the SWD data
+names(x_fut_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", 
+                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "slope")
+
+# make sure the raster stack is in EPSG:3310
+x_fut_stack <- projectRaster(x_fut_stack, crs = crs(env_raster))
+crs(x_fut_stack)
+plot(x_fut_stack)
+
+## define the extent as the extent from the Stewart SDM
+
+# load the Stewart BNLL extent shapefile
+stewart_bnll_ext_path <- here("data/raw/extent_range_boundaries/stewart_sdm_ext/stewart_sdm_ext.shp")
+
+stewart_bnll_ext <- read_sf(stewart_bnll_ext_path) %>% 
+  sf::st_make_valid() # make sure the geometry is valid
+
+# assign the correct CRS
+stewart_bnll_ext <- st_transform(stewart_bnll_ext, crs(x_stack))
+
+# extent object required for dismo
+stewart_bnll_ext <- extent(stewart_bnll_ext)
+
+## define the filename path for the future prediction raster
+filename_bnll_rcp45_2040_2069 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2040_2069.tif")
+
+## predict future HEC under RCP4.5 and 2040-2069
+dismo::predict(object = maxent_bnll,
+               x = x_fut_stack,
+               ext = stewart_bnll_ext,
+               filename = filename_bnll_rcp45_2040_2069,
+               overwrite = TRUE)
+
+## mask lakes from the future prediction raster
+
+# load the future prediction raster
+pred_rast_bnll_rcp45_2040_2069 <- rast(filename_bnll_rcp45_2040_2069)
+
+# set lake pixels to 0
+bnll_habitat_masked_rcp45_2040_2069 <- pred_rast_bnll_rcp45_2040_2069
+bnll_habitat_masked_rcp45_2040_2069[ca_lakes_rast] <- 0
+
+plot(bnll_habitat_masked_rcp45_2040_2069, 
+     main = "BNLL habitat suitability; RCP4.5 (2040-2069)")
+
+
+# save the masked future prediction raster
+writeRaster(bnll_habitat_masked_rcp45_2040_2069, 
+            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2040_2069_masked_lakes.tif"),
+            overwrite = TRUE)
+```
+
+#### RCP85 -- 2020-2049
+
+```{r}
+#### set up the prediction parameters
+
+## load the model object trained with the baseline data
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+
+
+## load the environmental data as a raster stack
+
+env_fut_folder <- here("data/intermediate/misc/habitat_suitability/env_predictors/future/maxent_ready/bnll/rcp85_2020_2049")
+
+# define the path to the predictor variable rasters for RCP8.5 and 2020-2049
+env_fut_files <- list.files(path = env_fut_folder, 
+                            pattern = ".tif$", 
+                            full.names = TRUE)
+
+# get a raster stack of the future predictor variable files
+x_fut_stack <- raster::stack(env_fut_files)
+# check the layer names; need to match pred var names in SWD data
+names(x_fut_stack)
+
+# match the layer names to the predictor variable names in the SWD data
+names(x_fut_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", 
+                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "slope")
+
+# make sure the raster stack is in EPSG:3310
+x_fut_stack <- projectRaster(x_fut_stack, crs = crs(env_raster))
+crs(x_fut_stack)
+plot(x_fut_stack)
+
+## define the extent as the extent from the Stewart SDM
+
+# load the Stewart BNLL extent shapefile
+stewart_bnll_ext_path <- here("data/raw/extent_range_boundaries/stewart_sdm_ext/stewart_sdm_ext.shp")
+
+stewart_bnll_ext <- read_sf(stewart_bnll_ext_path) %>% 
+  sf::st_make_valid() # make sure the geometry is valid
+
+# assign the correct CRS
+stewart_bnll_ext <- st_transform(stewart_bnll_ext, crs(x_stack))
+
+# extent object required for dismo
+stewart_bnll_ext <- extent(stewart_bnll_ext)
+
+## define the filename path for the future prediction raster
+filename_bnll_rcp85_2020_2049 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2020_2049.tif")
+
+## predict future HEC under RCP8.5 and 2020-2049
+dismo::predict(object = maxent_bnll,
+               x = x_fut_stack,
+               ext = stewart_bnll_ext,
+               filename = filename_bnll_rcp85_2020_2049,
+               overwrite = TRUE)
+
+## mask lakes from the future prediction raster
+
+# load the future prediction raster
+pred_rast_bnll_rcp85_2020_2049 <- rast(filename_bnll_rcp85_2020_2049)
+
+# set lake pixels to 0
+bnll_habitat_masked_rcp85_2020_2049 <- pred_rast_bnll_rcp85_2020_2049
+bnll_habitat_masked_rcp85_2020_2049[ca_lakes_rast] <- 0
+
+plot(bnll_habitat_masked_rcp85_2020_2049, 
+     main = "BNLL habitat suitability; RCP8.5 (2020-2049)")
+
+
+# save the masked future prediction raster
+writeRaster(bnll_habitat_masked_rcp85_2020_2049, 
+            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2020_2049_masked_lakes.tif"),
+            overwrite = TRUE)
+```
+
+#### RCP85 -- 2040-2069
+
+```{r}
+#### set up the prediction parameters
+
+## load the model object trained with the baseline data
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+
+
+## load the environmental data as a raster stack
+
+env_fut_folder <- here("data/intermediate/misc/habitat_suitability/env_predictors/future/maxent_ready/bnll/rcp85_2040_2069")
+
+# define the path to the predictor variable rasters for RCP8.5 and 2040-2069
+env_fut_files <- list.files(path = env_fut_folder, 
+                            pattern = ".tif$", 
+                            full.names = TRUE)
+
+# get a raster stack of the future predictor variable files
+x_fut_stack <- raster::stack(env_fut_files)
+# check the layer names; need to match pred var names in SWD data
+names(x_fut_stack)
+
+# match the layer names to the predictor variable names in the SWD data
+names(x_fut_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", 
+                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "slope")
+
+# make sure the raster stack is in EPSG:3310
+x_fut_stack <- projectRaster(x_fut_stack, crs = crs(env_raster))
+crs(x_fut_stack)
+plot(x_fut_stack)
+
+## define the extent as the extent from the Stewart SDM
+
+# load the Stewart BNLL extent shapefile
+stewart_bnll_ext_path <- here("data/raw/extent_range_boundaries/stewart_sdm_ext/stewart_sdm_ext.shp")
+
+stewart_bnll_ext <- read_sf(stewart_bnll_ext_path) %>% 
+  sf::st_make_valid() # make sure the geometry is valid
+
+# assign the correct CRS
+stewart_bnll_ext <- st_transform(stewart_bnll_ext, crs(x_stack))
+
+# extent object required for dismo
+stewart_bnll_ext <- extent(stewart_bnll_ext)
+
+## define the filename path for the future prediction raster
+filename_bnll_rcp85_2040_2069 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2040_2069.tif")
+
+## predict future HEC under RCP8.5 and 2040-2069
+dismo::predict(object = maxent_bnll,
+               x = x_fut_stack,
+               ext = stewart_bnll_ext,
+               filename = filename_bnll_rcp85_2040_2069,
+               overwrite = TRUE)
+
+## mask lakes from the future prediction raster
+
+# load the future prediction raster
+pred_rast_bnll_rcp85_2040_2069 <- rast(filename_bnll_rcp85_2040_2069)
+
+# set lake pixels to 0
+bnll_habitat_masked_rcp85_2040_2069 <- pred_rast_bnll_rcp85_2040_2069
+bnll_habitat_masked_rcp85_2040_2069[ca_lakes_rast] <- 0
+
+plot(bnll_habitat_masked_rcp85_2040_2069, 
+     main = "BNLL habitat suitability; RCP8.5 (2040-2069)")
+
+
+# save the masked future prediction raster
+writeRaster(bnll_habitat_masked_rcp85_2040_2069, 
+            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2040_2069_masked_lakes.tif"),
+            overwrite = TRUE)
+```
+
+
+
+
+
+
+
