@@ -652,6 +652,44 @@ writeRaster(bnll_habitat_masked_rcp85_2040_2069,
             overwrite = TRUE)
 ```
 
+## Calculate MaxEnt threshold for binary predictions
+
+We will threshold continuous suitability values into suitable and non-suitable habitat using the threshold that maximizes the true positive and true negative rate. In other words, this is the threshold that **maximizes sensitivity and specificity**. This threshold will be applied to the continuous prediction rasters to create binary rasters of suitable vs. non-suitable habitat for BNLL under current and future conditions in `5_prediction_plotting.qmd`.
+
+- Sensitivity = proportion of presences correctly predicted as suitable habitat (true positive rate)
+- Specificity = proportion of absences/background points correctly predicted as non-suitable habitat (true negative rate)
+
+```{r}
+# get presence coordinates from the occurrence data
+occ_coords <- occ_data %>%
+  dplyr::select(longitude, latitude)
+
+# get background coordinates from the background data
+bg_coords <- bg_data %>%
+  dplyr::select(longitude, latitude)
+
+# generate the ModelEvaluation object with dismo::evaluate()
+e <- dismo::evaluate(p = occ_coords,       # presence coordinates
+                     a = bg_coords,        # background coordinates
+                     model = maxent_bnll,  # model object from maxent() function
+                     x = x_stack)          # raster stack of predictor vars
+
+# calculate the threshold that maximizes sensitivity and specificity
+thresh <- dismo::threshold(e)
+thresh_spec_sens <- thresh$spec_sens   # 0.29
+```
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
