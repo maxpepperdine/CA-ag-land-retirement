@@ -31,15 +31,11 @@ library(tmap)
 ###### Habitat suitability
 
 ```{r}
-##### Blunt-nosed leopard lizard habitat suitability rasters #####
-
 # Fallow SJV model
 bnll_fallowSJV <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_masked_lakes.tif"))
 
 # Stewart et al. (2019) model
 bnll_stewart <- rast(here("data/raw/habitat_suitability/stewart_2019/G_sila_cont_suit.tif"))
-
-
 ```
 
 ###### Misc
@@ -218,7 +214,7 @@ tmap_arrange(map_diff_cont, map_diff_bin, ncol = 2)
 
 ## Comparing future predictions under different emissions scenarios
 
-#### Load the future predictions
+#### Load & plot the future predictions
 
 ```{r}
 bnll_baseline <- bnll_fallowSJV
@@ -236,7 +232,31 @@ bnll_rcp85_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_fil
 bnll_rcp85_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2040_2069_masked_lakes.tif"))
 ```
 
-#### Reclassify the future predictions & calculate difference rasters
+#### Calculate continuous difference rasters
+
+```{r}
+# calculate the continuous difference rasters (future - baseline)
+cont_diff_rcp45_2049 <- bnll_rcp45_2049 - bnll_baseline
+cont_diff_rcp45_2069 <- bnll_rcp45_2069 - bnll_baseline
+cont_diff_rcp85_2049 <- bnll_rcp85_2049 - bnll_baseline
+cont_diff_rcp85_2069 <- bnll_rcp85_2069 - bnll_baseline
+
+# clip to SJV boundary
+cont_diff_rcp45_2049_sjv <- cont_diff_rcp45_2049 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+cont_diff_rcp45_2069_sjv <- cont_diff_rcp45_2069 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+cont_diff_rcp85_2049_sjv <- cont_diff_rcp85_2049 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+cont_diff_rcp85_2069_sjv <- cont_diff_rcp85_2069 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+```
+
+#### Reclassify the future predictions & calculate binary difference rasters
 
 Calculated in `4_maxent_predictions.qmd`, reclassify continuous habitat suitability layers into binary suitable/unsuitable layers using the threshold that maximizes true positive/negative rate (i.e., specificity + sensitivity). This is **0.29** for the BNLL maxent model.
 
@@ -256,27 +276,29 @@ bnll_rcp85_2049_bin <- classify(bnll_rcp85_2049, reclass_matrix_future)
 bnll_rcp85_2069_bin <- classify(bnll_rcp85_2069, reclass_matrix_future)
 
 # calculate difference rasters (future - baseline)
-diff_rcp45_2049 <- bnll_rcp45_2049_bin - bnll_baseline_bin
-diff_rcp45_2069 <- bnll_rcp45_2069_bin - bnll_baseline_bin
-diff_rcp85_2049 <- bnll_rcp85_2049_bin - bnll_baseline_bin
-diff_rcp85_2069 <- bnll_rcp85_2069_bin - bnll_baseline_bin
+bin_diff_rcp45_2049 <- bnll_rcp45_2049_bin - bnll_baseline_bin
+bin_diff_rcp45_2069 <- bnll_rcp45_2069_bin - bnll_baseline_bin
+bin_diff_rcp85_2049 <- bnll_rcp85_2049_bin - bnll_baseline_bin
+bin_diff_rcp85_2069 <- bnll_rcp85_2069_bin - bnll_baseline_bin
 
 # clip difference rasters to SJV boundary
-diff_rcp45_2049_sjv <- diff_rcp45_2049 %>% 
+bin_diff_rcp45_2049_sjv <- bin_diff_rcp45_2049 %>% 
   mask(sjv_vect) %>% 
   crop(sjv_vect)
-diff_rcp45_2069_sjv <- diff_rcp45_2069 %>% 
+bin_diff_rcp45_2069_sjv <- bin_diff_rcp45_2069 %>% 
   mask(sjv_vect) %>% 
   crop(sjv_vect)
-diff_rcp85_2049_sjv <- diff_rcp85_2049 %>% 
+bin_diff_rcp85_2049_sjv <- bin_diff_rcp85_2049 %>% 
   mask(sjv_vect) %>% 
   crop(sjv_vect)
-diff_rcp85_2069_sjv <- diff_rcp85_2069 %>% 
+bin_diff_rcp85_2069_sjv <- bin_diff_rcp85_2069 %>% 
   mask(sjv_vect) %>% 
   crop(sjv_vect)
 ```
 
 #### Plot the future predictions and difference maps
+
+Binary difference maps
 
 ```{r}
 # convert terra vectors to sf for easier handling
@@ -298,6 +320,7 @@ sjv_bbox_expanded <- st_bbox(c(
 
 # Create expanded bounding box for CA
 ca_bbox <- st_bbox(ca_sf)
+ca_buffer <- 0.1
 x_expand_ca <- ca_buffer * (unname(ca_bbox["xmax"]) - unname(ca_bbox["xmin"]))
 y_expand_ca <- ca_buffer * (unname(ca_bbox["ymax"]) - unname(ca_bbox["ymin"]))
 
@@ -310,13 +333,13 @@ ca_bbox_expanded <- st_bbox(c(
 
 
 # stack the difference rasters and name them
-diff_stack <- c(diff_rcp45_2049_sjv, diff_rcp45_2069_sjv, 
-                diff_rcp85_2049_sjv, diff_rcp85_2069_sjv)
-names(diff_stack) <- c("RCP 4.5 (2020-2049)", "RCP 4.5 (2040-2069)", 
-                       "RCP 8.5 (2020-2049)", "RCP 8.5 (2040-2069)")
+bin_diff_stack <- c(bin_diff_rcp45_2049_sjv, bin_diff_rcp45_2069_sjv, 
+                    bin_diff_rcp85_2049_sjv, bin_diff_rcp85_2069_sjv)
+names(bin_diff_stack) <- c("RCP 4.5 (2020-2049)", "RCP 4.5 (2040-2069)", 
+                           "RCP 8.5 (2020-2049)", "RCP 8.5 (2040-2069)")
 
 # create the binary difference map
-main_map <- tm_shape(diff_stack, bbox = sjv_bbox_expanded) +
+main_map <- tm_shape(bin_diff_stack, bbox = sjv_bbox_expanded) +
   
   tm_raster(
     col.scale = tm_scale_categorical(
@@ -328,7 +351,7 @@ main_map <- tm_shape(diff_stack, bbox = sjv_bbox_expanded) +
   ) +
   tm_facets_wrap(ncol = 2) +
   tm_layout(
-    panel.labels = names(diff_stack)
+    panel.labels = names(bin_diff_stack)
   ) + 
   tm_shape(sjv_vect) +
   tm_borders(col = "black", lwd = 0.5) +
@@ -349,7 +372,72 @@ print(main_map)
 print(inset_map, vp = grid::viewport(x = 0.75, y = 0.5, width = 0.25, height = 0.3))
 ```
 
+Continuous difference maps
 
+```{r}
+# stack the continuous difference rasters and name them
+cont_diff_stack <- c(cont_diff_rcp45_2049_sjv, cont_diff_rcp45_2069_sjv, 
+                     cont_diff_rcp85_2049_sjv, cont_diff_rcp85_2069_sjv)
+names(cont_diff_stack) <- c("RCP 4.5 (2020-2049)", "RCP 4.5 (2040-2069)", 
+                            "RCP 8.5 (2020-2049)", "RCP 8.5 (2040-2069)")
+
+# create the continuous difference map
+main_map_cont <- tm_shape(cont_diff_stack, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "brewer.rd_bu", midpoint = 0),
+            col.legend = tm_legend(
+              title = "Change in habitat suitability\n(future - baseline)"), 
+            col.free = FALSE) +
+  tm_facets_wrap(ncol = 2) +
+  tm_layout(panel.labels = names(cont_diff_stack)) +
+  tm_shape(sjv_vect) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_facets_wrap(ncol = 2)
+
+# plot main map
+print(main_map_cont)
+
+# add inset using viewport
+print(inset_map, vp = grid::viewport(x = 0.7, y = 0.3, width = 0.25, height = 0.3))
+```
+
+Raw future projections
+
+```{r}
+# clip the cont future predictions to SJV boundary
+bnll_rcp45_2049_sjv <- bnll_rcp45_2049 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+bnll_rcp45_2069_sjv <- bnll_rcp45_2069 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+bnll_rcp85_2049_sjv <- bnll_rcp85_2049 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+bnll_rcp85_2069_sjv <- bnll_rcp85_2069 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+
+# stack the future predictions and name them
+future_stack <- c(bnll_rcp45_2049_sjv, bnll_rcp45_2069_sjv, 
+                  bnll_rcp85_2049_sjv, bnll_rcp85_2069_sjv)
+names(future_stack) <- c("RCP 4.5 (2020-2049)", "RCP 4.5 (2040-2069)", 
+                         "RCP 8.5 (2020-2049)", "RCP 8.5 (2040-2069)")
+
+# plot the future predictions
+bnll_fut_map <- tm_shape(future_stack, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis",
+                                             ticks = seq(0, 1, by = 0.25)),
+            col.legend = tm_legend(title = "Habitat suitability"), 
+            col.free = FALSE) +
+  tm_facets_wrap(ncol = 2) +
+  tm_layout(panel.labels = names(future_stack))
+
+# plot main map
+print(bnll_fut_map)
+
+# add inset using viewport
+print(inset_map, vp = grid::viewport(x = 0.73, y = 0.4, width = 0.2, height = 0.25))
+```
 
 
 
