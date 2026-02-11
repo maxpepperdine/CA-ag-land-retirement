@@ -397,7 +397,9 @@ tm_shape(rcp45_stack, bbox = sjv_bbox_expanded) +
   tm_facets(ncol = 3)
 ```
 
-#### Find the difference between RCP45 projections for each variable and time period
+## Raster math with the projections
+
+#### Find the difference between RCP45 projections
 
 Interpretation:
 - Positive values indicate an increase in `mm/yr` from the earlier period (2020-2049) to the later period (2040-2069).
@@ -421,12 +423,34 @@ tm_shape(rcp45_diff_stack, bbox = sjv_bbox_expanded) +
             col.legend = tm_legend(title = "mm / yr", 
                                    position = tm_pos_in("left", "bottom"))) +
   tm_layout(panel.labels = names(rcp45_diff_stack), 
-            panel.label.size = 0.8) +
+            panel.label.size = 1) +
   tm_facets(ncol = 3)
 ```
 
+#### Find the difference between RCP85 (2040-2069) & RCP45 (2020-2049) projections
 
+```{r}
+# calculate difference between RCP85 (2040-2069) and RCP45 (2020-2049) 
+aet_diff_rcp85_2040_2069_vs_rcp45_2020_2049 <- rcp85_stack[[4]] - rcp45_stack[[1]]
+cwd_diff_rcp85_2040_2069_vs_rcp45_2020_2049 <- rcp85_stack[[5]] - rcp45_stack[[2]]
+ppt_diff_rcp85_2040_2069_vs_rcp45_2020_2049 <- rcp85_stack[[6]] - rcp45_stack[[3]]
 
+# plot the differences
+rcp85_vs_rcp45_diff_stack <- c(aet_diff_rcp85_2040_2069_vs_rcp45_2020_2049, 
+                               cwd_diff_rcp85_2040_2069_vs_rcp45_2020_2049,
+                               ppt_diff_rcp85_2040_2069_vs_rcp45_2020_2049)
+names(rcp85_vs_rcp45_diff_stack) <- c("AET Δ (RCP85 2040-2069 - RCP45 2020-2049)", 
+                                      "CWD Δ (RCP85 2040-2069 - RCP45 2020-2049)", 
+                                      "PPT Δ (RCP85 2040-2069 - RCP45 2020-2049)")
+
+tm_shape(rcp85_vs_rcp45_diff_stack, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"), 
+            col.legend = tm_legend(title = "mm / yr", 
+                                   position = tm_pos_in("left", "bottom"))) +
+  tm_layout(panel.labels = names(rcp85_vs_rcp45_diff_stack), 
+            panel.label.size = 0.8) +
+  tm_facets(ncol = 3)
+```
 
 
 
