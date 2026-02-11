@@ -35,6 +35,7 @@ library(here)
 library(tidyverse)
 library(tigris)
 library(sf)
+library(tmap)
 ```
 
 #### Load the template raster to match crs, extent, and resolution
@@ -296,8 +297,133 @@ for (f in output_files) {
 }
 ```
 
+## Plot some of the projections
+
+#### Load the SJV vector boundary for plotting
+
+```{r}
+# load SJV boundary for masking
+sjv_boundary <- read_sf(here("data/raw/sjv_counties/sjv_counties.shp"))
+
+# transform SJV boundary to EPSG:3310
+sjv_boundary <- st_transform(sjv_boundary, crs = crs(ref_raster))
+crs(sjv_boundary)
+# convert to terra vector
+sjv_vect <- vect(sjv_boundary)
+```
+
+#### Load the projections as raster stacks & crop to SJV
+
+```{r}
+# RCP45 (2020-2049) ensemble mean for each variable 
+rcp45_2020_2049_path <- list.files(output_dir, 
+                                   pattern = "RCP45_2020_2049.*\\.tif$",
+                                   full.names = TRUE)
+rcp45_2020_2049_stack <- rast(rcp45_2020_2049_path)
+
+# RCP45 (2040-2069) ensemble mean for each variable
+rcp45_2040_2069_path <- list.files(output_dir,
+                                   pattern = "RCP45_2040_2069.*\\.tif$",
+                                   full.names = TRUE)
+rcp45_2040_2069_stack <- rast(rcp45_2040_2069_path)
+
+# RCP85 (2020-2049) ensemble mean for each variable
+rcp85_2020_2049_path <- list.files(output_dir,
+                                   pattern = "RCP85_2020_2049.*\\.tif$",
+                                   full.names = TRUE)
+rcp85_2020_2049_stack <- rast(rcp85_2020_2049_path)
+
+# RCP85 (2040-2069) ensemble mean for each variable
+rcp85_2040_2069_path <- list.files(output_dir,
+                                   pattern = "RCP85_2040_2069.*\\.tif$",
+                                   full.names = TRUE)
+rcp85_2040_2069_stack <- rast(rcp85_2040_2069_path)
 
 
+# crop to SJV extent
+rcp45_2020_2049_stack_sjv <- rcp45_2020_2049_stack %>% 
+  crop(sjv_vect) %>% 
+  mask(sjv_vect)
+rcp45_2040_2069_stack_sjv <- rcp45_2040_2069_stack %>% 
+  crop(sjv_vect) %>% 
+  mask(sjv_vect)
+rcp85_2020_2049_stack_sjv <- rcp85_2020_2049_stack %>% 
+  crop(sjv_vect) %>% 
+  mask(sjv_vect)
+rcp85_2040_2069_stack_sjv <- rcp85_2040_2069_stack %>% 
+  crop(sjv_vect) %>% 
+  mask(sjv_vect)
+```
+
+#### Plot the projections
+
+```{r}
+# convert terra vectors to sf for easier handling
+sjv_sf <- st_as_sf(sjv_vect)
+
+## Create expanded bounding box for SJV
+sjv_bbox <- st_bbox(sjv_sf)
+sjv_buffer <- 0.1
+x_expand <- sjv_buffer * (unname(sjv_bbox["xmax"]) - unname(sjv_bbox["xmin"]))
+y_expand <- sjv_buffer * (unname(sjv_bbox["ymax"]) - unname(sjv_bbox["ymin"]))
+
+sjv_bbox_expanded <- st_bbox(c(
+  xmin = unname(sjv_bbox["xmin"]) - x_expand,
+  xmax = unname(sjv_bbox["xmax"]) + x_expand,
+  ymin = unname(sjv_bbox["ymin"]) - y_expand,
+  ymax = unname(sjv_bbox["ymax"]) + y_expand
+), crs = st_crs(sjv_sf))
+```
+
+```{r}
+# stack the RCP45 and RCP85 stacks together for plotting and name them
+rcp45_stack <- c(rcp45_2020_2049_stack_sjv, rcp45_2040_2069_stack_sjv)
+names(rcp45_stack) <- c("AET RCP45 (2020_2049)", "CWD RCP45 (2020_2049)",
+                        "PPT RCP45 (2020_2049)", "AET RCP45 (2040_2069)",
+                        "CWD RCP45 (2040_2069)", "PPT RCP45 (2040_2069)")
+
+rcp85_stack <- c(rcp85_2020_2049_stack_sjv, rcp85_2040_2069_stack_sjv)
+names(rcp85_stack) <- c("AET RCP85 (2020_2049)", "CWD RCP85 (2020_2049)",
+                        "PPT RCP85 (2020_2049)", "AET RCP85 (2040_2069)",
+                        "CWD RCP85 (2040_2069)", "PPT RCP85 (2040_2069)")
+
+# plot the stacks using tmap
+tm_shape(rcp45_stack, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis"), 
+            col.legend = tm_legend(title = "mm / yr", 
+                                   position = tm_pos_in("left", "bottom"))) +
+  tm_layout(panel.labels = names(rcp45_stack), 
+            panel.label.size = 0.8) +
+  tm_facets(ncol = 3)
+```
+
+#### Find the difference between RCP45 projections for each variable and time period
+
+Interpretation:
+- Positive values indicate an increase in `mm/yr` from the earlier period (2020-2049) to the later period (2040-2069).
+- Negative values indicate a decrease in `mm/yr` from the earlier period to the later period.
+
+```{r}
+# calculate difference between RCP45 projections for each variable and time period
+aet_diff_rcp45_2020_2049 <- rcp45_stack[[4]] - rcp45_stack[[1]]
+cwd_diff_rcp45_2020_2049 <- rcp45_stack[[5]] - rcp45_stack[[2]]
+ppt_diff_rcp45_2020_2049 <- rcp45_stack[[6]] - rcp45_stack[[3]]
+
+# plot the differences
+rcp45_diff_stack <- c(aet_diff_rcp45_2020_2049, cwd_diff_rcp45_2020_2049, 
+                      ppt_diff_rcp45_2020_2049)
+names(rcp45_diff_stack) <- c("AET Δ (2040-2069 - 2020-2049)", 
+                             "CWD Δ (2040-2069 - 2020-2049)", 
+                             "PPT Δ (2040-2069 - 2020-2049)")
+
+tm_shape(rcp45_diff_stack, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"), 
+            col.legend = tm_legend(title = "mm / yr", 
+                                   position = tm_pos_in("left", "bottom"))) +
+  tm_layout(panel.labels = names(rcp45_diff_stack), 
+            panel.label.size = 0.8) +
+  tm_facets(ncol = 3)
+```
 
 
 
