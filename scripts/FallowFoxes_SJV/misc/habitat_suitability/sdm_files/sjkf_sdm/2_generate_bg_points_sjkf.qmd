@@ -1,0 +1,145 @@
+---
+title: "Generate GKR background points"
+author: "Stella Wing"
+format: html
+editor: visual
+date: last-modified
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+# clean environment
+rm(list = ls())
+```
+
+## Overview
+
+This script generates the bg data for habitat suitability modeling for the giant kangaroo rat (*Dipodomys ingens*) in the San Joaquin Valley, CA. It will load our GKR occurrence data, generate a 50 km buffer around each occurrence point, and then find all geographically unique vertebrate (phylum Vertebrata) occurrence points within that buffer. These will be the background points for the GKR MaxEnt model.
+
+## Load packages
+
+```{r}
+library(tidyverse)  # always
+library(here)       # for file paths
+library(rgbif)      # for GBIF data download
+library(sf)         # for spatial data processing
+```
+
+## Load data
+
+```{r}
+# Load SJFK occurrence data
+sjkf_occs <- read_csv(here("data/sjkf_occ_env_data.csv"))
+
+# CA boundary
+ca_boundary <- read_sf(here("data/ca_state/ca_state_boundary_no_islands.shp"))
+```
+
+## Data processing
+
+#### Create 50 km buffer around SJKF occ points
+
+```{r}
+# convert GKR occ data to sf object
+sjkf_sf <- st_as_sf(sjkf_occs, 
+                    coords = c("longitude", "latitude"), 
+                    crs = 3310)
+
+# create 100 km buffer around each occurrence point
+sjkf_buffer <- st_buffer(sjkf_sf, dist = 100000)
+
+# combine buffers into a single polygon
+sjkf_buffer_union <- st_union(sjkf_buffer)
+
+# clip to CA boundary to remove ocean areas
+sjkf_buffer_union <- st_intersection(sjkf_buffer_union, 
+                                    st_transform(ca_boundary, crs = 3310)) ### CANT RUN WITHOUT CA BOUNDARY****
+
+# transform buffer back to WGS84
+sjkf_buffer_wgs84 <- st_transform(sjkf_buffer_union, crs = 4326)
+
+# # save buffer to file for testing
+# write_sf(gkr_buffer_wgs84, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/2_generate_bg_points_gkr/gkr_100km_buffer.shp"), 
+#          append = FALSE)
+```
+
+```{r}
+# set buffer to WKT format for rgbif::occ_download()
+sjkf_buffer_wkt <- st_as_text(st_geometry(sjkf_buffer_wgs84)[[1]])
+nchar(sjkf_buffer_wkt)  # check length of WKT string
+
+
+st_geometry_type(sjkf_buffer_wgs84)
+st_is_valid(sjkf_buffer_wgs84)
+
+
+# buffer is too long for rgbif, so simplify it
+buffer_simplify <- st_simplify(sjkf_buffer_wgs84, dTolerance = 1000)
+buffer_simplify_wkt <- st_as_text(st_geometry(buffer_simplify)[[1]])
+nchar(buffer_simplify_wkt)  # check length of WKT string
+```
+
+#### Obtain & process occ records using `rgbif::occ_download()`
+
+```{r}
+# set up GBIF credentials (one-time setup)
+options(gbif_user = "stellawing")
+options(gbif_pwd = "Lire5436$")
+options(gbif_email = "stellawing21@gmail.com")
+
+# use rgbif::occ_download to acquire background points
+download_key <- occ_download(
+  pred_in("taxonKey", 44),  # Vertebrata
+  pred("hasCoordinate", TRUE),
+  pred("hasGeospatialIssue", FALSE),
+  pred_gte("year", 1990),
+  pred_lte("year", 2025),
+  pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
+  pred_lte("coordinateUncertaintyInMeters", 500),
+  pred_within(buffer_simplify_wkt)  # Your buffer
+)
+
+# check download status
+cat("Download key:", download_key, "\n")
+cat("Check status at: https://www.gbif.org/occurrence/download/", download_key, "\n")
+
+# check the download status programatically; this might take a while...
+occ_download_wait(download_key, status_ping = 10)  # Check every 10 seconds
+
+# download the data
+download_file <- occ_download_get(download_key, path = ".")
+
+# import the data
+vertebrate_data <- occ_download_import(download_file)
+
+# convert to sf
+vertebrate_sf <- st_as_sf(vertebrate_data,
+                          coords = c("decimalLongitude", "decimalLatitude"),
+                          crs = 4326) %>% 
+  # remove all GKR occ points
+  filter(species != "Vulpes macrotis") %>% 
+  filter(taxonKey != 2439550)
+
+
+# intersect occ points with the original precise buffer
+# this keeps only points within 50 km of GKR occs
+vertebrate_in_buffer <- st_intersection(vertebrate_sf, gkr_buffer_wgs84)
+
+# remove duplicates
+vertebrate_unique <- vertebrate_in_buffer %>%
+  distinct(geometry, .keep_all = TRUE) %>% 
+  # save relevant columns only
+  dplyr::select(gbifID, institutionCode, year, basisOfRecord, scientificName, class, 
+         classKey, species)
+
+# extract coordinates for MaxEnt and env data extraction
+background_coords <- st_coordinates(vertebrate_unique)
+colnames(background_coords) <- c("longitude", "latitude")
+
+# Create final dataframe
+background_df <- cbind(
+  as.data.frame(st_drop_geometry(vertebrate_unique)),
+  background_coords
+)
+```
