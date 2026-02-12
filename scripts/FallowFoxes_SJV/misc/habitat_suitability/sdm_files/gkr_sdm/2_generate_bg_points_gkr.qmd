@@ -46,8 +46,8 @@ gkr_sf <- st_as_sf(gkr_occs,
                     coords = c("longitude", "latitude"), 
                     crs = 3310)
 
-# create 100 km buffer around each occurrence point
-gkr_buffer <- st_buffer(gkr_sf, dist = 100000)
+# create 50 km buffer around each occurrence point
+gkr_buffer <- st_buffer(gkr_sf, dist = 50000)
 
 # combine buffers into a single polygon
 gkr_buffer_union <- st_union(gkr_buffer)
@@ -80,8 +80,8 @@ nchar(buffer_simplify_wkt)  # check length of WKT string
 ```{r}
 # set up GBIF credentials (one-time setup)
 options(gbif_user = "mpepperdine")
-options(gbif_pwd = "Pumbaason@20")
-options(gbif_email = "max.pepperdine@gmail.com")
+options(gbif_pwd = " ")
+options(gbif_email = " ")
 
 # use rgbif::occ_download to acquire background points
 download_key <- occ_download(
