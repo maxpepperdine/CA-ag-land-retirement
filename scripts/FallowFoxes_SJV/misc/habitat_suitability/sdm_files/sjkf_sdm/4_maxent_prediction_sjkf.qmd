@@ -1,0 +1,97 @@
+---
+title: "SJKF MaxEnt prediction generation"
+author: "Stella Wing"
+format: html
+editor: visual
+date: last-modified
+editor_options: 
+  chunk_output_type: console
+---
+
+## Overview
+
+This script reads in the prepared GKR occurrence records (produced in `1_extract_occ_env_data_gkr.qmd`) and background points (produced in `2_generate_bg_points_gkr.qmd` and `3_extract_bg_env_data_gkr.qmd`) to evaluate and generate MaxEnt models using the `dismo` package.
+
+```{r}
+rm(list = ls())
+```
+
+## Load packages
+
+```{r}
+library(tidyverse)  # always
+library(dismo)      # for MaxEnt
+library(terra)      # for raster data
+library(corrplot)   # for plotting correlation matrix
+library(ENMeval)    # for model evaluation
+library(rJava)      # needed for MaxEnt predictions
+library(sf)         # for spatial data
+library(tmap)       # for plotting better maps
+library(here)       # for file paths
+library(kableExtra) # for nice tables
+```
+
+## Bind the occurrence and background data into one df
+
+#### Load data
+
+```{r}
+# load occurrence data with env data extracted
+occ_data <- read_csv(here("data/sjkf_occ_env_data.csv"))
+
+# load background data with env data extracted
+bg_data <- read_csv(here("data/sjkf_bg_env_data.csv"))
+```
+
+```{r}
+# env pred raster for reprojecting
+env_raster <- rast(here("data/baseline/sjkf/aet1991_2020_ave_CA_270m.tif"))
+```
+
+```{r}
+# CA lakes shapefile for masking the final prediction rasters
+ca_lakes <- read_sf(here("data/California_Lakes.shp")) %>% ### need this shp file ***************************
+  st_transform(crs(env_raster))
+```
+
+#### Prepare data for Maxent
+
+Add a column indicating presence (1) or absence/background (0), and bind the two datasets together.
+
+```{r}
+# add presence column to occ data
+occ_data_bind <- occ_data %>%
+  mutate(presence = 1, 
+         .after = 2)
+
+# add presence column to bg data
+bg_data_bind <- bg_data %>%
+  mutate(presence = 0, 
+         .after = 2)
+
+# bind the two datasets together
+full_data <- rbind(occ_data_bind, bg_data_bind)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

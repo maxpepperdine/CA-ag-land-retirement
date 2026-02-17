@@ -1,0 +1,137 @@
+---
+title: "Extract env data to SJKF background points"
+author: "Stella Wing"
+format: html
+editor: visual
+date: last-modified
+editor_options: 
+  chunk_output_type: console
+---
+
+## Overview
+
+This script extracts environmental data to the GKR background points (created in `2_generate_bg_points_sjkf.qmd`) for use in MaxEnt modeling. The environmental data includes:
+
+-   BCM climate (AET, CWD, PPT)
+-   gSSURGO soil data (pH, % clay, % silt, EC)
+-   Slope from USGS Open Topography
+
+```{r}
+rm(list=ls())
+```
+
+## Load packages
+
+```{r}
+library(terra)      # for raster processing
+library(tidyverse)  # always
+library(sf)         # for spatial data processing
+library(here)       # for file paths
+```
+
+## Load data
+#### Environmental rasters
+
+```{r}
+# load all env rasters
+env_rasters <- rast(list.files(here("data/baseline/sjkf"), 
+                               pattern = ".tif$", 
+                               full.names = TRUE))
+# fix names
+names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
+                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "silt_pct_0_10cm", "slope")
+plot(env_rasters)
+```
+
+#### SJKF background points (created in `2_generate_bg_points_sjkf.qmd`)
+
+```{r}
+# load background points
+sjkf_bg <- read_csv(here("data/sjkf_bg_points.csv"))
+
+# convert bg points to SpatVector
+sjkf_bg_vect <- vect(sjkf_bg, 
+                     geom = c("longitude", "latitude"), 
+                     crs = "EPSG:4326")
+
+# make sure crs matches env rasters
+sjkf_bg_vect <- project(sjkf_bg_vect, crs(env_rasters))
+crs(sjkf_bg_vect)
+```
+
+Spatial thin using grid-based thinning method
+
+```{r}
+# convert back to lat/lon
+sjkf_bg_latlon <- project(sjkf_bg_vect, "EPSG:4326")
+sjkf_bg_df <- as.data.frame(sjkf_bg_latlon, geom = "XY")
+
+# convert to sf object
+sjkf_bg_sf <- st_as_sf(sjkf_bg_df, 
+                      coords = c("x", "y"), 
+                      crs = 4326)
+
+# project to EPSG 3310 for distance calculations
+sjkf_bg_projected <- st_transform(sjkf_bg_sf, crs = 3310)
+
+# create a grid ID based on 1km cells
+grid_size <- 1000  # 1 km in meters
+
+sjkf_bg_projected <- sjkf_bg_projected %>%
+  mutate(
+    grid_x = floor(st_coordinates(.)[,1] / grid_size),
+    grid_y = floor(st_coordinates(.)[,2] / grid_size),
+    grid_id = paste(grid_x, grid_y, sep = "_")
+  )
+
+# keep one random point per grid cell
+set.seed(123)  # for reproducibility
+sjkf_bg_thinned_sf <- sjkf_bg_projected %>%
+  group_by(grid_id) %>%
+  slice_sample(n = 1) %>%
+  ungroup() %>%
+  dplyr::select(-grid_x, -grid_y, -grid_id)
+
+# transform back to WGS84
+sjkf_bg_thinned_sf <- st_transform(sjkf_bg_thinned_sf, crs = 4326)
+
+# convert thinned points back to SpatVector and match original CRS
+sjkf_bg_thinned_vect <- vect(sjkf_bg_thinned_sf)
+
+# project to match env rasters
+sjkf_bg_thinned_vect <- project(sjkf_bg_thinned_vect, crs(env_rasters))
+crs(sjkf_bg_thinned_vect)  # check crs
+```
+
+## Extract environmental data to background points
+
+```{r}
+# extract env data to bg points
+sjkf_bg_env <- terra::extract(env_rasters, sjkf_bg_thinned_vect, 
+                              bind = TRUE)
+
+# set as sf object
+sjkf_bg_env_sf <- st_as_sf(sjkf_bg_env, 
+                           coords = c("longitude", "latitude")) %>% 
+  dplyr::select(all_of(names(env_rasters)))
+
+# extract geometry columns as lon/lat
+sjkf_bg_env_df <- sjkf_bg_env_sf %>% 
+  mutate(longitude = st_coordinates(sjkf_bg_env_sf)[,1],
+         latitude = st_coordinates(sjkf_bg_env_sf)[,2], 
+         .before = 1) %>% 
+  st_drop_geometry()
+```
+
+## Save the data
+
+```{r}
+# save final background points with env data to CSV
+write_csv(sjkf_bg_env_df, here("data/sjkf_bg_env_data.csv"))
+
+# save SF object
+write_sf(sjkf_bg_env_sf, here("data/sjkf_bg_env_data.shp"),
+         append = FALSE)
+```
+

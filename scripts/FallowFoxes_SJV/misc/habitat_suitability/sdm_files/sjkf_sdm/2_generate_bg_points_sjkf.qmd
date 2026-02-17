@@ -85,8 +85,8 @@ nchar(buffer_simplify_wkt)  # check length of WKT string
 ```{r}
 # set up GBIF credentials (one-time setup)
 options(gbif_user = "stellawing")
-options(gbif_pwd = "Lire5436$")
-options(gbif_email = "stellawing21@gmail.com")
+options(gbif_pwd = "Lire54321$")
+options(gbif_email = "stellawing@ucsb.edu")
 
 # use rgbif::occ_download to acquire background points
 download_key <- occ_download(
@@ -117,14 +117,14 @@ vertebrate_data <- occ_download_import(download_file)
 vertebrate_sf <- st_as_sf(vertebrate_data,
                           coords = c("decimalLongitude", "decimalLatitude"),
                           crs = 4326) %>% 
-  # remove all GKR occ points
+  # remove all SJKF occ points
   filter(species != "Vulpes macrotis") %>% 
   filter(taxonKey != 2439550)
 
 
 # intersect occ points with the original precise buffer
 # this keeps only points within 50 km of GKR occs
-vertebrate_in_buffer <- st_intersection(vertebrate_sf, gkr_buffer_wgs84)
+vertebrate_in_buffer <- st_intersection(vertebrate_sf, sjkf_buffer_wgs84)
 
 # remove duplicates
 vertebrate_unique <- vertebrate_in_buffer %>%
@@ -143,3 +143,16 @@ background_df <- cbind(
   background_coords
 )
 ```
+
+Save the data
+
+```{r}
+# save SF to test
+write_sf(vertebrate_unique, here("data/sjkf_bg_points.shp"),
+         append = FALSE)
+
+
+# save final background points to CSV
+write_csv(background_df, here("data/sjkf_bg_points.csv"))
+```
+
