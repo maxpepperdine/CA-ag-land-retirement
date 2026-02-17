@@ -249,7 +249,7 @@ save(maxent_sjkf,
      file = here("data/4_maxent_predictions/maxent_prediction_sjkf_sdm.rda"))
 ```
 
-#### Predict baseline (historical) BNLL occurrence probability
+#### Predict baseline (historical) SJKF occurrence probability
 
 ```{r}
 #### set up the prediction parameters
@@ -347,9 +347,9 @@ writeRaster(bnll_habitat_masked,
 ```
 
 
-## Predict future BNLL occurrence probability under projected environmental data
+## Predict future SJKF occurrence probability under projected environmental data
 
-Transfer the model to future environmental data under `RCP4.5` and `RCP8.5` for two time periods (`2020-2049` and `2040-2069`) to predict future BNLL occurrence probability under projected environmental conditions.
+Transfer the model to future environmental data under `RCP4.5` and `RCP8.5` for two time periods (`2020-2049` and `2040-2069`) to predict future SJKF occurrence probability under projected environmental conditions.
 
 Produce 4 future prediction rasters for each RCP and time period combination.
 
