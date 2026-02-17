@@ -230,7 +230,7 @@ args <- c("jackknife=TRUE",      # assess variable importance
           "threshold=FALSE",     # do not use threshold features
           "responsecurves=TRUE", # generate response curves
           "writeplotdata=TRUE",  # write output data used to make response curves 
-          "betamultiplier=0.5")   # this is the rm coefficient from ENMevaluate()
+          "betamultiplier=0.5")  # this is the rm coefficient from ENMevaluate()
 
 
 # path to save results
@@ -307,7 +307,7 @@ filename_sjkf <- here::here("data/4_maxent_predictions/maxent_sjkf_pred_fillNAs.
 ## predict current HEC 
 dismo::predict(object = maxent_sjkf, 
                x = x_stack, 
-               #ext = stewart_bnll_ext,
+               ext = stewart_bnll_ext,
                filename = filename_sjkf, 
                overwrite = TRUE) 
 
