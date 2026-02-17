@@ -53,7 +53,7 @@ plot(env_rasters)
 ```{r}
 # load occurrence points from GBIF
 sjkf_occs <- occ_search(
-  taxonKey = 5219311,  # taxon key for Vulpes macrotis 
+  taxonKey = 6164308,  # taxon key for Vulpes macrotis mutica
   hasCoordinate = TRUE,
   hasGeospatialIssue = FALSE,
   year = "1990,2025", 

@@ -176,7 +176,7 @@ evalplot.stats(e = max.eval.filtered,
 
 
 #==============================================================================
-# Best model: fc.P_rm.0.5 ####### REVIEW
+# Best model: fc.LQ_rm.0.5 ####### REVIEW
 #==============================================================================
 
 
@@ -198,7 +198,7 @@ This section generates a MaxEnt model using the selected feature class and regul
 
 These model objects are then used to predict baseline (historical) and future SJKF occurrence probabilities.
 
-#### Baseline (fc P and rm 0.5) 
+#### Baseline (fc LQ and rm 0.5) 
 
 ```{r}
 ## set up model parameters based on the evaluation results
@@ -222,16 +222,15 @@ p <- full_data %>%
   na.omit() %>%
   pull(presence) # turn p into a vector of 0's and 1's for presence and absence
 
-# set arguments for the maxent() function
 args <- c("jackknife=TRUE",      # assess variable importance
           "linear=TRUE",         # use linear features
           "quadratic=TRUE",      # use quadratic features
           "hinge=FALSE",         # do not use hinge features
-          "product=TRUE",       # use product features
+          "product=FALSE",       # do not use product features
           "threshold=FALSE",     # do not use threshold features
           "responsecurves=TRUE", # generate response curves
           "writeplotdata=TRUE",  # write output data used to make response curves 
-          "betamultiplier=0.5")  # this is the rm coefficient from ENMevaluate()
+          "betamultiplier=0.5")   # this is the rm coefficient from ENMevaluate()
 
 
 # path to save results
@@ -308,7 +307,7 @@ filename_sjkf <- here::here("data/4_maxent_predictions/maxent_sjkf_pred_fillNAs.
 ## predict current HEC 
 dismo::predict(object = maxent_sjkf, 
                x = x_stack, 
-               ext = stewart_bnll_ext,
+               #ext = stewart_bnll_ext,
                filename = filename_sjkf, 
                overwrite = TRUE) 
 
@@ -318,6 +317,10 @@ pred_rast_sjkf <- rast(filename_sjkf)
 plot(pred_rast_sjkf, 
      main = "MaxEnt Predicted Habitat Suitability 
      for San Joaquin Kit Fox (Vulpes macrotis)")
+
+pred_rast_sjkf <- rast(filename_sjkf)
+plot(pred_rast_sjkf)
+
 ```
 
 #### Mask lakes from prediction raster 
