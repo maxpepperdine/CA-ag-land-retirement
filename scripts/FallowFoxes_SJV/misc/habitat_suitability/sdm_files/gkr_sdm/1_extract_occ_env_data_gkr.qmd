@@ -45,8 +45,9 @@ env_rasters <- rast(list.files(here("data/intermediate/misc/habitat_suitability/
 # fix names
 names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
                         "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
-                        "silt_pct_0_10cm", "slope")
-plot(env_rasters)
+                        "sand_pct_0_10cm", "silt_pct_0_10cm", "slope", 
+                        "tmn1991_2020_ave", "tmx1991_2020_ave")
+# plot(env_rasters)
 ```
 
 #### GKR occurrences
@@ -142,7 +143,7 @@ gkr_occ_env_df <- gkr_occ_env_sf %>%
 # save final occurrence points with env data to CSV
 write_csv(gkr_occ_env_df, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data_gkr/gkr_occ_env_data.csv"))
 
-# save SF object
-write_sf(gkr_occ_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data_gkr/gkr_occ_env_data.shp"),
-         append = FALSE)
+# # save SF object
+# write_sf(gkr_occ_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/1_extract_occ_env_data_gkr/gkr_occ_env_data.shp"),
+#          append = FALSE)
 ```

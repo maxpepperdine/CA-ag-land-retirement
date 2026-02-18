@@ -38,7 +38,7 @@ ca_boundary <- read_sf(here("data/raw/ca_state/ca_state_boundary_no_islands.shp"
 
 ## Data processing
 
-#### Create 50 km buffer around GKR occ points
+#### Create 100 km buffer around GKR occ points
 
 ```{r}
 # convert GKR occ data to sf object
@@ -46,8 +46,8 @@ gkr_sf <- st_as_sf(gkr_occs,
                     coords = c("longitude", "latitude"), 
                     crs = 3310)
 
-# create 50 km buffer around each occurrence point
-gkr_buffer <- st_buffer(gkr_sf, dist = 50000)
+# create 100 km buffer around each occurrence point
+gkr_buffer <- st_buffer(gkr_sf, dist = 100000)
 
 # combine buffers into a single polygon
 gkr_buffer_union <- st_union(gkr_buffer)
@@ -91,7 +91,7 @@ download_key <- occ_download(
   pred_gte("year", 1990),
   pred_lte("year", 2025),
   pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
-  pred_lte("coordinateUncertaintyInMeters", 500),
+  pred_lte("coordinateUncertaintyInMeters", 250),
   pred_within(buffer_simplify_wkt)  # Your buffer
 )
 
