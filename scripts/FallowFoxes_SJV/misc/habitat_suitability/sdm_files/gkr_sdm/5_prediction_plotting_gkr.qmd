@@ -1,5 +1,5 @@
 ---
-title: "GKR habitat suitability prediction plotting"
+title: "GKR habitat suitability prediction plotting & comparison"
 format: html
 editor_options: 
   chunk_output_type: console
@@ -12,7 +12,7 @@ rm(list = ls())
 
 ## Overview/Purpose
 
-This script generates maps of the GKR habitat suitability predictions.
+This script generates plots and difference maps comparing the baseline GKR habitat suitability model with future predictions under various emissions scenarios. 
 
 ## Setup
 
@@ -23,78 +23,335 @@ library(terra)
 library(tidyverse)
 library(here)
 library(sf)
+library(tmap)
 ```
 
 #### Load data
 
-###### Habitat suitability
-
 ```{r}
-##### giant kangaroo rat habitat suitability rasters #####
+# baseline gkr model
+gkr_baseline <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/maxent_gkr_pred_masked_lakes.tif"))
 
-
-```
-
-###### Misc
-
-```{r}
 # load SJV boundary for masking
 sjv_boundary <- read_sf(here("data/raw/sjv_counties/sjv_counties.shp"))
+
+# load CA boundary for inset map
+ca_boundary <- read_sf(here("data/raw/ca_state/ca_state_boundary_wgs84.shp"))
 ```
 
-## Alignments checks
-
-Raster math requires matching CRS, extent, and resolution.
-
-```{r}
-
-```
-
-#### Make sure SJV is in `EPSG:3310`
+#### Make sure all are in `EPSG:3310`
 
 ```{r}
 # transform SJV boundary to EPSG:3310
-sjv_boundary <- st_transform(sjv_boundary, crs = crs(bnll_fallowSJV))
+sjv_boundary <- st_transform(sjv_boundary, crs = crs(gkr_baseline))
 crs(sjv_boundary)
 # convert to terra vector
 sjv_vect <- vect(sjv_boundary)
+
+# transform CA boundary to EPSG:3310
+ca_boundary <- st_transform(ca_boundary, crs = crs(gkr_baseline))
+crs(ca_boundary)
+# convert to terra vector
+ca_vect <- vect(ca_boundary)
 ```
 
-## Plotting
+## Comparing future predictions under different emissions scenarios
 
-#### Continuous (raw data) comparisons
-
-Side-by-side plot of the two raw models
+#### Load & plot the future predictions
 
 ```{r}
+# RCP 4.5 (2020-2049)
+gkr_rcp45_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp45_2020_2049_masked_lakes.tif"))
 
+# RCP 4.5 (2040-2069)
+gkr_rcp45_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp45_2040_2069_masked_lakes.tif"))
+
+# RCP 8.5 (2020-2049)
+gkr_rcp85_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp85_2020_2049_masked_lakes.tif"))
+
+# RCP 8.5 (2040-2069)
+gkr_rcp85_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp85_2040_2069_masked_lakes.tif"))
 ```
 
-Difference raster map. 
+#### Calculate continuous difference rasters
 
 ```{r}
+# calculate the continuous difference rasters (future - baseline)
+cont_diff_rcp45_2049 <- gkr_rcp45_2049 - gkr_baseline
+cont_diff_rcp45_2069 <- gkr_rcp45_2069 - gkr_baseline
+cont_diff_rcp85_2049 <- gkr_rcp85_2049 - gkr_baseline
+cont_diff_rcp85_2069 <- gkr_rcp85_2069 - gkr_baseline
 
+# clip to SJV boundary
+cont_diff_rcp45_2049_sjv <- cont_diff_rcp45_2049 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+cont_diff_rcp45_2069_sjv <- cont_diff_rcp45_2069 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+cont_diff_rcp85_2049_sjv <- cont_diff_rcp85_2049 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+cont_diff_rcp85_2069_sjv <- cont_diff_rcp85_2069 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
 ```
 
-#### Reclassified comparisons
+#### Reclassify the future predictions & calculate binary difference rasters
 
-Threshold: 
+Calculated in `4_maxent_predictions_gkr.qmd`, reclassify continuous habitat suitability layers into binary suitable/unsuitable layers using the threshold that maximizes true positive/negative rate (i.e., specificity + sensitivity). This is **0.28** for the GKR maxent model.
 
 ```{r}
+# define the reclass matrix
+reclass_matrix_future <- matrix(c(0, 0.28, 0,
+                                  0.28, 1, 1),
+                                ncol = 3, byrow = TRUE)
 
+# reclassify baseline
+gkr_baseline_bin <- classify(gkr_baseline, reclass_matrix_future)
+
+# reclassify future predictions
+gkr_rcp45_2049_bin <- classify(gkr_rcp45_2049, reclass_matrix_future)
+gkr_rcp45_2069_bin <- classify(gkr_rcp45_2069, reclass_matrix_future)
+gkr_rcp85_2049_bin <- classify(gkr_rcp85_2049, reclass_matrix_future)
+gkr_rcp85_2069_bin <- classify(gkr_rcp85_2069, reclass_matrix_future)
+
+# --- Create 4-category change rasters ---
+# Instead of simple subtraction, combine baseline and future into a single value
+# that encodes both states. We'll use: baseline * 10 + future
+# This gives us:
+#   0*10 + 0 = 0  -> Unsuitable to Unsuitable (No change - unsuitable)
+#   0*10 + 1 = 1  -> Unsuitable to Suitable (Gain)
+#   1*10 + 0 = 10 -> Suitable to Unsuitable (Loss)
+#   1*10 + 1 = 11 -> Suitable to Suitable (No change - suitable)
+
+# Create combined rasters
+combined_rcp45_2049 <- gkr_baseline_bin * 10 + gkr_rcp45_2049_bin
+combined_rcp45_2069 <- gkr_baseline_bin * 10 + gkr_rcp45_2069_bin
+combined_rcp85_2049 <- gkr_baseline_bin * 10 + gkr_rcp85_2049_bin
+combined_rcp85_2069 <- gkr_baseline_bin * 10 + gkr_rcp85_2069_bin
+
+# Reclassify to final 4 categories
+# 1 = Loss, 2 = No change - unsuitable, 3 = No change - suitable, 4 = Gain
+reclass_change <- matrix(c(
+  0,  2,   # 0 (unsuitable->unsuitable) becomes 2: No change - unsuitable
+  1,  4,   # 1 (unsuitable->suitable) becomes 4: Gain
+  10, 1,   # 10 (suitable->unsuitable) becomes 1: Loss
+  11, 3    # 11 (suitable->suitable) becomes 3: No change - suitable
+), ncol = 2, byrow = TRUE)
+
+bin_diff_rcp45_2049 <- classify(combined_rcp45_2049, reclass_change)
+bin_diff_rcp45_2069 <- classify(combined_rcp45_2069, reclass_change)
+bin_diff_rcp85_2049 <- classify(combined_rcp85_2049, reclass_change)
+bin_diff_rcp85_2069 <- classify(combined_rcp85_2069, reclass_change)
+
+# clip difference rasters to SJV boundary
+bin_diff_rcp45_2049_sjv <- bin_diff_rcp45_2049 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+bin_diff_rcp45_2069_sjv <- bin_diff_rcp45_2069 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+bin_diff_rcp85_2049_sjv <- bin_diff_rcp85_2049 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+bin_diff_rcp85_2069_sjv <- bin_diff_rcp85_2069 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
 ```
 
-Side-by-side plot of the two binary models
+#### Plot the future predictions and difference maps
+
+Make buffered bbox for plotting
 
 ```{r}
+# convert terra vectors to sf for easier handling
+sjv_sf <- st_as_sf(sjv_vect)
+ca_sf <- st_as_sf(ca_vect)
 
+## Create expanded bounding box for SJV
+sjv_bbox <- st_bbox(sjv_sf)
+sjv_buffer <- 0.1
+x_expand <- sjv_buffer * (unname(sjv_bbox["xmax"]) - unname(sjv_bbox["xmin"]))
+y_expand <- sjv_buffer * (unname(sjv_bbox["ymax"]) - unname(sjv_bbox["ymin"]))
+
+sjv_bbox_expanded <- st_bbox(c(
+  xmin = unname(sjv_bbox["xmin"]) - x_expand,
+  xmax = unname(sjv_bbox["xmax"]) + x_expand,
+  ymin = unname(sjv_bbox["ymin"]) - y_expand,
+  ymax = unname(sjv_bbox["ymax"]) + y_expand
+), crs = st_crs(sjv_sf))
+
+# Create expanded bounding box for CA
+ca_bbox <- st_bbox(ca_sf)
+ca_buffer <- 0.1
+x_expand_ca <- ca_buffer * (unname(ca_bbox["xmax"]) - unname(ca_bbox["xmin"]))
+y_expand_ca <- ca_buffer * (unname(ca_bbox["ymax"]) - unname(ca_bbox["ymin"]))
+
+ca_bbox_expanded <- st_bbox(c(
+  xmin = unname(ca_bbox["xmin"]) - x_expand_ca,
+  xmax = unname(ca_bbox["xmax"]) + x_expand_ca,
+  ymin = unname(ca_bbox["ymin"]) - y_expand_ca,
+  ymax = unname(ca_bbox["ymax"]) + y_expand_ca
+), crs = st_crs(ca_sf))
 ```
 
-Difference raster map (binary).
+Binary difference maps
 
 ```{r}
+# stack the difference rasters and name them
+bin_diff_stack <- c(bin_diff_rcp45_2049_sjv, bin_diff_rcp45_2069_sjv, 
+                    bin_diff_rcp85_2049_sjv, bin_diff_rcp85_2069_sjv)
+names(bin_diff_stack) <- c("RCP 4.5 (2020-2049)", "RCP 4.5 (2040-2069)", 
+                           "RCP 8.5 (2020-2049)", "RCP 8.5 (2040-2069)")
 
+# create the binary difference map with 4 categories
+main_map <- tm_shape(bin_diff_stack, bbox = sjv_bbox_expanded) +
+  
+  tm_raster(
+    col.scale = tm_scale_categorical(
+      values = c("#e6550d", "grey90", "lightgreen", "royalblue"),
+      labels = c("Loss", "No change - unsuitable", "No change - suitable", "Gain"),
+      levels = c(1, 2, 3, 4)
+    ),
+    col.legend = tm_legend(title = "Habitat change"), 
+    col.free = FALSE
+  ) +
+  tm_facets_wrap(ncol = 2) +
+  tm_layout(
+    panel.labels = names(bin_diff_stack)
+  ) + 
+  tm_shape(sjv_vect) +
+  tm_borders(col = "black", lwd = 0.5)
+
+# create the inset map
+inset_map <- tm_shape(ca_vect, bbox = ca_bbox_expanded) +
+  tm_borders(col = "black", lwd=1) +
+  tm_shape(sjv_vect) +
+  tm_fill(fill = "red", fill_alpha = 0.5) +
+  tm_borders(col = "red") +
+  tm_layout(frame = TRUE, bg.color = "white")
+
+# print main map
+print(main_map)
+
+# add inset using viewport
+print(inset_map, vp = grid::viewport(x = 0.72, y = 0.5, width = 0.2, height = 0.25))
 ```
+
+Continuous difference maps
+
+```{r}
+# stack the continuous difference rasters and name them
+cont_diff_stack <- c(cont_diff_rcp45_2049_sjv, cont_diff_rcp45_2069_sjv, 
+                     cont_diff_rcp85_2049_sjv, cont_diff_rcp85_2069_sjv)
+names(cont_diff_stack) <- c("RCP 4.5 (2020-2049)", "RCP 4.5 (2040-2069)", 
+                            "RCP 8.5 (2020-2049)", "RCP 8.5 (2040-2069)")
+
+# create the continuous difference map
+main_map_cont <- tm_shape(cont_diff_stack, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "brewer.rd_bu", midpoint = 0),
+            col.legend = tm_legend(
+              title = "Habitat change"), 
+            col.free = FALSE) +
+  tm_facets_wrap(ncol = 2) +
+  tm_layout(panel.labels = names(cont_diff_stack)) +
+  tm_shape(sjv_vect) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_facets_wrap(ncol = 2)
+
+# plot main map
+print(main_map_cont)
+
+# add inset using viewport
+print(inset_map, vp = grid::viewport(x = 0.73, y = 0.3, width = 0.2, height = 0.25))
+```
+
+Raw future projections
+
+```{r}
+# clip the cont future predictions to SJV boundary
+gkr_rcp45_2049_sjv <- gkr_rcp45_2049 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+gkr_rcp45_2069_sjv <- gkr_rcp45_2069 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+gkr_rcp85_2049_sjv <- gkr_rcp85_2049 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+gkr_rcp85_2069_sjv <- gkr_rcp85_2069 %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+
+# stack the future predictions and name them
+future_stack <- c(gkr_rcp45_2049_sjv, gkr_rcp45_2069_sjv, 
+                  gkr_rcp85_2049_sjv, gkr_rcp85_2069_sjv)
+names(future_stack) <- c("RCP 4.5 (2020-2049)", "RCP 4.5 (2040-2069)", 
+                         "RCP 8.5 (2020-2049)", "RCP 8.5 (2040-2069)")
+
+# plot the future predictions
+gkr_fut_map <- tm_shape(future_stack, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis",
+                                             ticks = seq(0, 1, by = 0.25)),
+            col.legend = tm_legend(title = "Habitat suitability"), 
+            col.free = FALSE) +
+  tm_facets_wrap(ncol = 2) +
+  tm_layout(panel.labels = names(future_stack))
+
+# plot main map
+print(gkr_fut_map)
+
+# add inset using viewport
+print(inset_map, vp = grid::viewport(x = 0.73, y = 0.3, width = 0.2, height = 0.25))
+```
+
+## Plot the baseline predictions
+
+```{r}
+# clip baseline to SJV boundary
+gkr_baseline_sjv <- gkr_baseline %>% 
+  mask(sjv_vect) %>% 
+  crop(sjv_vect)
+
+# plot baseline predictions
+gkr_baseline_map <- tm_shape(gkr_baseline_sjv, bbox = sjv_bbox_expanded) +
+  tm_graticules(col = "grey80", lwd = 0.5) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis",
+                                             ticks = seq(0, 1, by = 0.25)),
+            col.legend = tm_legend(title = "Habitat suitability (baseline)"), 
+            col.free = FALSE) +
+  tm_shape(sjv_vect) +
+  tm_borders(col = "black", lwd = 0.5)
+
+# plot main map
+print(gkr_baseline_map)
+
+# add inset using viewport
+print(inset_map, vp = grid::viewport(x = 0.73, y = 0.2, width = 0.2, height = 0.25))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

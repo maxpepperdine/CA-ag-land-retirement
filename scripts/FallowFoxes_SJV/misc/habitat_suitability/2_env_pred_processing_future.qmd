@@ -15,6 +15,8 @@ This script processes all of the future climate variables from the BCM that we'l
 - `aet`: actual evapotranspiration
 - `cwd`: climatic water deficit
 - `ppt`: precipitation
+- `tmn`: minimum temperature
+- `tmx`: maximum temperature
 
 For each climate variable, we have data for:
 
@@ -53,7 +55,7 @@ input_dir <- here("data/raw/bcm/bcmv8_future/")
 output_dir <- here("data/intermediate/misc/habitat_suitability/env_predictors/future/bcm_gcm_ensemble/")
 
 # define parameters
-climate_vars <- c("aet", "cwd", "ppt")
+climate_vars <- c("aet", "cwd", "ppt", "tmn", "tmx")
 gcms <- c("CanESM2", "CNRM-CM5", "HadGEM2-ES", "MIROC5")
 scenarios <- c("RCP45", "RCP85")
 time_periods <- c("2020_2049", "2040_2069")
@@ -264,37 +266,37 @@ for (var in climate_vars) {
 #### Project to WGS84 (`EPSG:4326`) for use in Wallace
 
 ```{r}
-# define output directory for WGS84 files
-wgs_output_dir <- file.path(output_dir, "WGS84")
-
-# track WGS84 output files
-wgs_output_files <- character()
-
-# reproject each ensemble file to WGS84
-for (f in output_files) {
-  message("Reprojecting: ", basename(f))
-  
-  # load the raster
-  r <- rast(f)
-  
-  # reproject to WGS84
-  r_wgs <- project(r, "EPSG:4326", method = "mean")
-  
-  # construct output filename (add _wgs84 suffix)
-  original_name <- tools::file_path_sans_ext(basename(f))
-  wgs_output_name <- paste0(original_name, "_wgs84.tif")
-  wgs_output_path <- file.path(wgs_output_dir, wgs_output_name)
-  
-  # save as GeoTIFF
-  writeRaster(
-    r_wgs,
-    filename = wgs_output_path,
-    overwrite = TRUE
-  )
-  
-  message("  Saved: ", wgs_output_name)
-  wgs_output_files <- c(wgs_output_files, wgs_output_path)
-}
+# # define output directory for WGS84 files
+# wgs_output_dir <- file.path(output_dir, "WGS84")
+# 
+# # track WGS84 output files
+# wgs_output_files <- character()
+# 
+# # reproject each ensemble file to WGS84
+# for (f in output_files) {
+#   message("Reprojecting: ", basename(f))
+#   
+#   # load the raster
+#   r <- rast(f)
+#   
+#   # reproject to WGS84
+#   r_wgs <- project(r, "EPSG:4326", method = "mean")
+#   
+#   # construct output filename (add _wgs84 suffix)
+#   original_name <- tools::file_path_sans_ext(basename(f))
+#   wgs_output_name <- paste0(original_name, "_wgs84.tif")
+#   wgs_output_path <- file.path(wgs_output_dir, wgs_output_name)
+#   
+#   # save as GeoTIFF
+#   writeRaster(
+#     r_wgs,
+#     filename = wgs_output_path,
+#     overwrite = TRUE
+#   )
+#   
+#   message("  Saved: ", wgs_output_name)
+#   wgs_output_files <- c(wgs_output_files, wgs_output_path)
+# }
 ```
 
 ## Plot some of the projections
@@ -379,13 +381,19 @@ sjv_bbox_expanded <- st_bbox(c(
 # stack the RCP45 and RCP85 stacks together for plotting and name them
 rcp45_stack <- c(rcp45_2020_2049_stack_sjv, rcp45_2040_2069_stack_sjv)
 names(rcp45_stack) <- c("AET RCP45 (2020_2049)", "CWD RCP45 (2020_2049)",
-                        "PPT RCP45 (2020_2049)", "AET RCP45 (2040_2069)",
-                        "CWD RCP45 (2040_2069)", "PPT RCP45 (2040_2069)")
+                        "PPT RCP45 (2020_2049)", "TMN RCP45 (2020_2049)", 
+                        "TMX RCP45 (2020_2049)",
+                        "AET RCP45 (2040_2069)", "CWD RCP45 (2040_2069)", 
+                        "PPT RCP45 (2040_2069)", "TMN RCP45 (2040_2069)", 
+                        "TMX RCP45 (2040_2069)")
 
 rcp85_stack <- c(rcp85_2020_2049_stack_sjv, rcp85_2040_2069_stack_sjv)
 names(rcp85_stack) <- c("AET RCP85 (2020_2049)", "CWD RCP85 (2020_2049)",
-                        "PPT RCP85 (2020_2049)", "AET RCP85 (2040_2069)",
-                        "CWD RCP85 (2040_2069)", "PPT RCP85 (2040_2069)")
+                        "PPT RCP85 (2020_2049)", "TMN RCP85 (2020_2049)", 
+                        "TMX RCP85 (2020_2049)",
+                        "AET RCP85 (2040_2069)", "CWD RCP85 (2040_2069)", 
+                        "PPT RCP85 (2040_2069)", "TMN RCP85 (2040_2069)",
+                        "TMX RCP85 (2040_2069)")
 
 # plot the stacks using tmap
 tm_shape(rcp45_stack, bbox = sjv_bbox_expanded) +

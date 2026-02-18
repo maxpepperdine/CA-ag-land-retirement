@@ -27,6 +27,7 @@ library(here)
 library(tidyverse)
 library(tigris)
 library(sf)
+library(tmap)
 ```
 
 #### Load data
@@ -604,3 +605,110 @@ writeRaster(slope_wgs84,
             filename = file.path(output_dir, "WGS84/slope_deg_CA_wgs84.tif"), 
             overwrite = TRUE)
 ```
+
+## Plot some of the historic BCM data
+
+```{r}
+# load SJV boundary for masking
+sjv_boundary <- read_sf(here("data/raw/sjv_counties/sjv_counties.shp"))
+
+# transform SJV boundary to EPSG:3310
+sjv_boundary <- st_transform(sjv_boundary, crs = crs(ref_raster))
+crs(sjv_boundary)
+# convert to terra vector
+sjv_vect <- vect(sjv_boundary)
+
+# convert terra vectors to sf for easier handling
+sjv_sf <- st_as_sf(sjv_vect)
+
+## Create expanded bounding box for SJV
+sjv_bbox <- st_bbox(sjv_sf)
+sjv_buffer <- 0.1
+x_expand <- sjv_buffer * (unname(sjv_bbox["xmax"]) - unname(sjv_bbox["xmin"]))
+y_expand <- sjv_buffer * (unname(sjv_bbox["ymax"]) - unname(sjv_bbox["ymin"]))
+
+sjv_bbox_expanded <- st_bbox(c(
+  xmin = unname(sjv_bbox["xmin"]) - x_expand,
+  xmax = unname(sjv_bbox["xmax"]) + x_expand,
+  ymin = unname(sjv_bbox["ymin"]) - y_expand,
+  ymax = unname(sjv_bbox["ymax"]) + y_expand
+), crs = st_crs(sjv_sf))
+```
+
+```{r}
+# load the 1991-2020 average rasters in EPSG 3310
+aet_1991_2020 <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/aet1991_2020_ave_CA_270m.tif"))
+cwd_1991_2020 <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/cwd1991_2020_ave_CA_270m.tif"))
+ppt_1991_2020 <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/ppt1991_2020_ave_CA_270m.tif"))
+tmn_1991_2020 <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/tmn1991_2020_ave_CA_270m.tif"))
+tmx_1991_2020 <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/tmx1991_2020_ave_CA_270m.tif"))
+
+# crop rasters to SJV boundary vect
+aet_1991_2020_sjv <- aet_1991_2020 %>%
+  crop(sjv_vect) %>%
+  mask(sjv_vect)
+cwd_1991_2020_sjv <- cwd_1991_2020 %>%
+  crop(sjv_vect) %>%
+  mask(sjv_vect)
+ppt_1991_2020_sjv <- ppt_1991_2020 %>%
+  crop(sjv_vect) %>%
+  mask(sjv_vect)
+tmn_1991_2020_sjv <- tmn_1991_2020 %>%
+  crop(sjv_vect) %>%
+  mask(sjv_vect)
+tmx_1991_2020_sjv <- tmx_1991_2020 %>%
+  crop(sjv_vect) %>%
+  mask(sjv_vect)
+```
+
+```{r}
+# plot each raster and then combine into a multi-panel plot
+aet_plot <- tm_shape(aet_1991_2020_sjv, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis"), 
+            col.legend = tm_legend(title = "mm / yr", 
+                                   position = tm_pos_in("left", "bottom"))) + 
+  tm_title("AET (1991-2020 avg)", 
+           position = tm_pos_in("left", "top"), 
+           size = 1)
+
+cwd_plot <- tm_shape(cwd_1991_2020_sjv, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis"),
+            col.legend = tm_legend(title = "mm / yr", 
+                                   position = tm_pos_in("left", "bottom"))) + 
+  tm_title("CWD (1991-2020 avg)", 
+           position = tm_pos_in("left", "top"), 
+           size = 1)
+
+ppt_plot <- tm_shape(ppt_1991_2020_sjv, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis"),
+            col.legend = tm_legend(title = "mm / yr", 
+                                   position = tm_pos_in("left", "bottom"))) +
+  tm_title("PPT (1991-2020 avg)", 
+           position = tm_pos_in("left", "top"), 
+           size = 1)
+
+tmn_plot <- tm_shape(tmn_1991_2020_sjv, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis"),
+            col.legend = tm_legend(title = "°C", 
+                                   position = tm_pos_in("left", "bottom"))) +
+  tm_title("TMN (1991-2020 avg)", 
+           position = tm_pos_in("left", "top"), 
+           size = 1)
+
+tmx_plot <- tm_shape(tmx_1991_2020_sjv, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis"),
+            col.legend = tm_legend(title = "°C", 
+                                   position = tm_pos_in("left", "bottom"))) +
+  tm_title("TMX (1991-2020 avg)", 
+           position = tm_pos_in("left", "top"), 
+           size = 1)
+
+combined_plot <- tmap_arrange(aet_plot, cwd_plot, ppt_plot, tmn_plot, tmx_plot, 
+                              ncol = 3)
+combined_plot
+```
+
+
+
+
+
