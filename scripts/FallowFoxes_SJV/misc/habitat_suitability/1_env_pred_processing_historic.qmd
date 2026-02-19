@@ -608,6 +608,8 @@ writeRaster(slope_wgs84,
 
 ## Plot some of the historic BCM data
 
+#### Load rasters and boundaries
+
 ```{r}
 # load SJV boundary for masking
 sjv_boundary <- read_sf(here("data/raw/sjv_counties/sjv_counties.shp"))
@@ -617,7 +619,11 @@ sjv_boundary <- st_transform(sjv_boundary, crs = crs(ref_raster))
 crs(sjv_boundary)
 # convert to terra vector
 sjv_vect <- vect(sjv_boundary)
+```
 
+Make bounding box for plotting aesthetics
+
+```{r}
 # convert terra vectors to sf for easier handling
 sjv_sf <- st_as_sf(sjv_vect)
 
@@ -634,6 +640,8 @@ sjv_bbox_expanded <- st_bbox(c(
   ymax = unname(sjv_bbox["ymax"]) + y_expand
 ), crs = st_crs(sjv_sf))
 ```
+
+
 
 ```{r}
 # load the 1991-2020 average rasters in EPSG 3310

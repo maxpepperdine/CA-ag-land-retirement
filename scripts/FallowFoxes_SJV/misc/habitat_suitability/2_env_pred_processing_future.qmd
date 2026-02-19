@@ -301,7 +301,7 @@ for (var in climate_vars) {
 
 ## Plot some of the projections
 
-#### Load the SJV vector boundary for plotting
+#### Load the SJV & CA boundaries for plotting
 
 ```{r}
 # load SJV boundary for masking
@@ -312,6 +312,16 @@ sjv_boundary <- st_transform(sjv_boundary, crs = crs(ref_raster))
 crs(sjv_boundary)
 # convert to terra vector
 sjv_vect <- vect(sjv_boundary)
+
+
+# load CA boundary for inset map
+ca_boundary <- read_sf(here("data/raw/ca_state/ca_state_boundary_wgs84.shp"))
+
+# transform CA boundary to EPSG:3310
+ca_boundary <- st_transform(ca_boundary, crs = crs(ref_raster))
+crs(ca_boundary)
+# convert to terra vector
+ca_vect <- vect(ca_boundary)
 ```
 
 #### Load the projections as raster stacks & crop to SJV
@@ -362,6 +372,7 @@ rcp85_2040_2069_stack_sjv <- rcp85_2040_2069_stack %>%
 ```{r}
 # convert terra vectors to sf for easier handling
 sjv_sf <- st_as_sf(sjv_vect)
+ca_sf <- st_as_sf(ca_vect)
 
 ## Create expanded bounding box for SJV
 sjv_bbox <- st_bbox(sjv_sf)
@@ -375,6 +386,19 @@ sjv_bbox_expanded <- st_bbox(c(
   ymin = unname(sjv_bbox["ymin"]) - y_expand,
   ymax = unname(sjv_bbox["ymax"]) + y_expand
 ), crs = st_crs(sjv_sf))
+
+# Create expanded bounding box for CA
+ca_bbox <- st_bbox(ca_sf)
+ca_buffer <- 0.1
+x_expand_ca <- ca_buffer * (unname(ca_bbox["xmax"]) - unname(ca_bbox["xmin"]))
+y_expand_ca <- ca_buffer * (unname(ca_bbox["ymax"]) - unname(ca_bbox["ymin"]))
+
+ca_bbox_expanded <- st_bbox(c(
+  xmin = unname(ca_bbox["xmin"]) - x_expand_ca,
+  xmax = unname(ca_bbox["xmax"]) + x_expand_ca,
+  ymin = unname(ca_bbox["ymin"]) - y_expand_ca,
+  ymax = unname(ca_bbox["ymax"]) + y_expand_ca
+), crs = st_crs(ca_sf))
 ```
 
 ```{r}
@@ -405,7 +429,7 @@ tm_shape(rcp45_stack, bbox = sjv_bbox_expanded) +
   tm_facets(ncol = 3)
 ```
 
-## Raster math with the projections
+## Raster math between the future projections
 
 #### Find the difference between RCP45 projections
 
@@ -420,17 +444,17 @@ cwd_diff_rcp45_2020_2049 <- rcp45_stack[[5]] - rcp45_stack[[2]]
 ppt_diff_rcp45_2020_2049 <- rcp45_stack[[6]] - rcp45_stack[[3]]
 
 # plot the differences
-rcp45_diff_stack <- c(aet_diff_rcp45_2020_2049, cwd_diff_rcp45_2020_2049, 
+rcp45_diff_stack <- c(aet_diff_rcp45_2020_2049, cwd_diff_rcp45_2020_2049,
                       ppt_diff_rcp45_2020_2049)
-names(rcp45_diff_stack) <- c("AET Δ (2040-2069 - 2020-2049)", 
-                             "CWD Δ (2040-2069 - 2020-2049)", 
+names(rcp45_diff_stack) <- c("AET Δ (2040-2069 - 2020-2049)",
+                             "CWD Δ (2040-2069 - 2020-2049)",
                              "PPT Δ (2040-2069 - 2020-2049)")
 
 tm_shape(rcp45_diff_stack, bbox = sjv_bbox_expanded) +
-  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"), 
-            col.legend = tm_legend(title = "mm / yr", 
+  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"),
+            col.legend = tm_legend(title = "mm / yr",
                                    position = tm_pos_in("left", "bottom"))) +
-  tm_layout(panel.labels = names(rcp45_diff_stack), 
+  tm_layout(panel.labels = names(rcp45_diff_stack),
             panel.label.size = 1) +
   tm_facets(ncol = 3)
 ```
@@ -460,9 +484,198 @@ tm_shape(rcp85_vs_rcp45_diff_stack, bbox = sjv_bbox_expanded) +
   tm_facets(ncol = 3)
 ```
 
+## Raster math between future and baseline projections
 
+#### Find the difference between future and baseline BCM data
 
+Load the processed baseline (1991-2020) BCM rasters
 
+```{r}
+# load the 1991-2020 average rasters in EPSG 3310
+aet_1991_2020 <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/aet1991_2020_ave_CA_270m.tif"))
+cwd_1991_2020 <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/cwd1991_2020_ave_CA_270m.tif"))
+ppt_1991_2020 <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/ppt1991_2020_ave_CA_270m.tif"))
+tmn_1991_2020 <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/tmn1991_2020_ave_CA_270m.tif"))
+tmx_1991_2020 <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/tmx1991_2020_ave_CA_270m.tif"))
+
+# crop rasters to SJV boundary vect
+aet_1991_2020_sjv <- aet_1991_2020 %>%
+  crop(sjv_vect) %>%
+  mask(sjv_vect)
+cwd_1991_2020_sjv <- cwd_1991_2020 %>%
+  crop(sjv_vect) %>%
+  mask(sjv_vect)
+ppt_1991_2020_sjv <- ppt_1991_2020 %>%
+  crop(sjv_vect) %>%
+  mask(sjv_vect)
+tmn_1991_2020_sjv <- tmn_1991_2020 %>%
+  crop(sjv_vect) %>%
+  mask(sjv_vect)
+tmx_1991_2020_sjv <- tmx_1991_2020 %>%
+  crop(sjv_vect) %>%
+  mask(sjv_vect)
+```
+
+Calculate the difference between RCP45 projections and baseline for each variable and time period.
+
+```{r}
+# calculate difference between RCP45 projections and baseline
+aet_diff_rcp45_2020_2049_vs_baseline <- rcp45_stack[[1]] - aet_1991_2020_sjv
+cwd_diff_rcp45_2020_2049_vs_baseline <- rcp45_stack[[2]] - cwd_1991_2020_sjv
+ppt_diff_rcp45_2020_2049_vs_baseline <- rcp45_stack[[3]] - ppt_1991_2020_sjv
+tmn_diff_rcp45_2020_2049_vs_baseline <- rcp45_stack[[4]] - tmn_1991_2020_sjv
+tmx_diff_rcp45_2020_2049_vs_baseline <- rcp45_stack[[5]] - tmx_1991_2020_sjv
+
+aet_diff_rcp45_2040_2069_vs_baseline <- rcp45_stack[[6]] - aet_1991_2020_sjv
+cwd_diff_rcp45_2040_2069_vs_baseline <- rcp45_stack[[7]] - cwd_1991_2020_sjv
+ppt_diff_rcp45_2040_2069_vs_baseline <- rcp45_stack[[8]] - ppt_1991_2020_sjv
+tmn_diff_rcp45_2040_2069_vs_baseline <- rcp45_stack[[9]] - tmn_1991_2020_sjv
+tmx_diff_rcp45_2040_2069_vs_baseline <- rcp45_stack[[10]] - tmx_1991_2020_sjv
+```
+
+Plot the raw baseline rasters
+
+```{r}
+# plot each raster and then combine into a multi-panel plot
+
+# AET
+aet_base_plot <- tm_shape(aet_1991_2020_sjv, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis"), 
+            col.legend = tm_legend(title = "mm / yr", 
+                                   position = tm_pos_in("left", "bottom"))) + 
+  tm_title("AET (1991-2020 avg)", 
+           position = tm_pos_in("right", "top"), 
+           size = 0.8)
+
+# CWD
+cwd_base_plot <- tm_shape(cwd_1991_2020_sjv, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis"),
+            col.legend = tm_legend(title = "mm / yr", 
+                                   position = tm_pos_in("left", "bottom"))) + 
+  tm_title("CWD (1991-2020 avg)", 
+           position = tm_pos_in("right", "top"), 
+           size = 0.8)
+
+# PPT
+ppt_base_plot <- tm_shape(ppt_1991_2020_sjv, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis"),
+            col.legend = tm_legend(title = "mm / yr", 
+                                   position = tm_pos_in("left", "bottom"))) +
+  tm_title("PPT (1991-2020 avg)", 
+           position = tm_pos_in("right", "top"), 
+           size = 0.8)
+
+# TMN
+tmn_base_plot <- tm_shape(tmn_1991_2020_sjv, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis"),
+            col.legend = tm_legend(title = "°C", 
+                                   position = tm_pos_in("left", "bottom"))) +
+  tm_title("TMN (1991-2020 avg)", 
+           position = tm_pos_in("right", "top"), 
+           size = 0.8)
+
+# TMX
+tmx_base_plot <- tm_shape(tmx_1991_2020_sjv, bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "viridis"),
+            col.legend = tm_legend(title = "°C", 
+                                   position = tm_pos_in("left", "bottom"))) +
+  tm_title("TMX (1991-2020 avg)", 
+           position = tm_pos_in("right", "top"), 
+           size = 0.8)
+
+# combine into multi-panel plot
+base_plot <- tmap_arrange(aet_base_plot, cwd_base_plot, ppt_base_plot, 
+                              tmn_base_plot, tmx_base_plot, 
+                              ncol = 3)
+
+# create the inset map
+inset_map <- tm_shape(ca_vect, bbox = ca_bbox_expanded) +
+  tm_borders(col = "black", lwd=1) +
+  tm_shape(sjv_vect) +
+  tm_fill(fill = "red", fill_alpha = 0.5) +
+  tm_borders(col = "red") +
+  tm_layout(frame = TRUE, bg.color = "white")
+
+# print main map
+print(base_plot)
+
+# add inset using viewport
+print(inset_map, vp = grid::viewport(x = 0.75, y = 0.36, 
+                                     width = 0.2, height = 0.25))
+```
+
+Plot the differences between RCP45 (2020-2049) projections and baseline
+
+Interpretation (`future - baseline`):
+
+- **Positive values** indicate an increase in the variable (e.g., more AET, more PPT, higher temperatures) in the future period compared to the baseline.
+- **Negative values** indicate a decrease in the variable (e.g., less AET, less PPT, lower temperatures) in the future period compared to the baseline.
+
+```{r}
+# plot each difference raster and then combine into a multi-panel plot
+
+# AET
+aet_diff_plot <- tm_shape(aet_diff_rcp45_2020_2049_vs_baseline, 
+                          bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"), 
+            col.legend = tm_legend(title = "mm / yr", 
+                                   position = tm_pos_in("left", "bottom"))) + 
+  tm_title("AET Δ (RCP45 2020-2049 - baseline)", 
+           position = tm_pos_in("right", "top"), 
+           size = 1)
+
+# CWD
+cwd_diff_plot <- tm_shape(cwd_diff_rcp45_2020_2049_vs_baseline, 
+                          bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"),
+            col.legend = tm_legend(title = "mm / yr", 
+                                   position = tm_pos_in("left", "bottom"))) + 
+  tm_title("CWD Δ (RCP45 2020-2049 - baseline)", 
+           position = tm_pos_in("right", "top"), 
+           size = 1)
+
+# PPT
+ppt_diff_plot <- tm_shape(ppt_diff_rcp45_2020_2049_vs_baseline, 
+                          bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"),
+            col.legend = tm_legend(title = "mm / yr", 
+                                   position = tm_pos_in("left", "bottom"))) +
+  tm_title("PPT Δ (RCP45 2020-2049 - baseline)", 
+           position = tm_pos_in("right", "top"), 
+           size = 1)
+
+# TMN
+tmn_diff_plot <- tm_shape(tmn_diff_rcp45_2020_2049_vs_baseline, 
+                          bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"),
+            col.legend = tm_legend(title = "°C", 
+                                   position = tm_pos_in("left", "bottom"))) +
+  tm_title("TMN Δ (RCP45 2020-2049 - baseline)", 
+           position = tm_pos_in("right", "top"), 
+           size = 1)
+
+# TMX
+tmx_diff_plot <- tm_shape(tmx_diff_rcp45_2020_2049_vs_baseline, 
+                          bbox = sjv_bbox_expanded) +
+  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"),
+            col.legend = tm_legend(title = "°C", 
+                                   position = tm_pos_in("left", "bottom"))) +
+  tm_title("TMX Δ (RCP45 2020-2049 - baseline)", 
+           position = tm_pos_in("right", "top"), 
+           size = 1)
+
+# combine into multi-panel plot
+diff_plot <- tmap_arrange(aet_diff_plot, cwd_diff_plot, ppt_diff_plot, 
+                              tmn_diff_plot, tmx_diff_plot, 
+                              ncol = 3)
+
+# print main map
+print(diff_plot)
+
+# add inset using viewport
+print(inset_map, vp = grid::viewport(x = 0.75, y = 0.36, 
+                                     width = 0.2, height = 0.25))
+```
 
 
 
