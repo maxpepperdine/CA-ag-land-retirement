@@ -332,24 +332,39 @@ rcp45_2020_2049_path <- list.files(output_dir,
                                    pattern = "RCP45_2020_2049.*\\.tif$",
                                    full.names = TRUE)
 rcp45_2020_2049_stack <- rast(rcp45_2020_2049_path)
+names(rcp45_2020_2049_stack) <- c("AET RCP45 (2020_2049)", "CWD RCP45 (2020_2049)",
+                                  "PPT RCP45 (2020_2049)", "TMN RCP45 (2020_2049)",
+                                  "TMX RCP45 (2020_2049)")
+
 
 # RCP45 (2040-2069) ensemble mean for each variable
 rcp45_2040_2069_path <- list.files(output_dir,
                                    pattern = "RCP45_2040_2069.*\\.tif$",
                                    full.names = TRUE)
 rcp45_2040_2069_stack <- rast(rcp45_2040_2069_path)
+names(rcp45_2040_2069_stack) <- c("AET RCP45 (2040_2069)", "CWD RCP45 (2040_2069)",
+                                  "PPT RCP45 (2040_2069)", "TMN RCP45 (2040_2069)",
+                                  "TMX RCP45 (2040_2069)")
+
 
 # RCP85 (2020-2049) ensemble mean for each variable
 rcp85_2020_2049_path <- list.files(output_dir,
                                    pattern = "RCP85_2020_2049.*\\.tif$",
                                    full.names = TRUE)
 rcp85_2020_2049_stack <- rast(rcp85_2020_2049_path)
+names(rcp85_2020_2049_stack) <- c("AET RCP85 (2020_2049)", "CWD RCP85 (2020_2049)",
+                                  "PPT RCP85 (2020_2049)", "TMN RCP85 (2020_2049)",
+                                  "TMX RCP85 (2020_2049)")
+
 
 # RCP85 (2040-2069) ensemble mean for each variable
 rcp85_2040_2069_path <- list.files(output_dir,
                                    pattern = "RCP85_2040_2069.*\\.tif$",
                                    full.names = TRUE)
 rcp85_2040_2069_stack <- rast(rcp85_2040_2069_path)
+names(rcp85_2040_2069_stack) <- c("AET RCP85 (2040_2069)", "CWD RCP85 (2040_2069)",
+                                  "PPT RCP85 (2040_2069)", "TMN RCP85 (2040_2069)",
+                                  "TMX RCP85 (2040_2069)")
 
 
 # crop to SJV extent
@@ -404,29 +419,18 @@ ca_bbox_expanded <- st_bbox(c(
 ```{r}
 # stack the RCP45 and RCP85 stacks together for plotting and name them
 rcp45_stack <- c(rcp45_2020_2049_stack_sjv, rcp45_2040_2069_stack_sjv)
-names(rcp45_stack) <- c("AET RCP45 (2020_2049)", "CWD RCP45 (2020_2049)",
-                        "PPT RCP45 (2020_2049)", "TMN RCP45 (2020_2049)", 
-                        "TMX RCP45 (2020_2049)",
-                        "AET RCP45 (2040_2069)", "CWD RCP45 (2040_2069)", 
-                        "PPT RCP45 (2040_2069)", "TMN RCP45 (2040_2069)", 
-                        "TMX RCP45 (2040_2069)")
 
 rcp85_stack <- c(rcp85_2020_2049_stack_sjv, rcp85_2040_2069_stack_sjv)
-names(rcp85_stack) <- c("AET RCP85 (2020_2049)", "CWD RCP85 (2020_2049)",
-                        "PPT RCP85 (2020_2049)", "TMN RCP85 (2020_2049)", 
-                        "TMX RCP85 (2020_2049)",
-                        "AET RCP85 (2040_2069)", "CWD RCP85 (2040_2069)", 
-                        "PPT RCP85 (2040_2069)", "TMN RCP85 (2040_2069)",
-                        "TMX RCP85 (2040_2069)")
 
-# plot the stacks using tmap
-tm_shape(rcp45_stack, bbox = sjv_bbox_expanded) +
-  tm_raster(col.scale = tm_scale_continuous(values = "viridis"), 
-            col.legend = tm_legend(title = "mm / yr", 
-                                   position = tm_pos_in("left", "bottom"))) +
-  tm_layout(panel.labels = names(rcp45_stack), 
-            panel.label.size = 0.8) +
-  tm_facets(ncol = 3)
+
+# # plot the stacks using tmap
+# tm_shape(rcp45_stack, bbox = sjv_bbox_expanded) +
+#   tm_raster(col.scale = tm_scale_continuous(values = "viridis"), 
+#             col.legend = tm_legend(title = "mm / yr", 
+#                                    position = tm_pos_in("left", "bottom"))) +
+#   tm_layout(panel.labels = names(rcp45_stack), 
+#             panel.label.size = 0.8) +
+#   tm_facets(ncol = 3)
 ```
 
 ## Raster math between the future projections
@@ -617,50 +621,65 @@ Interpretation (`future - baseline`):
 # AET
 aet_diff_plot <- tm_shape(aet_diff_rcp45_2020_2049_vs_baseline, 
                           bbox = sjv_bbox_expanded) +
-  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"), 
+  tm_raster(col.scale = tm_scale_continuous(values = "-RdBu"), 
             col.legend = tm_legend(title = "mm / yr", 
                                    position = tm_pos_in("left", "bottom"))) + 
-  tm_title("AET Δ (RCP45 2020-2049 - baseline)", 
+  tm_shape(sjv_vect) +
+  tm_borders(col = "black", 
+             lwd = 0.8) +
+  tm_title("AET Δ (rcp45_2020_2049 - baseline)", 
            position = tm_pos_in("right", "top"), 
            size = 1)
 
 # CWD
 cwd_diff_plot <- tm_shape(cwd_diff_rcp45_2020_2049_vs_baseline, 
                           bbox = sjv_bbox_expanded) +
-  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"),
+  tm_raster(col.scale = tm_scale_continuous(values = "-RdBu"),
             col.legend = tm_legend(title = "mm / yr", 
-                                   position = tm_pos_in("left", "bottom"))) + 
-  tm_title("CWD Δ (RCP45 2020-2049 - baseline)", 
+                                   position = tm_pos_in("left", "bottom"))) +
+  tm_shape(sjv_vect) +
+  tm_borders(col = "black", 
+             lwd = 0.8) +
+  tm_title("CWD Δ (rcp45_2020_2049 - baseline)", 
            position = tm_pos_in("right", "top"), 
            size = 1)
 
 # PPT
 ppt_diff_plot <- tm_shape(ppt_diff_rcp45_2020_2049_vs_baseline, 
                           bbox = sjv_bbox_expanded) +
-  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"),
+  tm_raster(col.scale = tm_scale_continuous(values = "-RdBu"),
             col.legend = tm_legend(title = "mm / yr", 
                                    position = tm_pos_in("left", "bottom"))) +
-  tm_title("PPT Δ (RCP45 2020-2049 - baseline)", 
+  tm_shape(sjv_vect) +
+  tm_borders(col = "black", 
+             lwd = 0.8) +
+  tm_title("PPT Δ (rcp45_2020_2049 - baseline)", 
            position = tm_pos_in("right", "top"), 
            size = 1)
 
 # TMN
 tmn_diff_plot <- tm_shape(tmn_diff_rcp45_2020_2049_vs_baseline, 
                           bbox = sjv_bbox_expanded) +
-  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"),
+  tm_raster(col.scale = tm_scale_continuous(values = "-RdBu"),
             col.legend = tm_legend(title = "°C", 
                                    position = tm_pos_in("left", "bottom"))) +
-  tm_title("TMN Δ (RCP45 2020-2049 - baseline)", 
+  tm_shape(sjv_vect) +
+  tm_borders(col = "black", 
+             lwd = 0.8) +
+  tm_title("TMN Δ (rcp45_2020_2049 - baseline)", 
            position = tm_pos_in("right", "top"), 
            size = 1)
 
 # TMX
 tmx_diff_plot <- tm_shape(tmx_diff_rcp45_2020_2049_vs_baseline, 
                           bbox = sjv_bbox_expanded) +
-  tm_raster(col.scale = tm_scale_continuous(values = "RdBu"),
+  tm_raster(col.scale = tm_scale_continuous(values = "-RdBu"),
             col.legend = tm_legend(title = "°C", 
                                    position = tm_pos_in("left", "bottom"))) +
-  tm_title("TMX Δ (RCP45 2020-2049 - baseline)", 
+  tm_shape(sjv_vect) +
+  tm_borders(col = "black", 
+             lwd = 0.8) +
+  tm_title("TMX Δ (rcp45_2020_2049 - baseline)", 
            position = tm_pos_in("right", "top"), 
            size = 1)
 

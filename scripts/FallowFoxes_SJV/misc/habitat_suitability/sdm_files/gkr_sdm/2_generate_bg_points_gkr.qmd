@@ -91,7 +91,7 @@ download_key <- occ_download(
   pred_gte("year", 1990),
   pred_lte("year", 2025),
   pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
-  pred_lte("coordinateUncertaintyInMeters", 250),
+  pred_lte("coordinateUncertaintyInMeters", 200),
   pred_within(buffer_simplify_wkt)  # Your buffer
 )
 

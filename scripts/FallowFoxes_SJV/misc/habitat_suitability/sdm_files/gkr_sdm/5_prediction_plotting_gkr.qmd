@@ -99,12 +99,12 @@ cont_diff_rcp85_2069_sjv <- cont_diff_rcp85_2069 %>%
 
 #### Reclassify the future predictions & calculate binary difference rasters
 
-Calculated in `4_maxent_predictions_gkr.qmd`, reclassify continuous habitat suitability layers into binary suitable/unsuitable layers using the threshold that maximizes true positive/negative rate (i.e., specificity + sensitivity). This is **0.28** for the GKR maxent model.
+Calculated in `4_maxent_predictions_gkr.qmd`, reclassify continuous habitat suitability layers into binary suitable/unsuitable layers using the threshold that maximizes true positive/negative rate (i.e., specificity + sensitivity). This is **0.27** for the GKR maxent model.
 
 ```{r}
 # define the reclass matrix
-reclass_matrix_future <- matrix(c(0, 0.28, 0,
-                                  0.28, 1, 1),
+reclass_matrix_future <- matrix(c(0, 0.27, 0,
+                                  0.27, 1, 1),
                                 ncol = 3, byrow = TRUE)
 
 # reclassify baseline
@@ -319,7 +319,7 @@ gkr_baseline_map <- tm_shape(gkr_baseline_sjv, bbox = sjv_bbox_expanded) +
   tm_graticules(col = "grey80", lwd = 0.5) +
   tm_raster(col.scale = tm_scale_continuous(values = "viridis",
                                              ticks = seq(0, 1, by = 0.25)),
-            col.legend = tm_legend(title = "Habitat suitability (baseline)"), 
+            col.legend = tm_legend(title = "Habitat suitability"), 
             col.free = FALSE) +
   tm_shape(sjv_vect) +
   tm_borders(col = "black", lwd = 0.5)
@@ -328,7 +328,7 @@ gkr_baseline_map <- tm_shape(gkr_baseline_sjv, bbox = sjv_bbox_expanded) +
 print(gkr_baseline_map)
 
 # add inset using viewport
-print(inset_map, vp = grid::viewport(x = 0.73, y = 0.2, width = 0.2, height = 0.25))
+print(inset_map, vp = grid::viewport(x = 0.75, y = 0.2, width = 0.2, height = 0.25))
 ```
 
 

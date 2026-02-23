@@ -108,9 +108,11 @@ After selecting the best model, we can use the `maxent()` function from the `dis
 ```{r}
 # remove unwanted variables from occ & bg data
 occ_data <- occ_data %>%
-  dplyr::select(-c(clay_pct_0_10cm, silt_pct_0_10cm))
+  dplyr::select(-c(sand_pct_0_10cm, silt_pct_0_10cm, 
+                   tmn1991_2020_ave, tmx1991_2020_ave))
 bg_data <- bg_data %>%
-  dplyr::select(-c(clay_pct_0_10cm, silt_pct_0_10cm))
+  dplyr::select(-c(sand_pct_0_10cm, silt_pct_0_10cm, 
+                   tmn1991_2020_ave, tmx1991_2020_ave))
 
 # set up the block for spatial partitioning
 block <- ENMeval::get.block(occ_data, bg_data, 
@@ -183,8 +185,8 @@ evalplot.stats(e = max.eval.filtered,
 save(max.eval.gkr, 
      file = here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/max_eval_gkr.rda"))
 
-# load the evaluation results
-load(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/max_eval_gkr.rda"))
+# # load the evaluation results
+# load(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/max_eval_gkr.rda"))
 ```
 
 ## Running MaxEnt & generating predictions
@@ -197,7 +199,7 @@ This section generates a MaxEnt model using the selected feature class and regul
 
 These model objects are then used to predict baseline (historical) and future GKR occurrence probabilities.
 
-#### Baseline (fc LQ and rm 0.5)
+#### Baseline (fc LQ and rm 1)
 
 ```{r}
 ## set up model parameters based on the evaluation results
@@ -207,7 +209,8 @@ x <- full_data %>%
   na.omit() %>%
   # select only the environmental variables
   dplyr::select(4:14) %>% 
-  dplyr::select(-c(clay_pct_0_10cm, silt_pct_0_10cm))
+  dplyr::select(-c(sand_pct_0_10cm, silt_pct_0_10cm, 
+                   tmn1991_2020_ave, tmx1991_2020_ave)) 
 
 # # examine how many presence and absence points were lost from NA removal
 # x_summary <- x %>%
@@ -230,7 +233,7 @@ args <- c("jackknife=TRUE",      # assess variable importance
           "threshold=FALSE",     # do not use threshold features
           "responsecurves=TRUE", # generate response curves
           "writeplotdata=TRUE",  # write output data used to make response curves 
-          "betamultiplier=1")    # this is the rm coefficient from ENMevaluate()
+          "betamultiplier=1.5")  # this is the rm coefficient from ENMevaluate()
 
 # path to save results
 path <- here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/")
@@ -275,7 +278,8 @@ names(x_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave",
                         "tmn1991_2020_ave", "tmx1991_2020_ave")
 
 # get rid of clay and silt 
-layers_to_drop <- c("clay_pct_0_10cm", "silt_pct_0_10cm")
+layers_to_drop <- c("sand_pct_0_10cm", "silt_pct_0_10cm", 
+                    "tmn1991_2020_ave", "tmx1991_2020_ave")
 x_stack <- dropLayer(x_stack, layers_to_drop)
 
 # make sure the raster stack is in EPSG:3310
@@ -333,10 +337,10 @@ gkr_habitat_masked[ca_lakes_rast] <- 0
 plot(gkr_habitat_masked, 
      main = "GKR baseline habitat suitability prediction")
 
-# # save the masked raster
-# writeRaster(gkr_habitat_masked, 
-#             here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/maxent_gkr_pred_masked_lakes.tif"),
-#             overwrite = TRUE)
+# save the masked raster
+writeRaster(gkr_habitat_masked,
+            here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/maxent_gkr_pred_masked_lakes.tif"),
+            overwrite = TRUE)
 ```
 
 ## Predict future GKR occurrence probability under projected environmental data
@@ -387,10 +391,14 @@ x_fut_stack <- raster::stack(env_fut_files)
 names(x_fut_stack)
 
 # match the layer names to the predictor variable names in the SWD data
-names(x_fut_stack) <- c("aet1991_2020_ave", "cwd1991_2020_ave", 
-                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
-                        "sand_pct_0_10cm", "slope", "tmn1991_2020_ave", 
+names(x_fut_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", 
+                        "cwd1991_2020_ave", "ec_dS_m_0_10cm", "pH_0_10cm", 
+                        "ppt1991_2020_ave", "slope", "tmn1991_2020_ave", 
                         "tmx1991_2020_ave")
+
+# get rid of tmn and tmx 
+layers_to_drop <- c("tmn1991_2020_ave", "tmx1991_2020_ave")
+x_fut_stack <- dropLayer(x_fut_stack, layers_to_drop)
 
 # make sure the raster stack is in EPSG:3310
 x_fut_stack <- projectRaster(x_fut_stack, crs = crs(env_raster))
@@ -446,10 +454,14 @@ x_fut_stack <- raster::stack(env_fut_files)
 names(x_fut_stack)
 
 # match the layer names to the predictor variable names in the SWD data
-names(x_fut_stack) <- c("aet1991_2020_ave", "cwd1991_2020_ave", 
-                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
-                        "sand_pct_0_10cm", "slope", "tmn1991_2020_ave", 
+names(x_fut_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", 
+                        "cwd1991_2020_ave", "ec_dS_m_0_10cm", "pH_0_10cm", 
+                        "ppt1991_2020_ave", "slope", "tmn1991_2020_ave", 
                         "tmx1991_2020_ave")
+
+# get rid of tmn and tmx 
+layers_to_drop <- c("tmn1991_2020_ave", "tmx1991_2020_ave")
+x_fut_stack <- dropLayer(x_fut_stack, layers_to_drop)
 
 # make sure the raster stack is in EPSG:3310
 x_fut_stack <- projectRaster(x_fut_stack, crs = crs(env_raster))
@@ -504,10 +516,14 @@ x_fut_stack <- raster::stack(env_fut_files)
 names(x_fut_stack)
 
 # match the layer names to the predictor variable names in the SWD data
-names(x_fut_stack) <- c("aet1991_2020_ave", "cwd1991_2020_ave", 
-                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
-                        "sand_pct_0_10cm", "slope", "tmn1991_2020_ave", 
+names(x_fut_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", 
+                        "cwd1991_2020_ave", "ec_dS_m_0_10cm", "pH_0_10cm", 
+                        "ppt1991_2020_ave", "slope", "tmn1991_2020_ave", 
                         "tmx1991_2020_ave")
+
+# get rid of tmn and tmx 
+layers_to_drop <- c("tmn1991_2020_ave", "tmx1991_2020_ave")
+x_fut_stack <- dropLayer(x_fut_stack, layers_to_drop)
 
 # make sure the raster stack is in EPSG:3310
 x_fut_stack <- projectRaster(x_fut_stack, crs = crs(env_raster))
@@ -562,10 +578,14 @@ x_fut_stack <- raster::stack(env_fut_files)
 names(x_fut_stack)
 
 # match the layer names to the predictor variable names in the SWD data
-names(x_fut_stack) <- c("aet1991_2020_ave", "cwd1991_2020_ave", 
-                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
-                        "sand_pct_0_10cm", "slope", "tmn1991_2020_ave", 
+names(x_fut_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", 
+                        "cwd1991_2020_ave", "ec_dS_m_0_10cm", "pH_0_10cm", 
+                        "ppt1991_2020_ave", "slope", "tmn1991_2020_ave", 
                         "tmx1991_2020_ave")
+
+# get rid of tmn and tmx 
+layers_to_drop <- c("tmn1991_2020_ave", "tmx1991_2020_ave")
+x_fut_stack <- dropLayer(x_fut_stack, layers_to_drop)
 
 # make sure the raster stack is in EPSG:3310
 x_fut_stack <- projectRaster(x_fut_stack, crs = crs(env_raster))
@@ -625,7 +645,7 @@ e <- dismo::evaluate(p = occ_coords,       # presence coordinates
 
 # calculate the threshold that maximizes sensitivity and specificity
 thresh <- dismo::threshold(e)
-thresh_spec_sens <- thresh$spec_sens   # 0.28
+thresh_spec_sens <- thresh$spec_sens   # 0.27
 ```
 
 
