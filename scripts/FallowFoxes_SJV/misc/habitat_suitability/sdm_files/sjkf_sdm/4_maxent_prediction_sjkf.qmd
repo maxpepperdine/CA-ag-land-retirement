@@ -10,7 +10,7 @@ editor_options:
 
 ## Overview
 
-This script reads in the prepared GKR occurrence records (produced in `1_extract_occ_env_data_gkr.qmd`) and background points (produced in `2_generate_bg_points_gkr.qmd` and `3_extract_bg_env_data_gkr.qmd`) to evaluate and generate MaxEnt models using the `dismo` package.
+This script reads in the prepared SJKF occurrence records (produced in `1_extract_occ_env_data_gkr.qmd`) and background points (produced in `2_generate_bg_points_gkr.qmd` and `3_extract_bg_env_data_gkr.qmd`) to evaluate and generate MaxEnt models using the `dismo` package.
 
 ```{r}
 rm(list = ls())
@@ -71,6 +71,43 @@ bg_data_bind <- bg_data %>%
 
 # bind the two datasets together
 full_data <- rbind(occ_data_bind, bg_data_bind)
+```
+
+```{r}
+## Test 
+
+library(terra)
+
+# Select precipitation raster
+r <- env_rasters[["ppt1991_2020_ave"]]
+
+# Convert to SpatVector
+full_vect <- vect(full_data,
+                  geom = c("longitude", "latitude"),  # change if needed
+                  crs = "EPSG:4326")
+
+# Reproject to match raster
+full_vect <- project(full_vect, crs(r))
+
+
+par(mfrow = c(1,1))
+par(mar = c(2,2,2,2))
+
+plot(r,
+     main = "Occurrences (red) and Background (blue)")
+
+# Background points (presence = 0)
+points(full_vect[full_vect$presence == 0, ],
+       pch = 16,
+       col = "blue",
+       cex = 0.4)
+
+# Occurrence points (presence = 1)
+points(full_vect[full_vect$presence == 1, ],
+       pch = 16,
+       col = "red",
+       cex = 0.6)
+
 ```
 
 ## Model evaluation
@@ -198,7 +235,7 @@ This section generates a MaxEnt model using the selected feature class and regul
 
 These model objects are then used to predict baseline (historical) and future SJKF occurrence probabilities.
 
-#### Baseline (fc LQ and rm 0.5) 
+#### Baseline (fc LQ and rm 0.5)
 
 ```{r}
 ## set up model parameters based on the evaluation results
@@ -288,7 +325,7 @@ plot(x_stack)
 ## define the extent as the extent from the Stewart SDM
 
 # load the Stewart BNLL extent shapefile
-stewart_bnll_ext_path <- here("data/stewart_sdm_ext/stewart_sdm_ext.shp")
+stewart_bnll_ext_path <- here("data/ca_state/ca_state_boundary_no_islands.shp") # try with SJV counties shp file, 
 
 stewart_bnll_ext <- read_sf(stewart_bnll_ext_path) %>% 
   sf::st_make_valid() # make sure the geometry is valid
@@ -323,7 +360,7 @@ plot(pred_rast_sjkf)
 
 ```
 
-#### Mask lakes from prediction raster 
+#### Mask lakes from prediction raster
 
 ```{r}
 ca_lakes <- st_make_valid(ca_lakes) # REVIEW 
@@ -348,7 +385,6 @@ writeRaster(bnll_habitat_masked,
             here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_masked_lakes.tif"),
             overwrite = TRUE)
 ```
-
 
 ## Predict future SJKF occurrence probability under projected environmental data
 
@@ -431,36 +467,3 @@ writeRaster(bnll_habitat_masked_rcp45_2020_2049,
             here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2020_2049_masked_lakes.tif"),
             overwrite = TRUE)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

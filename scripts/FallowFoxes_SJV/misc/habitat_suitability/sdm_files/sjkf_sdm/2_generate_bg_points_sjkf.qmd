@@ -46,8 +46,8 @@ sjkf_sf <- st_as_sf(sjkf_occs,
                     coords = c("longitude", "latitude"), 
                     crs = 3310)
 
-# create 100 km buffer around each occurrence point
-sjkf_buffer <- st_buffer(sjkf_sf, dist = 100000)
+# create 50 km buffer around each occurrence point
+sjkf_buffer <- st_buffer(sjkf_sf, dist = 50000)
 
 # combine buffers into a single polygon
 sjkf_buffer_union <- st_union(sjkf_buffer)
@@ -143,6 +143,42 @@ background_df <- cbind(
   background_coords
 )
 ```
+
+```{r}
+# checking  bg pointy locations 
+
+library(terra)
+
+env_rasters <- rast(list.files(here("data/baseline/sjkf"), 
+                               pattern = ".tif$", 
+                               full.names = TRUE))
+# fix names
+names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
+                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", "slope", "silt_pct_0_10cm") 
+
+# Select precipitation raster
+r <- env_rasters[["ppt1991_2020_ave"]]
+
+# Convert background_df to SpatVector
+bg_vect <- vect(background_df,
+                geom = c("longitude", "latitude"),
+                crs = "EPSG:4326")
+
+# Reproject to match raster CRS
+bg_vect <- project(bg_vect, crs(r))
+
+# Plot raster
+plot(r,
+     main = "Background Points on Mean Annual Precipitation")
+
+# Add background points
+points(bg_vect,
+       pch = 16,
+       col = "red",
+       cex = 0.4)
+
+```
+
 
 Save the data
 

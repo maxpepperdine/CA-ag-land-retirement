@@ -73,6 +73,33 @@ sjkf_occ_vect <- vect(sjkf_occ_df,
 
 # make sure crs matches env rasters
 sjkf_occ_vect <- project(sjkf_occ_vect, crs(env_rasters))
+
+```
+
+```{r}
+# checking  occ pointy locations 
+
+# Read shapefile
+ca_state <- vect("/Users/stellawing/Desktop/CA-ag-land-retirement/data/ca_state/ca_state_boundary_no_islands.shp")
+
+
+# Check CRS
+crs(ca_state)
+crs(sjkf_occ_vect)
+
+# Select one raster layer by name
+r <- env_rasters[["ppt1991_2020_ave"]]
+
+# Plot raster
+plot(r,
+     main = "San Joaquin Kit Fox Occurrences\non Mean Annual Precipitation")
+
+# Add occurrence points
+points(sjkf_occ_vect,
+       pch = 20,
+       col = "red",
+       cex = 0.6)
+
 ```
 
 #### Spatial thinning of occurrence points
