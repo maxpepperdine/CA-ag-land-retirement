@@ -309,11 +309,12 @@ names(x_stack)
 # match the layer names to the predictor variable names in the SWD data
 names(x_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
                         "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
-                         "silt_pct_0_10cm", "slope")
+                        "sand_pct_0_10cm", "silt_pct_0_10cm", "slope", 
+                        "tmn1991_2020_ave", "tmx1991_2020_ave")
 # get rid of cwd layer since it was not used in the model
-layers_to_drop <- c("cwd1991_2020_ave") ### REVIEW 
+#layers_to_drop <- c("cwd1991_2020_ave") ### REVIEW 
 
-x_stack <- dropLayer(x_stack, layers_to_drop)
+#x_stack <- dropLayer(x_stack, layers_to_drop)
 
 # make sure the raster stack is in EPSG:3310
 x_stack <- projectRaster(x_stack, crs = crs(env_raster))
