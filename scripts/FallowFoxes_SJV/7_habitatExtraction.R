@@ -2,7 +2,7 @@
 # Extracting habitat values for fields in SJV
 # =============================================================================
 # Purpose: Find the amount of high quality habitat for our species of interest 
-#          (BNLL, SJKF, GKR, SJWT, TKR) in each SJV field.
+#          (BNLL, GKR, SJKF) in each SJV field.
 # =============================================================================
 
 
@@ -22,156 +22,123 @@ library(smoothr)
 library(exactextractr)
 library(prioritizr)
 
-options(tigris_use_cache = TRUE)
-
-
-# tmap_mode("view")
-# tmap_options(check.and.fix = TRUE)
-
 
 # Metrics Function --------------------------------------------------------
 
-source(here("scripts/FallowFoxes_F25/0_startup/functions.R"))
+source(here("scripts/FallowFoxes_SJV/0_startup/functions.R"))
 
 
 
 # =============================================================================
-# STEP 1: Load data
+# STEP 1: Load SJV fields and baseline habitat rasters
 # =============================================================================
 
-# Read in Extract layer (SJV fields with revenue and water data, fully estimated)
-fieldData <- read_sf(here("data/intermediate/6_estimateFallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.shp"))
-crs(fieldData) # make sure EPSG:3310
-
-# inspect data
-fieldData %>% str()
+# Read in Extract layer from 6_estimateFallowing_median.R
+# SJV fields with revenue and water data, fully estimated
+field_data <- read_sf(here("data/intermediate/6_estimateFallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.shp"))
+crs(field_data) # make sure EPSG:3310
 
 
-# Read in blunt-nosed leopard lizard habitat raster (replace file paths later)
-bnllHabitatRaw <- rast(here("data/intermediate/"))
-# check CRS
-crs(bnllHabitatRaw)
+# Read in blunt-nosed leopard lizard baseline habitat raster
+bnll_baseline <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_masked_lakes.tif"))
+crs(bnll_baseline)
 
 # Read in giant kangaroo rat habitat raster
-gkrHabitatRaw <- rast(here("data/intermediate/"))
-crs(gkrHabitatRaw)
+gkr_baseline <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/maxent_gkr_pred_masked_lakes.tif"))
+crs(gkr_baseline)
 
 # Read in San Joaquin kit fox habitat raster
-sjkfHabitatRaw <- rast(here("data/intermediate/"))
-crs(sjkfHabitatRaw)
+sjkf_baseline <- rast(here("data/intermediate/"))
+crs(sjkf_baseline)
 
-# Read in San Joaquin woolly threads habitat raster
-sjwtHabitatRaw <- rast(here("data/intermediate/"))
-crs(sjwtHabitatRaw)
 
-# Read in Tipton kangaroo rat habitat raster
-tkrHabitatRaw <- rast(here("data/intermediate/"))
-crs(tkrHabitatRaw)
+# =============================================================================
+# STEP 2: Load future habitat rasters
+# =============================================================================
 
 
 
 # =============================================================================
-# STEP 2: Crop habitat rasters to SJV counties
+# STEP 3: Crop habitat rasters to SJV counties
 # =============================================================================
 
+# load SJV boundary 
+sjv_counties <- read_sf(here("data/raw/sjv_counties/sjv_counties.shp"))
 
-# Create SJV polygon -----------------------------------------------
+# transform SJV boundary to EPSG:3310
+sjv_counties <- st_transform(sjv_counties, crs = crs(bnll_baseline))
 
-# get California counties from Census TIGER/Line shapefiles
-ca_counties <- counties(state = "CA")
-
-# define San Joaquin Valley counties
-sjv_counties <- c("San Joaquin", "Stanislaus", "Merced", "Madera",
-                  "Fresno", "Kings", "Tulare", "Kern")
-
-# filter and combine into one polygon
-sjv_vect <- ca_counties %>%
-  filter(NAME %in% sjv_counties) %>%
-  st_union() %>%
-  st_transform(crs = crs(fieldData)) %>% # transform to EPSG:3310
-  vect() # convert to terra vector format
-
+# convert to terra vector
+sjv_vect <- vect(sjv_counties)
 
 
 # Crop habitat rasters to SJV --------------------------------------------
 
 # blunt-nosed leopard lizard
-bnllHabitat <- crop(foxHabitatRaw, sjv_vect)
-plot(bnllHabitat)
+bnll_baseline_sjv <- bnll_baseline %>% 
+  crop(sjv_vect) %>% 
+  mask(sjv_vect)
+plot(bnll_baseline_sjv)
 
 # giant kangaroo rat
-gkrHabitat <- crop(foxHabitatRaw, sjv_vect)
-plot(gkrHabitat)
+gkr_baseline_sjv <- gkr_baseline %>% 
+  crop(sjv_vect) %>% 
+  mask(sjv_vect)
+plot(gkr_baseline_sjv)
 
 # San Joaquin kit fox
-sjkfHabitat <- crop(foxHabitatRaw, sjv_vect)
-plot(sjkfHabitat)
 
-# San Joaquin woolly threads
-sjwtHabitat <- crop(foxHabitatRaw, sjv_vect)
-plot(sjwtHabitat)
-
-# Tipton kangaroo rat
-tkrHabitat <- crop(foxHabitatRaw, sjv_vect)
-plot(tkrHabitat)
 
 
 # =============================================================================
-# STEP 3: Mask poor and NA habitat (define our 'high quality' habitat)
+# STEP 4: Keep only 'high quality' habitat in rasters
 # =============================================================================
 
-# Mask Poor and NA habitat ------------------------------------------------
+# Mask out 'poor quality' habitat for each species. 
+# For each species, define high quality habitat using the 10th percentile training presence threshold
+
+# BNLL: 0.23
+# GKR: 0.27
+# SJKF: ...
+
+# BNLL -------------------------------------------------
+
+# Isolate high quality habitat for baseline BNLL
+# classify: values > 0.23 = 1 (high quality), else NA
+bnll_baseline_hq <- ifel(bnll_baseline_sjv > 0.23, 1, NA)
+
+
+# GKR -------------------------------------------------
+
+# Isolate poor quality habitat for baseline GKR
+gkr_baseline_hq <- ifel(gkr_baseline_sjv > 0.27, 1, NA)
+
+
+# SJKF -------------------------------------------------
+
+# add when SJKF habitat raster is ready
 
 
 
-#Isolate 128 values in raster for mask
-foxNull <- foxHabitat > 100
-plot(foxNull)
 
+# =============================================================================
+# STEP 5: Run habitat extractions
+# =============================================================================
 
-#Isolate poor quality habitat for mask
-foxPoor <- foxHabitat < 34
+# calculate cell area
+cell_area_m2 <- prod(res(bnll_baseline_hq))
 
+# BNLL -------------------------------------------------
 
-#Mask no value values
-foxNoValMask <- mask(foxHabitat, foxNull, maskvalues = 1)
-
-
-
-#Mask poor quality habitat
-foxPoorMask <- mask(foxNoValMask, foxPoor, maskvalues = 1)
-
-
-
-#Turn logical
-foxMask <- foxPoorMask > 1
+# extract sum of high quality habitat in each field
+bnll_base_hq_areas <- exact_extract(x = bnll_baseline_hq, 
+                                    y = field_data, 
+                                    fun = 'sum')
+# convert to acres and bind to field_data
+field_data$bnll_base <- (bnll_base_hq_areas * cell_area_m2) / 4047
 
 
 
-# Convert Fox habitat to area ---------------------------------------------
-
-
-foxAreaRaw <- cellSize(foxMask)
-
-foxArea <- foxAreaRaw * foxMask
-
-
-# Run Habitat Extractions -------------------------------------------------
-
-
-# Get extraction as single column tibble
-habitat <- exact_extract(x = foxMask, 
-                         y = fieldData, 
-                         fun = 'weighted_sum', 
-                         weights = cellSize(foxArea)
-)
-
-# Cbind to fieldData table and convert m2 to acres
-habitatExtract <- fieldData %>% 
-  cbind(habitat) %>% 
-  mutate(
-    habitat = habitat / (4047)
-  )
 
 
 # Export ------------------------------------------------------------------
