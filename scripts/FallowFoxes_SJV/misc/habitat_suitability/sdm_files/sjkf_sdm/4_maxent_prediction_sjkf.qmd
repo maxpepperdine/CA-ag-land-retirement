@@ -13,7 +13,7 @@ editor_options:
 This script reads in the prepared SJKF occurrence records (produced in `1_extract_occ_env_data_gkr.qmd`) and background points (produced in `2_generate_bg_points_gkr.qmd` and `3_extract_bg_env_data_gkr.qmd`) to evaluate and generate MaxEnt models using the `dismo` package.
 
 ```{r}
-rm(list = ls())
+#rm(list = ls())
 ```
 
 ## Load packages
@@ -119,7 +119,7 @@ Assessing the correlation between environmental variables for MaxEnt. A Pearson 
 ```{r}
 # select only the environmental variables
 env_data_corr <- full_data %>%
-  dplyr::select(4:11)
+  dplyr::select(4:14)
 
 # create a correlation matrix
 cor_matrix <- cor(env_data_corr, # binded occ & bg data with only env variables

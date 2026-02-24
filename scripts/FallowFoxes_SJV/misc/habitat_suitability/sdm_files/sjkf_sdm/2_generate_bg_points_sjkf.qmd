@@ -46,7 +46,7 @@ sjkf_sf <- st_as_sf(sjkf_occs,
                     coords = c("longitude", "latitude"), 
                     crs = 3310)
 
-# create 50 km buffer around each occurrence point
+# create 50km km buffer around each occurrence point
 sjkf_buffer <- st_buffer(sjkf_sf, dist = 50000)
 
 # combine buffers into a single polygon
@@ -96,7 +96,7 @@ download_key <- occ_download(
   pred_gte("year", 1990),
   pred_lte("year", 2025),
   pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
-  pred_lte("coordinateUncertaintyInMeters", 500),
+  pred_lte("coordinateUncertaintyInMeters", 200),
   pred_within(buffer_simplify_wkt)  # Your buffer
 )
 
@@ -154,7 +154,9 @@ env_rasters <- rast(list.files(here("data/baseline/sjkf"),
                                full.names = TRUE))
 # fix names
 names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
-                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", "slope", "silt_pct_0_10cm") 
+                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "sand_pct_0_10cm", "silt_pct_0_10cm", "slope", 
+                        "tmn1991_2020_ave", "tmx1991_2020_ave")
 
 # Select precipitation raster
 r <- env_rasters[["ppt1991_2020_ave"]]
@@ -178,7 +180,6 @@ points(bg_vect,
        cex = 0.4)
 
 ```
-
 
 Save the data
 

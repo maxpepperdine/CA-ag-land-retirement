@@ -17,7 +17,7 @@ This script extracts environmental data to the GKR background points (created in
 -   Slope from USGS Open Topography
 
 ```{r}
-rm(list=ls())
+#rm(list=ls())
 ```
 
 ## Load packages
@@ -38,10 +38,11 @@ library(here)       # for file paths
 env_rasters <- rast(list.files(here("data/baseline/sjkf"), 
                                pattern = ".tif$", 
                                full.names = TRUE))
-# fix names
+
 names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
                         "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
-                        "silt_pct_0_10cm", "slope")
+                        "sand_pct_0_10cm", "silt_pct_0_10cm", "slope", 
+                        "tmn1991_2020_ave", "tmx1991_2020_ave")
 plot(env_rasters)
 ```
 
@@ -132,6 +133,6 @@ sjkf_bg_env_df <- sjkf_bg_env_sf %>%
 write_csv(sjkf_bg_env_df, here("data/sjkf_bg_env_data.csv"))
 
 # save SF object
-write_sf(sjkf_bg_env_sf, here("data/sjkf_bg_env_data.shp"),
+#write_sf(sjkf_bg_env_sf, here("data/sjkf_bg_env_data.shp"),
          append = FALSE)
 ```
