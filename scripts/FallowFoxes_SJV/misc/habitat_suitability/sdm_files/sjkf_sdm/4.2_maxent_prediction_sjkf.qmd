@@ -1,0 +1,203 @@
+---
+title: "SJKF MaxEnt prediction generation 2.0"
+author: "Stella Wing"
+format: html
+editor: visual
+---
+
+## Overview
+
+This script reads in the prepared SJKF occurrence records (produced in `1_extract_occ_env_data_sjkf.qmd`) and background points (produced in `2_generate_bg_points_sjkf.qmd` and `3_extract_bg_env_data_sjkf.qmd`) to evaluate and generate MaxEnt models using the `dismo` package.
+
+```{r}
+rm(list = ls())
+```
+
+## Load packages
+
+```{r}
+library(tidyverse)  # always
+library(dismo)      # for MaxEnt
+library(terra)      # for raster data
+library(corrplot)   # for plotting correlation matrix
+library(ENMeval)    # for model evaluation
+library(rJava)      # needed for MaxEnt predictions
+library(sf)         # for spatial data
+library(tmap)       # for plotting better maps
+library(here)       # for file paths
+library(kableExtra) # for nice tables
+```
+
+## Bind the occurrence and background data into one df
+
+#### Load data
+
+```{r}
+# load occurrence data with env data extracted
+occ_data <- read_csv(here("data/sjkf_occ_env_data.csv"))
+
+# load background data with env data extracted
+bg_data <- read_csv(here("data/sjkf_bg_env_data.csv"))
+```
+
+```{r}
+# env pred raster for reprojecting
+env_raster <- rast(here("data/baseline/sjkf/aet1991_2020_ave_CA_270m.tif"))
+```
+
+```{r}
+# CA lakes shapefile for masking the final prediction rasters
+ca_lakes <- read_sf(here("data/California_Lakes/California_Lakes.shp")) %>% 
+  st_transform(crs(env_raster))
+```
+
+#### Prepare data for Maxent
+
+Add a column indicating presence (1) or absence/background (0), and bind the two datasets together.
+
+```{r}
+# add presence column to occ data
+occ_data_bind <- occ_data %>%
+  mutate(presence = 1, 
+         .after = 2)
+
+# add presence column to bg data
+bg_data_bind <- bg_data %>%
+  mutate(presence = 0, 
+         .after = 2)
+
+# bind the two datasets together
+full_data <- rbind(occ_data_bind, bg_data_bind)
+```
+
+## Model evaluation
+
+#### Test for correlation
+
+Assessing the correlation between environmental variables for MaxEnt. A Pearson correlation matrix is produced; based on the values, certain variables may be removed from the final SWD file.
+
+```{r}
+# select only the environmental variables
+env_data_corr <- full_data %>%
+  dplyr::select(4:14)
+
+# create a correlation matrix
+cor_matrix <- cor(env_data_corr, # binded occ & bg data with only env variables
+                  method = "pearson", # Pearson correlation method
+                  use = "complete.obs") # use complete observations only
+
+# plot the correlation matrix with corrplot
+cor_plot <- corrplot::corrplot(cor_matrix,
+                               method = "color", # color method
+                               type = "upper", # upper triangle
+                               tl.col = "black", # text label color
+                               tl.srt = 45, # text label rotation
+                               addCoef.col = "black", # add correlation coefficients
+                               number.cex = 0.7) # number size
+```
+
+
+#### Model evaluation
+
+Using the `ENMevaluate()` function from the `ENMeval` package, we can evaluate the model performance using different feature classes and regularization multipliers. Spatial partitioning with the `block` partition method is used to evaluate model performance.
+
+After selecting the best model, we can use the `maxent()` function from the `dismo` package to run the model with the selected feature class and regularization multiplier. In this step, we'll use the `jacknife` partition argument to assess the importance of each environmental variable in the model.
+
+```{r}
+# remove unwanted variables from occ & bg data
+occ_data <- occ_data %>%
+  dplyr::select(-c(sand_pct_0_10cm, silt_pct_0_10cm, 
+                   tmn1991_2020_ave, tmx1991_2020_ave))
+bg_data <- bg_data %>%
+  dplyr::select(-c(sand_pct_0_10cm, silt_pct_0_10cm, 
+                   tmn1991_2020_ave, tmx1991_2020_ave))
+
+# set up the block for spatial partitioning
+block <- ENMeval::get.block(occ_data, bg_data, 
+                            orientation = "lat_lon")
+# check for even distribution of blocks
+table(block$occs.grp)
+
+
+## Evaluating the model
+max.eval.sjkf <- ENMeval::ENMevaluate(occs = occ_data, 
+                                      bg = bg_data, 
+                                      tune.args = list(fc = c("L", "LQ", "LQP", 
+                                                              "LP", "Q", "QP", 
+                                                              "P"), 
+                                                      rm = seq(0.5, 3, 0.5)),
+                                      algorithm = "maxnet", 
+                                      partitions = "block")
+```
+
+```{r}
+# examine the model results
+max.eval.sjkf
+eval.results(max.eval.sjkf) # model evaluation results
+eval.tune.settings(max.eval.sjkf) # extract the tuning parameter settings 
+eval.results.partitions(max.eval.sjkf) # assess model performance for each partition
+
+
+# clean results
+results <- eval.results(max.eval.sjkf) %>%
+  dplyr::select(fc, rm, tune.args, auc.train, auc.val.avg, AICc, delta.AICc, 
+                or.10p.avg, or.mtp.avg, cbi.val.avg) %>% 
+  arrange(AICc) %>% 
+  mutate(across(where(is.numeric), \(x) round(x, digits = 3)))
+
+# make a nice table
+kable(results, row.names = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE) %>%
+  row_spec(1, bold = TRUE)  # highlight the top model
+
+
+
+# plot stat results across values of the tuning parameters
+evalplot.stats(e = max.eval.sjkf, 
+               # or.mtp me
+               stats = c("or.mtp", "auc.val"), 
+               facet.labels = c("or.mtp" = "OR (mtp)", 
+                                "auc.val" = "AUC (val)"),
+               x.var = "rm", 
+               color = "fc", 
+               error.bars = FALSE)
+
+# # removing delta.AICc for plotting because it gets included with AIC by default
+# max.eval.filtered <- max.eval.gkr
+# max.eval.filtered@results <- max.eval.gkr@results[, !colnames(max.eval.gkr@results) %in% "delta.AICc"]
+# 
+# evalplot.stats(e = max.eval.filtered,
+#                stats = c("AICc", "auc.train"),
+#                facet.labels = c("AICc" = "AIC", 
+#                                 "auc.train" = "AUC (train)"), 
+#                x.var = "rm",
+#                color = "fc",
+#                error.bars = FALSE)
+
+#==============================================================================
+# Best model: fc.LQ_rm.3
+#==============================================================================
+
+# save the evaluation results to avoid re-running the model
+save(max.eval.sjkf, 
+     file = here("data/max_eval_sjkf.rda"))
+
+# load the evaluation results
+load(here("data/max_eval_sjkf.rda"))
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

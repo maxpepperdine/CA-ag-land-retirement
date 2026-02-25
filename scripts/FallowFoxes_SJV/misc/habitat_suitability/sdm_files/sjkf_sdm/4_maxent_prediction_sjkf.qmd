@@ -512,7 +512,7 @@ pred_rast_sjkf_rcp45_2020_2049 <- rast(filename_sjkf_rcp45_2020_2049)
 sjkf_habitat_masked_rcp45_2020_2049 <- pred_rast_sjkf_rcp45_2020_2049
 sjkf_habitat_masked_rcp45_2020_2049[ca_lakes_rast] <- 0
 
-plot(gkr_habitat_masked_rcp45_2020_2049, 
+plot(sjkf_habitat_masked_rcp45_2020_2049, 
      main = "GKR habitat suitability; RCP4.5 (2020-2049)")
 
 
