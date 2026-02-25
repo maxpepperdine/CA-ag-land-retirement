@@ -99,12 +99,12 @@ cont_diff_rcp85_2069_sjv <- cont_diff_rcp85_2069 %>%
 
 #### Reclassify the future predictions & calculate binary difference rasters
 
-Calculated in `4_maxent_predictions_gkr.qmd`, reclassify continuous habitat suitability layers into binary suitable/unsuitable layers using the threshold that maximizes true positive/negative rate (i.e., specificity + sensitivity). This is **0.27** for the GKR maxent model.
+Calculated in `4_maxent_predictions_gkr.qmd`, reclassify continuous habitat suitability layers into binary suitable/unsuitable layers using the threshold that maximizes true positive/negative rate (i.e., specificity + sensitivity). This is **0.31** for the GKR maxent model.
 
 ```{r}
 # define the reclass matrix
-reclass_matrix_future <- matrix(c(0, 0.27, 0,
-                                  0.27, 1, 1),
+reclass_matrix_future <- matrix(c(0, 0.31, 0,
+                                  0.31, 1, 1),
                                 ncol = 3, byrow = TRUE)
 
 # reclassify baseline
@@ -236,7 +236,7 @@ inset_map <- tm_shape(ca_vect, bbox = ca_bbox_expanded) +
 print(main_map)
 
 # add inset using viewport
-print(inset_map, vp = grid::viewport(x = 0.72, y = 0.5, width = 0.2, height = 0.25))
+print(inset_map, vp = grid::viewport(x = 0.70, y = 0.5, width = 0.2, height = 0.25))
 ```
 
 Continuous difference maps
@@ -303,7 +303,7 @@ gkr_fut_map <- tm_shape(future_stack, bbox = sjv_bbox_expanded) +
 print(gkr_fut_map)
 
 # add inset using viewport
-print(inset_map, vp = grid::viewport(x = 0.73, y = 0.3, width = 0.2, height = 0.25))
+print(inset_map, vp = grid::viewport(x = 0.70, y = 0.3, width = 0.15, height = 0.2))
 ```
 
 ## Plot the baseline predictions

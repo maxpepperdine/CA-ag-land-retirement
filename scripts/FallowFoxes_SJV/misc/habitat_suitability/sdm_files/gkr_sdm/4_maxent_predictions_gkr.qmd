@@ -163,21 +163,21 @@ evalplot.stats(e = max.eval.gkr,
                color = "fc", 
                error.bars = FALSE)
 
-# removing delta.AICc for plotting because it gets included with AIC by default
-max.eval.filtered <- max.eval.gkr
-max.eval.filtered@results <- max.eval.gkr@results[, !colnames(max.eval.gkr@results) %in% "delta.AICc"]
-
-evalplot.stats(e = max.eval.filtered,
-               stats = c("AICc", "auc.train"),
-               facet.labels = c("AICc" = "AIC", 
-                                "auc.train" = "AUC (train)"), 
-               x.var = "rm",
-               color = "fc",
-               error.bars = FALSE)
+# # removing delta.AICc for plotting because it gets included with AIC by default
+# max.eval.filtered <- max.eval.gkr
+# max.eval.filtered@results <- max.eval.gkr@results[, !colnames(max.eval.gkr@results) %in% "delta.AICc"]
+# 
+# evalplot.stats(e = max.eval.filtered,
+#                stats = c("AICc", "auc.train"),
+#                facet.labels = c("AICc" = "AIC", 
+#                                 "auc.train" = "AUC (train)"), 
+#                x.var = "rm",
+#                color = "fc",
+#                error.bars = FALSE)
 
 
 #==============================================================================
-# Best model: fc.LQ_rm.1
+# Best model: fc.LQ_rm.3
 #==============================================================================
 
 
@@ -185,8 +185,8 @@ evalplot.stats(e = max.eval.filtered,
 save(max.eval.gkr, 
      file = here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/max_eval_gkr.rda"))
 
-# # load the evaluation results
-# load(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/max_eval_gkr.rda"))
+# load the evaluation results
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/max_eval_gkr.rda"))
 ```
 
 ## Running MaxEnt & generating predictions
@@ -199,7 +199,7 @@ This section generates a MaxEnt model using the selected feature class and regul
 
 These model objects are then used to predict baseline (historical) and future GKR occurrence probabilities.
 
-#### Baseline (fc LQ and rm 1)
+#### Baseline (fc LQ and rm 3)
 
 ```{r}
 ## set up model parameters based on the evaluation results
@@ -233,7 +233,7 @@ args <- c("jackknife=TRUE",      # assess variable importance
           "threshold=FALSE",     # do not use threshold features
           "responsecurves=TRUE", # generate response curves
           "writeplotdata=TRUE",  # write output data used to make response curves 
-          "betamultiplier=1.5")  # this is the rm coefficient from ENMevaluate()
+          "betamultiplier=3")  # this is the rm coefficient from ENMevaluate()
 
 # path to save results
 path <- here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/")
@@ -303,7 +303,7 @@ stewart_bnll_ext <- extent(stewart_bnll_ext)
 
 
 ## define the filename path for the prediction raster
-filename_gkr <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/maxent_gkr_pred_fillNAs.tif")
+filename_gkr <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/maxent_gkr_pred.tif")
 
 
 ## predict current HEC 
@@ -647,26 +647,3 @@ e <- dismo::evaluate(p = occ_coords,       # presence coordinates
 thresh <- dismo::threshold(e)
 thresh_spec_sens <- thresh$spec_sens   # 0.27
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
