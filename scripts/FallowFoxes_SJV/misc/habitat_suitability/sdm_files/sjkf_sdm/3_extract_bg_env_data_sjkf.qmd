@@ -134,5 +134,5 @@ write_csv(sjkf_bg_env_df, here("data/sjkf_bg_env_data.csv"))
 
 # save SF object
 #write_sf(sjkf_bg_env_sf, here("data/sjkf_bg_env_data.shp"),
-         append = FALSE)
+         #append = FALSE)
 ```
