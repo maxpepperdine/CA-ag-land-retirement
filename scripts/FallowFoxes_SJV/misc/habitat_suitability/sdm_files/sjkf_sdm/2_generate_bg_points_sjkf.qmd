@@ -38,7 +38,7 @@ ca_boundary <- read_sf(here("data/ca_state/ca_state_boundary_no_islands.shp"))
 
 ## Data processing
 
-#### Create 100 km buffer around SJKF occ points
+#### Create 70 km buffer around SJKF occ points
 
 ```{r}
 # convert SJKF occ data to sf object
@@ -47,7 +47,7 @@ sjkf_sf <- st_as_sf(sjkf_occs,
                     crs = 3310)
 
 # create 50km km buffer around each occurrence point
-sjkf_buffer <- st_buffer(sjkf_sf, dist = 100000)
+sjkf_buffer <- st_buffer(sjkf_sf, dist = 70000)
 
 # combine buffers into a single polygon
 sjkf_buffer_union <- st_union(sjkf_buffer)
