@@ -187,7 +187,6 @@ load(here("data/max_eval_sjkf.rda"))
 
 ```
 
-
 ## Running MaxEnt & generating predictions
 
 After identifying the best model based on the evaluation results, we'll run the model using the `dismo::maxent()` function. This generates a model object that can be used to predict baseline (historical) and future SJKF occurrence probability under projected environmental data using the `dismo::predict()` function.
@@ -647,13 +646,3 @@ e <- dismo::evaluate(p = occ_coords,       # presence coordinates
 thresh <- dismo::threshold(e)
 thresh_spec_sens <- thresh$spec_sens   # 0.399
 ```
-
-
-
-
-
-
-
-
-
-
