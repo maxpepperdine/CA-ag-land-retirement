@@ -379,7 +379,9 @@ field_data$gkr_rcp85_2069_hq <- (gkr_rcp85_2069_hq_areas * cell_area_m2) / 4046.
 
 # Export ------------------------------------------------------------------
 
-#write_sf(habitatExtract, here("data/intermediate/7_foxExtraction/kernExtractions/kernExtractions.shp"))
+# save as a geopackage to preserve column names
+write_sf(field_data, here("data/intermediate/7_habitatExtraction/sjvHabitatExtractions/sjvHabitatExtractions.gpkg"), 
+         append = FALSE)
 
 
 
