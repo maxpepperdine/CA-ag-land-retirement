@@ -27,20 +27,20 @@ library(gt)
 
 # Read in Extract layer from 6_estimateFallowing_median.R
 # SJV fields with revenue and water data, fully estimated
-field_data <- read_sf(here("data/intermediate/6_estimateFallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.shp"))
+field_data <- read_sf(here("data/intermediate/6_estimateFallowing/sjvAddFallow/sjvAddFallow.shp"))
 crs(field_data) # make sure EPSG:3310
 
 
 # Read in blunt-nosed leopard lizard baseline habitat raster
-bnll_baseline <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_masked_lakes.tif"))
+bnll_baseline <- rast(here("data/intermediate/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_masked_lakes.tif"))
 crs(bnll_baseline)
 
 # Read in giant kangaroo rat habitat raster
-gkr_baseline <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/maxent_gkr_pred_masked_lakes.tif"))
+gkr_baseline <- rast(here("data/intermediate/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/maxent_gkr_pred_masked_lakes.tif"))
 crs(gkr_baseline)
 
 # Read in San Joaquin kit fox habitat raster
-sjkf_baseline <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/maxent_sjkf_pred_masked_lakes.tif"))
+sjkf_baseline <- rast(here("data/intermediate/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/maxent_sjkf_pred_masked_lakes.tif"))
 crs(sjkf_baseline)
 
 
@@ -49,22 +49,22 @@ crs(sjkf_baseline)
 # =============================================================================
 
 # BNLL ------------------------------------------------
-bnll_rcp45_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2020_2049_masked_lakes.tif"))
-bnll_rcp45_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2040_2069_masked_lakes.tif"))
-bnll_rcp85_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2020_2049_masked_lakes.tif"))
-bnll_rcp85_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2040_2069_masked_lakes.tif"))
+bnll_rcp45_2049 <- rast(here("data/intermediate/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2020_2049_masked_lakes.tif"))
+bnll_rcp45_2069 <- rast(here("data/intermediate/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2040_2069_masked_lakes.tif"))
+bnll_rcp85_2049 <- rast(here("data/intermediate/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2020_2049_masked_lakes.tif"))
+bnll_rcp85_2069 <- rast(here("data/intermediate/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2040_2069_masked_lakes.tif"))
 
 # GKR ------------------------------------------------
-gkr_rcp45_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp45_2020_2049_masked_lakes.tif"))
-gkr_rcp45_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp45_2040_2069_masked_lakes.tif"))
-gkr_rcp85_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp85_2020_2049_masked_lakes.tif"))
-gkr_rcp85_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp85_2040_2069_masked_lakes.tif"))
+gkr_rcp45_2049 <- rast(here("data/intermediate/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp45_2020_2049_masked_lakes.tif"))
+gkr_rcp45_2069 <- rast(here("data/intermediate/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp45_2040_2069_masked_lakes.tif"))
+gkr_rcp85_2049 <- rast(here("data/intermediate/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp85_2020_2049_masked_lakes.tif"))
+gkr_rcp85_2069 <- rast(here("data/intermediate/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp85_2040_2069_masked_lakes.tif"))
 
 # SJKF ------------------------------------------------
-sjkf_rcp45_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2020_2049_masked_lakes.tif"))
-sjkf_rcp45_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2040_2069_masked_lakes.tif"))
-sjkf_rcp85_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2020_2049_masked_lakes.tif"))
-sjkf_rcp85_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2040_2069_masked_lakes.tif"))
+sjkf_rcp45_2049 <- rast(here("data/intermediate/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2020_2049_masked_lakes.tif"))
+sjkf_rcp45_2069 <- rast(here("data/intermediate/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2040_2069_masked_lakes.tif"))
+sjkf_rcp85_2049 <- rast(here("data/intermediate/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2020_2049_masked_lakes.tif"))
+sjkf_rcp85_2069 <- rast(here("data/intermediate/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2040_2069_masked_lakes.tif"))
 
 
 
@@ -74,7 +74,7 @@ sjkf_rcp85_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_fil
 # =============================================================================
 
 # load SJV boundary 
-sjv_counties <- read_sf(here("data/raw/sjv_counties/sjv_counties.shp"))
+sjv_counties <- read_sf(here("data/sjv_counties/sjv_counties.shp")) #data/raw...
 
 # transform SJV boundary to EPSG:3310
 sjv_counties <- st_transform(sjv_counties, crs = crs(bnll_baseline))
@@ -101,7 +101,7 @@ plot(gkr_baseline_sjv)
 sjkf_baseline_sjv <- sjkf_baseline %>% 
   crop(sjv_vect) %>% 
   mask(sjv_vect)
-plot(sjkf_baseline_sjv) ##### EDITS STOP HERE
+plot(sjkf_baseline_sjv) 
 
 
 # Crop future habitat rasters to SJV --------------------------------------------
@@ -135,7 +135,18 @@ gkr_rcp85_2069_sjv <- gkr_rcp85_2069 %>%
   mask(sjv_vect)
 
 # SJKF
-
+sjkf_rcp45_2049_sjv <- sjkf_rcp45_2049 %>% 
+  crop(sjv_vect) %>% 
+  mask(sjv_vect)
+sjkf_rcp45_2069_sjv <- sjkf_rcp45_2069 %>% 
+  crop(sjv_vect) %>% 
+  mask(sjv_vect)
+sjkf_rcp85_2049_sjv <- sjkf_rcp85_2049 %>% 
+  crop(sjv_vect) %>% 
+  mask(sjv_vect)
+sjkf_rcp85_2069_sjv <- sjkf_rcp85_2069 %>% 
+  crop(sjv_vect) %>% 
+  mask(sjv_vect)
 
 # =============================================================================
 # STEP 4: Keep only 'suitable' habitat in rasters
@@ -146,6 +157,7 @@ gkr_rcp85_2069_sjv <- gkr_rcp85_2069 %>%
 
 # BNLL: 0.23
 # GKR: 0.31
+# SJKF: 0.39
 
 
 # BNLL -------------------------------------------------
@@ -170,7 +182,12 @@ gkr_rcp85_2069_suit <- ifel(gkr_rcp85_2069_sjv > 0.31, 1, NA)
 
 # SJKF -------------------------------------------------
 
-# add when SJKF habitat raster is ready
+# Isolate suitable habitat for GKR rasters
+sjkf_baseline_suit <- ifel(sjkf_baseline_sjv > 0.31, 1, NA)
+sjkf_rcp45_2049_suit <- ifel(sjkf_rcp45_2049_sjv > 0.39, 1, NA)
+sjkf_rcp45_2069_suit <- ifel(sjkf_rcp45_2069_sjv > 0.39, 1, NA)
+sjkf_rcp85_2049_suit <- ifel(sjkf_rcp85_2049_sjv > 0.39, 1, NA)
+sjkf_rcp85_2069_suit <- ifel(sjkf_rcp85_2069_sjv > 0.39, 1, NA)
 
 
 # =============================================================================
@@ -211,7 +228,15 @@ gkr_rcp85_2069_hq <- ifel(gkr_rcp85_2069_sjv > thresh_80_gkr, 1, NA)
 
 # SJKF -------------------------------------------------
 
-# add when SJKF habitat raster is ready
+vals_sjkf <- values(sjkf_baseline_sjv, na.rm = TRUE)
+thresh_80_sjkf <- quantile(vals_sjkf, 0.8, na.rm = TRUE)
+
+# Isolate high quality habitat for GKR rasters
+sjkf_baseline_hq <- ifel(sjkf_baseline_sjv > thresh_80_sjkf, 1, NA)
+sjkf_rcp45_2049_hq <- ifel(sjkf_rcp45_2049_sjv > thresh_80_sjkf, 1, NA)
+sjkf_rcp45_2069_hq <- ifel(sjkf_rcp45_2069_sjv > thresh_80_sjkf, 1, NA)
+sjkf_rcp85_2049_hq <- ifel(sjkf_rcp85_2049_sjv > thresh_80_sjkf, 1, NA)
+sjkf_rcp85_2069_hq <- ifel(sjkf_rcp85_2069_sjv > thresh_80_sjkf, 1, NA)
 
 
 
@@ -300,6 +325,41 @@ gkr_rcp85_2069_suit_areas <- exact_extract(x = gkr_rcp85_2069_suit,
 field_data$gkr_rcp85_2069_suit <- (gkr_rcp85_2069_suit_areas * cell_area_m2) / 4046.86
 
 
+# SJKF -------------------------------------------------
+
+# Baseline
+sjkf_base_suit_areas <- exact_extract(x = sjkf_baseline_suit,
+                                     y = field_data, 
+                                     fun = 'sum')
+field_data$sjkf_base_suit <- (sjkf_base_suit_areas * cell_area_m2) / 4046.86
+
+
+# RCP45 (2020-2049)
+sjkf_rcp45_2049_suit_areas <- exact_extract(x = sjkf_rcp45_2049_suit, 
+                                           y = field_data, 
+                                           fun = 'sum')
+field_data$sjkf_rcp45_2049_suit <- (sjkf_rcp45_2049_suit_areas * cell_area_m2) / 4046.86
+
+
+# RCP45 (2040-2069)
+sjkf_rcp45_2069_suit_areas <- exact_extract(x = sjkf_rcp45_2069_suit, 
+                                           y = field_data, 
+                                           fun = 'sum')
+field_data$sjkf_rcp45_2069_suit <- (sjkf_rcp45_2069_suit_areas * cell_area_m2) / 4046.86
+
+
+# RCP85 (2020-2049)
+sjkf_rcp85_2049_suit_areas <- exact_extract(x = sjkf_rcp85_2049_suit, 
+                                           y = field_data, 
+                                           fun = 'sum')
+field_data$sjkf_rcp85_2049_suit <- (sjkf_rcp85_2049_suit_areas * cell_area_m2) / 4046.86
+
+
+# RCP85 (2040-2069)
+sjkf_rcp85_2069_suit_areas <- exact_extract(x = sjkf_rcp85_2069_suit, 
+                                           y = field_data, 
+                                           fun = 'sum')
+field_data$sjkf_rcp85_2069_suit <- (sjkf_rcp85_2069_suit_areas * cell_area_m2) / 4046.86
 
 # =============================================================================
 # STEP 7: Run habitat extractions for high quality habitat rasters
@@ -384,6 +444,41 @@ gkr_rcp85_2069_hq_areas <- exact_extract(x = gkr_rcp85_2069_hq,
 field_data$gkr_rcp85_2069_hq <- (gkr_rcp85_2069_hq_areas * cell_area_m2) / 4046.86
 
 
+# SJKF ------------------------------------------------- 
+
+# Baseline
+sjkf_base_hq_areas <- exact_extract(x = sjkf_baseline_hq, 
+                                   y = field_data, 
+                                   fun = 'sum')
+field_data$sjkf_base_hq <- (sjkf_base_hq_areas * cell_area_m2) / 4046.86
+
+
+# RCP45 (2020-2049)
+sjkf_rcp45_2049_hq_areas <- exact_extract(x = sjkf_rcp45_2049_hq, 
+                                         y = field_data, 
+                                         fun = 'sum')
+field_data$sjkf_rcp45_2049_hq <- (sjkf_rcp45_2049_hq_areas * cell_area_m2) / 4046.86
+
+
+# RCP45 (2040-2069)
+sjkf_rcp45_2069_hq_areas <- exact_extract(x = sjkf_rcp45_2069_hq, 
+                                         y = field_data, 
+                                         fun = 'sum')
+field_data$sjkf_rcp45_2069_hq <- (sjkf_rcp45_2069_hq_areas * cell_area_m2) / 4046.86
+
+
+# RCP85 (2020-2049)
+sjkf_rcp85_2049_hq_areas <- exact_extract(x = sjkf_rcp85_2049_hq, 
+                                         y = field_data, 
+                                         fun = 'sum')
+field_data$sjkf_rcp85_2049_hq <- (sjkf_rcp85_2049_hq_areas * cell_area_m2) / 4046.86
+
+
+# RCP85 (2040-2069)
+sjkf_rcp85_2069_hq_areas <- exact_extract(x = sjkf_rcp85_2069_hq, 
+                                         y = field_data, 
+                                         fun = 'sum')
+field_data$sjkf_rcp85_2069_hq <- (sjkf_rcp85_2069_hq_areas * cell_area_m2) / 4046.86
 
 
 
@@ -405,14 +500,16 @@ summary_table_suit <- field_data %>%
   st_drop_geometry() %>%
   summarise(
     across(c(bnll_base_suit, bnll_rcp45_2049_suit, bnll_rcp45_2069_suit, bnll_rcp85_2049_suit, bnll_rcp85_2069_suit,
-             gkr_base_suit,  gkr_rcp45_2049_suit,  gkr_rcp45_2069_suit,  gkr_rcp85_2049_suit,  gkr_rcp85_2069_suit),
+             gkr_base_suit,  gkr_rcp45_2049_suit,  gkr_rcp45_2069_suit,  gkr_rcp85_2049_suit,  gkr_rcp85_2069_suit, 
+             sjkf_base_suit,  sjkf_rcp45_2049_suit,  sjkf_rcp45_2069_suit,  sjkf_rcp85_2049_suit,  sjkf_rcp85_2069_suit),
            ~ sum(.x, na.rm = TRUE))
   ) %>%
   pivot_longer(everything(), names_to = "column", values_to = "total_acres") %>%
   mutate(
     species  = case_when(
       startsWith(column, "bnll") ~ "Blunt-nosed Leopard Lizard",
-      startsWith(column, "gkr")  ~ "Giant Kangaroo Rat"
+      startsWith(column, "gkr")  ~ "Giant Kangaroo Rat", 
+      startsWith(column, "sjkf")  ~ "San Joaquin Kit Fox"
     ),
     scenario = case_when(
       endsWith(column, "base_suit")      ~ "Baseline",
@@ -434,10 +531,11 @@ summary_table_suit %>%
   cols_label(
     scenario                     = "Scenario",
     `Blunt-nosed Leopard Lizard` = "Blunt-nosed Leopard Lizard (ac)",
-    `Giant Kangaroo Rat`         = "Giant Kangaroo Rat (ac)"
+    `Giant Kangaroo Rat`         = "Giant Kangaroo Rat (ac)", 
+    `San Joaquin Kit Fox`         = "San Joaquin Kit Fox (ac)"
   ) %>%
   fmt_number(
-    columns  = c(`Blunt-nosed Leopard Lizard`, `Giant Kangaroo Rat`),
+    columns  = c(`Blunt-nosed Leopard Lizard`, `Giant Kangaroo Rat`, `San Joaquin Kit Fox`),
     decimals = 1
   ) %>%
   tab_style(
@@ -451,14 +549,16 @@ summary_table_hq <- field_data %>%
   st_drop_geometry() %>%
   summarise(
     across(c(bnll_base_hq, bnll_rcp45_2049_hq, bnll_rcp45_2069_hq, bnll_rcp85_2049_hq, bnll_rcp85_2069_hq,
-             gkr_base_hq,  gkr_rcp45_2049_hq,  gkr_rcp45_2069_hq,  gkr_rcp85_2049_hq,  gkr_rcp85_2069_hq),
+             gkr_base_hq,  gkr_rcp45_2049_hq,  gkr_rcp45_2069_hq,  gkr_rcp85_2049_hq,  gkr_rcp85_2069_hq, 
+             sjkf_base_hq,  sjkf_rcp45_2049_hq,  sjkf_rcp45_2069_hq,  sjkf_rcp85_2049_hq,  sjkf_rcp85_2069_hq),
            ~ sum(.x, na.rm = TRUE))
   ) %>%
   pivot_longer(everything(), names_to = "column", values_to = "total_acres") %>%
   mutate(
     species  = case_when(
       startsWith(column, "bnll") ~ "Blunt-nosed Leopard Lizard",
-      startsWith(column, "gkr")  ~ "Giant Kangaroo Rat"
+      startsWith(column, "gkr")  ~ "Giant Kangaroo Rat", 
+      startsWith(column, "sjkf")  ~ "San Joaquin Kit Fox"
     ),
     scenario = case_when(
       endsWith(column, "base_hq")      ~ "Baseline",
@@ -480,10 +580,11 @@ summary_table_hq %>%
   cols_label(
     scenario                     = "Scenario",
     `Blunt-nosed Leopard Lizard` = "Blunt-nosed Leopard Lizard (ac)",
-    `Giant Kangaroo Rat`         = "Giant Kangaroo Rat (ac)"
+    `Giant Kangaroo Rat`         = "Giant Kangaroo Rat (ac)", 
+    `San Joaquin Kit Fox`         = "San Joaquin Kit Fox (ac)"
   ) %>%
   fmt_number(
-    columns  = c(`Blunt-nosed Leopard Lizard`, `Giant Kangaroo Rat`),
+    columns  = c(`Blunt-nosed Leopard Lizard`, `Giant Kangaroo Rat`,`San Joaquin Kit Fox`),
     decimals = 1
   ) %>%
   tab_style(
@@ -519,14 +620,16 @@ summary_table_hq %>%
 field_data_long_suit <- field_data %>%
   pivot_longer(
     cols      = c(bnll_base_suit, bnll_rcp45_2049_suit, bnll_rcp45_2069_suit, bnll_rcp85_2049_suit, bnll_rcp85_2069_suit,
-                  gkr_base_suit,  gkr_rcp45_2049_suit,  gkr_rcp45_2069_suit,  gkr_rcp85_2049_suit,  gkr_rcp85_2069_suit),
+                  gkr_base_suit,  gkr_rcp45_2049_suit,  gkr_rcp45_2069_suit,  gkr_rcp85_2049_suit,  gkr_rcp85_2069_suit, 
+                  sjkf_base_suit,  sjkf_rcp45_2049_suit,  sjkf_rcp45_2069_suit,  sjkf_rcp85_2049_suit,  sjkf_rcp85_2069_suit),
     names_to  = "column",
     values_to = "suit_acres"
   ) %>%
   mutate(
     species  = case_when(
       startsWith(column, "bnll") ~ "Blunt-nosed Leopard Lizard",
-      startsWith(column, "gkr")  ~ "Giant Kangaroo Rat"
+      startsWith(column, "gkr")  ~ "Giant Kangaroo Rat", 
+      startsWith(column, "sjkf")  ~ "San Joaquin Kit Fox"
     ),
     scenario = case_when(
       endsWith(column, "base_suit")      ~ "Baseline",
@@ -545,7 +648,7 @@ field_data_long_suit <- field_data %>%
                             right          = FALSE)
   )
 
-for (sp in c("Blunt-nosed Leopard Lizard", "Giant Kangaroo Rat")) {
+for (sp in c("Blunt-nosed Leopard Lizard", "Giant Kangaroo Rat", "San Joaquin Kit Fox")) {
   
   p <- field_data_long_suit %>%
     filter(species == sp) %>%
