@@ -40,7 +40,7 @@ gkr_baseline <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/
 crs(gkr_baseline)
 
 # Read in San Joaquin kit fox habitat raster
-sjkf_baseline <- rast(here("data/intermediate/"))
+sjkf_baseline <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/maxent_sjkf_pred_masked_lakes.tif"))
 crs(sjkf_baseline)
 
 
@@ -59,6 +59,14 @@ gkr_rcp45_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_file
 gkr_rcp45_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp45_2040_2069_masked_lakes.tif"))
 gkr_rcp85_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp85_2020_2049_masked_lakes.tif"))
 gkr_rcp85_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp85_2040_2069_masked_lakes.tif"))
+
+# SJKF ------------------------------------------------
+sjkf_rcp45_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2020_2049_masked_lakes.tif"))
+sjkf_rcp45_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2040_2069_masked_lakes.tif"))
+sjkf_rcp85_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2020_2049_masked_lakes.tif"))
+sjkf_rcp85_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2040_2069_masked_lakes.tif"))
+
+
 
 
 # =============================================================================
@@ -90,7 +98,10 @@ gkr_baseline_sjv <- gkr_baseline %>%
 plot(gkr_baseline_sjv)
 
 # SJKF
-
+sjkf_baseline_sjv <- sjkf_baseline %>% 
+  crop(sjv_vect) %>% 
+  mask(sjv_vect)
+plot(sjkf_baseline_sjv) ##### EDITS STOP HERE
 
 
 # Crop future habitat rasters to SJV --------------------------------------------
