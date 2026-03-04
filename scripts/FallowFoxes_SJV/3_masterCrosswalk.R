@@ -216,6 +216,16 @@ missing_crops_landIQ <- master_SJV_plots %>%
   arrange(county, crp_ty_)
 
 
+# # find all unqiue crop type/county combos
+# crops_county <- master_SJV_plots %>%
+#   distinct(crp_ty_, county) %>%
+#   arrange(county, crp_ty_) %>% 
+#   rename(comm = crp_ty_)
+# 
+# # save this for later reference
+# write_csv(crops_county, here("data/intermediate/3_masterCrosswalk/sjv_cropCountyCombos.csv"))
+
+
 # NASS crop types missing revenue values
 # NA values in this df are idle or unclassified fallow that we'll estimate later
 missing_crops_nass_county <- master_SJV_plots %>%
