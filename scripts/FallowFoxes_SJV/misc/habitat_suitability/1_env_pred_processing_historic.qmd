@@ -46,6 +46,13 @@ crs(aet_rast) <- "EPSG:3310" # assign correct CRS
 res(aet_rast) # 270m resolution
 crs(aet_rast) # EPSG:3310
 
+## PET
+pet_rast <- rast(here("data/raw/bcm/BCMv8_1991_2020_aves/pet1991_2020_ave.asc"))
+crs(pet_rast) <- "EPSG:3310" # assign correct CRS
+# QC resolution & crs
+res(pet_rast) # 270m resolution
+crs(pet_rast) # EPSG:3310
+
 ## MAP
 ppt_rast <- rast(here("data/raw/bcm/BCMv8_1991_2020_aves/ppt1991_2020_ave.asc"))
 crs(ppt_rast) <- "EPSG:3310" # assign correct CRS
@@ -189,6 +196,17 @@ summary(values(aet_ca))
 values(aet_ca)[values(aet_ca) == -9999] <- NA
 
 
+# crop PET raster to CA boundary
+pet_ca <- pet_rast %>%
+  crop(ca_state) %>%
+  mask(ca_state)
+
+# view range of PET values in CA
+summary(values(pet_ca))
+# -9999 indicates no data values -- these should be NA
+values(pet_ca)[values(pet_ca) == -9999] <- NA
+
+
 # crop PPT raster to CA boundary
 ppt_ca <- ppt_rast %>%
   crop(ca_state) %>%
@@ -231,6 +249,7 @@ values(tmx_ca)[values(tmx_ca) == -9999] <- NA
 
 # plot cropped rasters
 plot(aet_ca, main = "AET (CA Boundary)")
+plot(pet_ca, main = "PET (CA Boundary)")
 plot(ppt_ca, main = "PPT (CA Boundary)")
 plot(cwd_ca, main = "CWD (CA Boundary)")
 plot(tmn_ca, main = "TMN (CA Boundary)")
@@ -256,7 +275,7 @@ fill_all_na <- function(raster, max_iter = 100) {
   return(r)
 }
 
-## AET
+## AET -----------------------------------------------
 # apply function to AET raster
 aet_ca_filled <- fill_all_na(aet_ca)
 
@@ -271,7 +290,22 @@ ppt_ca <- resample(ppt_ca,
                    method = "mean")
 
 
-## CWD
+## PET -----------------------------------------------
+# apply function to PET raster
+pet_ca_filled <- fill_all_na(pet_ca)
+
+# crop to PPT to ensure no edge effects
+pet_ca_filled <- pet_ca_filled %>%
+  crop(ppt_ca) %>%
+  mask(ppt_ca)
+
+# resample pet to match aet extent
+pet_ca_filled <- resample(pet_ca_filled, 
+                          aet_ca_filled, 
+                          method = "mean")
+
+
+## CWD -----------------------------------------------
 # apply function to CWD raster
 cwd_ca_filled <- fill_all_na(cwd_ca)
 
@@ -286,7 +320,7 @@ cwd_ca_filled <- resample(cwd_ca_filled,
                           method = "mean")
 
 
-## TMN
+## TMN -----------------------------------------------
 # crop to PPT to ensure no edge effects
 tmn_ca <- tmn_ca %>%
   crop(ppt_ca) %>%
@@ -297,7 +331,7 @@ tmn_ca <- resample(tmn_ca,
                    aet_ca_filled, 
                    method = "mean")
 
-## TMX
+## TMX -----------------------------------------------
 # crop to PPT to ensure no edge effects
 tmx_ca <- tmx_ca %>%
   crop(ppt_ca) %>%
@@ -326,8 +360,9 @@ crs(aet_ca_filled) == crs(tmx_ca)
 ext(aet_ca_filled) == ext(tmx_ca)
 res(aet_ca_filled) == res(tmx_ca)
 
-# plot final AET & CWD raster
+# plot final AET, PET & CWD raster
 plot(aet_ca_filled, main = "Mean AET (filled NA values)")
+plot(pet_ca_filled, main = "Mean PET (filled NA values)")
 plot(cwd_ca_filled, main = "Mean CWD (filled NA values)")
 ```
 
@@ -488,6 +523,11 @@ writeRaster(aet_ca_filled,
             filename = file.path(output_dir, "aet1991_2020_ave_CA_270m.tif"), 
             overwrite = TRUE)
 
+# export PET raster
+writeRaster(pet_ca_filled,
+            filename = file.path(output_dir, "pet1991_2020_ave_CA_270m.tif"), 
+            overwrite = TRUE)
+
 # export PPT raster
 writeRaster(ppt_ca, 
             filename = file.path(output_dir, "ppt1991_2020_ave_CA_270m.tif"), 
@@ -543,67 +583,67 @@ writeRaster(elevation_ca,
 Reproject all rasters to WGS 84 (`EPSG:4326`) for use in Wallace.
 
 ```{r}
-# project all rasters to WGS 84
-aet_wgs84 <- project(aet_ca_filled, "EPSG:4326", method = "mean")
-ppt_wgs84 <- project(ppt_ca, "EPSG:4326", method = "mean")
-cwd_wgs84 <- project(cwd_ca_filled, "EPSG:4326", method = "mean")
-clay_wgs84 <- project(clay_filled, "EPSG:4326", method = "mean")
-ph_wgs84 <- project(ph_filled, "EPSG:4326", method = "mean")
-ec_wgs84 <- project(ec_filled, "EPSG:4326", method = "mean")
-slope_wgs84 <- project(slope_resampled, "EPSG:4326", method = "mean")
-
-# confirm all rasters have the same extent and resolution
-crs(aet_wgs84) == crs(ppt_wgs84)
-crs(aet_wgs84) == crs(clay_wgs84)
-crs(aet_wgs84) == crs(ph_wgs84)
-crs(aet_wgs84) == crs(ec_wgs84)
-crs(aet_wgs84) == crs(slope_wgs84)
-crs(aet_wgs84) == crs(cwd_wgs84)
-
-ext(aet_wgs84) == ext(ppt_wgs84)
-ext(aet_wgs84) == ext(clay_wgs84)
-ext(aet_wgs84) == ext(ph_wgs84)
-ext(aet_wgs84) == ext(ec_wgs84)
-ext(aet_wgs84) == ext(slope_wgs84)
-ext(aet_wgs84) == ext(cwd_wgs84)
-
-res(aet_wgs84) == res(ppt_wgs84)
-res(aet_wgs84) == res(clay_wgs84)
-res(aet_wgs84) == res(ph_wgs84)
-res(aet_wgs84) == res(ec_wgs84)
-res(aet_wgs84) == res(slope_wgs84)
-res(aet_wgs84) == res(cwd_wgs84)
+# # project all rasters to WGS 84
+# aet_wgs84 <- project(aet_ca_filled, "EPSG:4326", method = "mean")
+# ppt_wgs84 <- project(ppt_ca, "EPSG:4326", method = "mean")
+# cwd_wgs84 <- project(cwd_ca_filled, "EPSG:4326", method = "mean")
+# clay_wgs84 <- project(clay_filled, "EPSG:4326", method = "mean")
+# ph_wgs84 <- project(ph_filled, "EPSG:4326", method = "mean")
+# ec_wgs84 <- project(ec_filled, "EPSG:4326", method = "mean")
+# slope_wgs84 <- project(slope_resampled, "EPSG:4326", method = "mean")
+# 
+# # confirm all rasters have the same extent and resolution
+# crs(aet_wgs84) == crs(ppt_wgs84)
+# crs(aet_wgs84) == crs(clay_wgs84)
+# crs(aet_wgs84) == crs(ph_wgs84)
+# crs(aet_wgs84) == crs(ec_wgs84)
+# crs(aet_wgs84) == crs(slope_wgs84)
+# crs(aet_wgs84) == crs(cwd_wgs84)
+# 
+# ext(aet_wgs84) == ext(ppt_wgs84)
+# ext(aet_wgs84) == ext(clay_wgs84)
+# ext(aet_wgs84) == ext(ph_wgs84)
+# ext(aet_wgs84) == ext(ec_wgs84)
+# ext(aet_wgs84) == ext(slope_wgs84)
+# ext(aet_wgs84) == ext(cwd_wgs84)
+# 
+# res(aet_wgs84) == res(ppt_wgs84)
+# res(aet_wgs84) == res(clay_wgs84)
+# res(aet_wgs84) == res(ph_wgs84)
+# res(aet_wgs84) == res(ec_wgs84)
+# res(aet_wgs84) == res(slope_wgs84)
+# res(aet_wgs84) == res(cwd_wgs84)
 ```
 
 Save the WGS84 rasters.
 
 ```{r}
-# export BCM rasters in WGS84
-writeRaster(aet_wgs84, 
-            filename = file.path(output_dir, "WGS84/aet1991_2020_ave_CA_wgs84.tif"), 
-            overwrite = TRUE)
-writeRaster(ppt_wgs84, 
-            filename = file.path(output_dir, "WGS84/ppt1991_2020_ave_CA_wgs84.tif"), 
-            overwrite = TRUE)
-writeRaster(cwd_wgs84, 
-            filename = file.path(output_dir, "WGS84/cwd1991_2020_ave_CA_wgs84.tif"), 
-            overwrite = TRUE)
-
-# export gSSURGO rasters in WGS84
-writeRaster(clay_wgs84, 
-            filename = file.path(output_dir, "WGS84/clay_pct_0_10cm_CA_wgs84.tif"), 
-            overwrite = TRUE)
-writeRaster(ph_wgs84, 
-            filename = file.path(output_dir, "WGS84/ph_0_10cm_CA_wgs84.tif"), 
-            overwrite = TRUE)
-writeRaster(ec_wgs84, 
-            filename = file.path(output_dir, "WGS84/ec_dS_m_0_10cm_CA_wgs84.tif"), 
-            overwrite = TRUE)
-
-# export slope raster in WGS84
-writeRaster(slope_wgs84, 
-            filename = file.path(output_dir, "WGS84/slope_deg_CA_wgs84.tif"), 
-            overwrite = TRUE)
+# # export BCM rasters in WGS84
+# writeRaster(aet_wgs84, 
+#             filename = file.path(output_dir, "WGS84/aet1991_2020_ave_CA_wgs84.tif"), 
+#             overwrite = TRUE)
+# writeRaster(ppt_wgs84, 
+#             filename = file.path(output_dir, "WGS84/ppt1991_2020_ave_CA_wgs84.tif"), 
+#             overwrite = TRUE)
+# writeRaster(cwd_wgs84, 
+#             filename = file.path(output_dir, "WGS84/cwd1991_2020_ave_CA_wgs84.tif"), 
+#             overwrite = TRUE)
+# 
+# # export gSSURGO rasters in WGS84
+# writeRaster(clay_wgs84, 
+#             filename = file.path(output_dir, "WGS84/clay_pct_0_10cm_CA_wgs84.tif"), 
+#             overwrite = TRUE)
+# writeRaster(ph_wgs84, 
+#             filename = file.path(output_dir, "WGS84/ph_0_10cm_CA_wgs84.tif"), 
+#             overwrite = TRUE)
+# writeRaster(ec_wgs84, 
+#             filename = file.path(output_dir, "WGS84/ec_dS_m_0_10cm_CA_wgs84.tif"), 
+#             overwrite = TRUE)
+# 
+# # export slope raster in WGS84
+# writeRaster(slope_wgs84, 
+#             filename = file.path(output_dir, "WGS84/slope_deg_CA_wgs84.tif"), 
+#             overwrite = TRUE)
 ```
 
 ## Plot some of the historic BCM data
@@ -640,8 +680,6 @@ sjv_bbox_expanded <- st_bbox(c(
   ymax = unname(sjv_bbox["ymax"]) + y_expand
 ), crs = st_crs(sjv_sf))
 ```
-
-
 
 ```{r}
 # load the 1991-2020 average rasters in EPSG 3310
@@ -715,8 +753,3 @@ combined_plot <- tmap_arrange(aet_plot, cwd_plot, ppt_plot, tmn_plot, tmx_plot,
                               ncol = 3)
 combined_plot
 ```
-
-
-
-
-
