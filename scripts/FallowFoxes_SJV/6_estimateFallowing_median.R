@@ -29,7 +29,7 @@ library(nngeo)
 # Load in Data ------------------------------------------------------------
 
 # sjv Year Data with last cultivated revenue and water info (from 2_lastCultivatedRevWater.R)
-sjv <- read_sf(here("data/intermediate/misc/LandIQ_processing/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.shp"))
+sjv <- read_sf(here("data/intermediate/misc/LandIQ_processing/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.gpkg"))
 # ensure CRS is CA Albers (EPSG:3310)
 st_crs(sjv)
 
@@ -42,10 +42,12 @@ sjvNoFallow <- sjv %>%
   filter(fallow == FALSE) %>% 
   mutate(
     geoGroup = geo_grp,
-    pricePerAcre = rvPrAcr,
-    waterUse = wtrPrAc,
+    pricePerAcre = revPerAcre,
+    waterUseAW = waterPerAcreAW,
+    waterUseETc = waterPerAcreETc,
     revenue = revYear,
-    water = waterYr,
+    waterAW = waterYearAW,
+    waterETc = waterYearETc,
     .keep = "unused"
   )
 
@@ -53,10 +55,12 @@ sjvFallow <- sjv %>%
   filter(fallow == TRUE) %>% 
   mutate(
     geoGroup = geo_grp,
-    pricePerAcre = rvPrAcr,
-    waterUse = wtrPrAc,
+    pricePerAcre = revPerAcre,
+    waterUseAW = waterPerAcreAW,
+    waterUseETc = waterPerAcreETc,
     revenue = revYear,
-    water = waterYr,
+    waterAW = waterYearAW,
+    waterETc = waterYearETc,
     .keep = "unused"
   )
 
@@ -88,10 +92,12 @@ sjv_crop_fallow_w_last_cult <- sjv %>%
   ) %>%
   mutate(
     geoGroup = geo_grp,
-    pricePerAcre = rvPrAcr,
-    waterUse = wtrPrAc,
+    pricePerAcre = revPerAcre,
+    waterUseAW = waterPerAcreAW,
+    waterUseETc = waterPerAcreETc,
     revenue = revYear,
-    water = waterYr,
+    waterAW = waterYearAW,
+    waterETc = waterYearETc,
     .keep = "unused"
   )
 
@@ -103,10 +109,12 @@ sjv_fallow_no_last_cult <- sjv %>%
   ) %>%
   mutate(
     geoGroup = geo_grp,
-    pricePerAcre = rvPrAcr,
-    waterUse = wtrPrAc,
+    pricePerAcre = revPerAcre,
+    waterUseAW = waterPerAcreAW,
+    waterUseETc = waterPerAcreETc,
     revenue = revYear,
-    water = waterYr,
+    waterAW = waterYearAW,
+    waterETc = waterYearETc,
     .keep = "unused"
   )
 
@@ -126,12 +134,21 @@ median_pricePerAcre <- median(
   na.rm = TRUE
 )
 
-# find the median waterUse (acre-ft/acre) from fallowed lands with last cultivated info
-median_waterUse <- median(
+# find the median waterUseAW (acre-ft/acre) from fallowed lands with last cultivated info
+median_waterUseAW <- median(
   sjv_crop_fallow_w_last_cult %>%
     st_drop_geometry() %>%
     filter(fallow == TRUE) %>%
-    pull(waterUse),
+    pull(waterUseAW),
+  na.rm = TRUE
+)
+
+# find the median waterUseETc from fallowed lands with last cultivated info
+median_waterUseETc <- median(
+  sjv_crop_fallow_w_last_cult %>%
+    st_drop_geometry() %>%
+    filter(fallow == TRUE) %>%
+    pull(waterUseETc),
   na.rm = TRUE
 )
 
@@ -140,9 +157,11 @@ median_waterUse <- median(
 sjv_fallow_est <- sjv_fallow_no_last_cult %>%
   mutate(
     pricePerAcre = median_pricePerAcre,
-    waterUse = median_waterUse,
+    waterUseAW = median_waterUseAW,
+    waterUseETc = median_waterUseETc,
     revenue = pricePerAcre * acres,
-    water = waterUse * acres
+    waterAW = waterUseAW * acres,
+    waterETc = waterUseETc * acres
   )
 
 
@@ -160,7 +179,8 @@ allsjv <- sjv_fallow_est %>%
     retired = ifelse(comm == "Idle - Long Term", 1, 0)
   ) %>% 
   select(id, uniqu_d, geoGroup, acres, comm, last_comm, county, annual, nass, 
-         crop, fallow, retired, pricePerAcre, waterUse, revenue, water)
+         crop, fallow, retired, pricePerAcre, waterUseAW, waterUseETc, 
+         revenue, waterAW, waterETc)
 
 
 # ==============================================================================
@@ -175,9 +195,11 @@ fallowSummary <- sjv_fallow_est %>%
   summarise(
     total_acres = sum(acres),
     total_revenue = sum(revenue),
-    total_water = sum(water),
+    total_waterAW = sum(waterAW),
+    total_waterETc = sum(waterETc),
     avg_pricePerAcre = mean(pricePerAcre),
-    avg_waterUse = mean(waterUse)
+    avg_waterUseAW = mean(waterUseAW),
+    avg_waterUseETc = mean(waterUseETc)
   )
 print(fallowSummary)
 
@@ -190,9 +212,11 @@ fallow_w_last_cult_Summary <- sjv_crop_fallow_w_last_cult %>%
   summarise(
     total_acres = sum(acres),
     total_revenue = sum(revenue),
-    total_water = sum(water),
+    total_waterAW = sum(waterAW),
+    total_waterETc = sum(waterETc),
     avg_pricePerAcre = mean(pricePerAcre),
-    avg_waterUse = mean(waterUse)
+    avg_waterUseAW = mean(waterUseAW),
+    avg_waterUseETc = mean(waterUseETc)
   )
 print(fallow_w_last_cult_Summary)
 
@@ -204,16 +228,18 @@ cultivatedSummary <- sjvNoFallow %>%
   summarise(
     total_acres = sum(acres),
     total_revenue = sum(revenue),
-    total_water = sum(water),
+    total_waterAW = sum(waterAW),
+    total_waterETc = sum(waterETc),
     avg_pricePerAcre = mean(pricePerAcre),
-    avg_waterUse = mean(waterUse)
+    avg_waterUseAW = mean(waterUseAW),
+    avg_waterUseETc = mean(waterUseETc)
   )
 print(cultivatedSummary)
 
 
 # Export ------------------------------------------------------------------
 
-write_sf(allsjv, here("data/intermediate/6_estimateFallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.shp"), 
+write_sf(allsjv, here("data/intermediate/6_estimateFallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.gpkg"), 
          append = FALSE)
 
 

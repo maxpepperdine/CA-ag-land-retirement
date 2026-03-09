@@ -345,8 +345,8 @@ write_csv(usda_final_averages_CPI,
 # this is the sjv_crosswalkPlots_na.shp data from the 3_masterCrosswalk.R script
 
 # load the LandIQ SJV data with crop crosswalk info
-SJV_landIQ_na_crosswalk <- read_sf(here("data/intermediate/3_masterCrosswalk/sjv_crosswalkPlots_na/sjv_crosswalkPlots_na.shp")) %>% 
-  rename(price_per_acre = prc_pr_)
+SJV_landIQ_na_crosswalk <- read_sf(here("data/intermediate/3_masterCrosswalk/sjv_crosswalkPlots_na/sjv_crosswalkPlots_na.gpkg"))
+crs(SJV_landIQ_na_crosswalk) # QC (EPSG: 3310)
 
 # join the estimated data to the LandIQ plot crosswalk
 SJV_landIQ_full_crosswalk <- SJV_landIQ_na_crosswalk %>%
@@ -371,7 +371,7 @@ missing_crops_test <- SJV_landIQ_full_crosswalk %>%
 
 # export the LandIQ plots with all crosswalk info and revenue estimates
 write_sf(SJV_landIQ_full_crosswalk, 
-         here("data/intermediate/4_revenueEstimation/sjv_landIQ_fullCrosswalk/sjv_landIQ_fullCrosswalk.shp"), 
+         here("data/intermediate/4_revenueEstimation/sjv_landIQ_fullCrosswalk/sjv_landIQ_fullCrosswalk.gpkg"), 
          append = FALSE)
 
 

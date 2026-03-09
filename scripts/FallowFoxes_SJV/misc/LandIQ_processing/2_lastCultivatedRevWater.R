@@ -20,7 +20,7 @@ library(here)
 # =============================================================================
 
 # sjv plots processed through crop rotation script (5_cropRotation.R)
-sjv <- read_sf(here("data/intermediate/5_cropRotation/sjvYearRotation/sjvYearRotation.shp"))
+sjv <- read_sf(here("data/intermediate/5_cropRotation/sjvYearRotation/sjvYearRotation.gpkg"))
 
 # LandIQ plots with last cultivated crop info (from 1_lastCultivatedLandIQ_2022.R)
 sjv_lastCult <- read_sf(here("data/intermediate/misc/LandIQ_processing/1_lastCultivatedLandIQ_2022/landiq_2022_lastCultivated.shp")) %>% 
@@ -52,8 +52,9 @@ revenue_water_lookup <- sjv_joined %>%
   # take the mean revenue and water use for each county-comm combination
   # this deals with floating point issues for county-comm combos
   summarise(
-    lookup_rvPrAcr = mean(rvPrAcr, na.rm = TRUE),
-    lookup_wtrPrAc = mean(wtrPrAc, na.rm = TRUE),
+    lookup_revPerAcre = mean(revPerAcre, na.rm = TRUE),
+    lookup_waterPerAcreAW = mean(waterPerAcreAW, na.rm = TRUE),
+    lookup_waterPerAcreETc = mean(waterPerAcreETc, na.rm = TRUE),
     .groups = "drop"
   )
 
@@ -73,38 +74,51 @@ sjv_joined_revWat <- sjv_joined %>%
 # replace zero values with appropriate lookup values for idle/fallow fields
 sjv_final <- sjv_joined_revWat %>%
   mutate(
-    # replace rvPrAcr: use lookup value if field is idle AND has a last_comm
-    rvPrAcr = case_when(
+    # replace revPerAcre: use lookup value if field is idle AND has a last_comm
+    revPerAcre = case_when(
       comm %in% idle_categories & 
         !is.na(last_comm) & 
-        !is.na(lookup_rvPrAcr) ~ lookup_rvPrAcr,
-      TRUE ~ rvPrAcr
+        !is.na(lookup_revPerAcre) ~ lookup_revPerAcre,
+      TRUE ~ revPerAcre
     ),
-    # replace wtrPrAc: use lookup value if field is idle AND has a last_comm
-    wtrPrAc = case_when(
+    # replace waterPerAcreAW: use lookup value if field is idle AND has a last_comm
+    waterPerAcreAW = case_when(
       comm %in% idle_categories & 
         !is.na(last_comm) & 
-        !is.na(lookup_wtrPrAc) ~ lookup_wtrPrAc,
-      TRUE ~ wtrPrAc
+        !is.na(lookup_waterPerAcreAW) ~ lookup_waterPerAcreAW,
+      TRUE ~ waterPerAcreAW
+    ),
+    # replace waterPerAcreETc: use lookup value if field is idle AND has a last_comm
+    waterPerAcreETc = case_when(
+      comm %in% idle_categories & 
+        !is.na(last_comm) & 
+        !is.na(lookup_waterPerAcreETc) ~ lookup_waterPerAcreETc,
+      TRUE ~ waterPerAcreETc
     ),
   ) %>% 
   mutate(
-    # reclaculate total revenue and water use for idle categories only
+    # recalculate total revenue and water use for idle categories only
     revYear = case_when(
       comm %in% idle_categories & 
         !is.na(last_comm) & 
-        !is.na(rvPrAcr) ~ rvPrAcr * acres,
+        !is.na(revPerAcre) ~ revPerAcre * acres,
       TRUE ~ revYear
     ),
-    waterYr = case_when(
+    waterYearAW = case_when(
       comm %in% idle_categories & 
         !is.na(last_comm) & 
-        !is.na(wtrPrAc) ~ wtrPrAc * acres,
-      TRUE ~ waterYr
+        !is.na(waterPerAcreAW) ~ waterPerAcreAW * acres,
+      TRUE ~ waterYearAW
+    ),
+    waterYearETc = case_when(
+      comm %in% idle_categories & 
+        !is.na(last_comm) & 
+        !is.na(waterPerAcreETc) ~ waterPerAcreETc * acres,
+      TRUE ~ waterYearETc
     )
   ) %>%
   # remove the temporary lookup columns
-  select(-lookup_rvPrAcr, -lookup_wtrPrAc)
+  select(-lookup_revPerAcre, -lookup_waterPerAcreAW, -lookup_waterPerAcreETc)
 
 
 
@@ -123,9 +137,9 @@ update_summary <- sjv_joined %>%
   summarise(
     total_idle_fields = n(),
     fields_with_last_comm = sum(!is.na(last_comm)),
-    fields_updated = sum(!is.na(last_comm) & !is.na(lookup_rvPrAcr)),
+    fields_updated = sum(!is.na(last_comm) & !is.na(lookup_revPerAcre)),
     fields_not_updated_no_last_comm = sum(is.na(last_comm)),
-    fields_not_updated_no_match = sum(!is.na(last_comm) & is.na(lookup_rvPrAcr))
+    fields_not_updated_no_match = sum(!is.na(last_comm) & is.na(lookup_revPerAcre))
   )
 
 # filter to fields not updated no match for review
@@ -136,7 +150,7 @@ fields_not_updated_no_match <- sjv_joined %>%
     revenue_water_lookup,
     by = c("county" = "county", "last_comm" = "comm")
   ) %>%
-  filter(!is.na(last_comm) & is.na(lookup_rvPrAcr))
+  filter(!is.na(last_comm) & is.na(lookup_revPerAcre))
 
 
 # some fields with a last comm weren't updated because there was no match 
@@ -147,7 +161,7 @@ sjv_final <- sjv_final %>%
     last_comm = case_when(
       comm %in% idle_categories & 
         !is.na(last_comm) & 
-        rvPrAcr == 0 ~ NA_character_,
+        revPerAcre == 0 ~ NA_character_,
       TRUE ~ last_comm
     )
   )
@@ -159,16 +173,16 @@ update_summary_test <- sjv_final %>%
   summarise(
     total_idle_fields = n(),
     fields_with_last_comm = sum(!is.na(last_comm)),
-    fields_updated = sum(!is.na(last_comm) & !is.na(rvPrAcr)),
+    fields_updated = sum(!is.na(last_comm) & !is.na(revPerAcre)),
     fields_not_updated_no_last_comm = sum(is.na(last_comm)),
     # this should now be zero
-    fields_not_updated_no_match = sum(!is.na(last_comm) & is.na(rvPrAcr))
+    fields_not_updated_no_match = sum(!is.na(last_comm) & is.na(revPerAcre))
   )
 
 
 # export data
 write_sf(sjv_final, 
-         here("data/intermediate/misc/LandIQ_processing/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.shp"), 
+         here("data/intermediate/misc/LandIQ_processing/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.gpkg"), 
          append = FALSE)
 
 

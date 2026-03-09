@@ -20,14 +20,13 @@ source(here("scripts/FallowFoxes_SJV/0_startup/functions.R"))
 
 
 # read in the .shp just created in 4_revenueEstimation 
-sjv <- read_sf(here("data/intermediate/4_revenueEstimation/sjv_landIQ_fullCrosswalk/sjv_landIQ_fullCrosswalk.shp")) %>% 
+sjv <- read_sf(here("data/intermediate/4_revenueEstimation/sjv_landIQ_fullCrosswalk/sjv_landIQ_fullCrosswalk.gpkg")) %>% 
   clean_names()
 
 
 # rename columns; sf and dplyr don't always like the rename() function
 names(sjv)[names(sjv) == "crp_ty"] <- "comm"
-names(sjv)[names(sjv) == "water_us"] <- "water_use"
-names(sjv)[names(sjv) == "prc_pr"] <- "price_per_acre"
+names(sjv)[names(sjv) == "water_use_e_tc"] <- "water_use_etc"
 
 
 # Filter plots present at the end of the water year, arrange by the most valuable 
@@ -120,7 +119,8 @@ joinAnnualKey <- dropDuplicates %>%
   # For each plot sum the per acre revenue rates
   summarize(
     sumRev = sum(price_per_acre, na.rm = TRUE),
-    sumWater = sum(water_use, na.rm = TRUE),
+    sumWaterAW = sum(water_use_aw, na.rm = TRUE),
+    sumWaterETc = sum(water_use_etc, na.rm = TRUE),
     area = mean(area)
   ) %>%
   # Leave each plot unique rates
@@ -128,7 +128,8 @@ joinAnnualKey <- dropDuplicates %>%
     # names are inaccurate to facilitate ease of code
     # These are not means, they are sums of different rotations
     meanRev = sumRev,
-    meanWater = sumWater,
+    meanWaterAW = sumWaterAW,
+    meanWaterETc = sumWaterETc,
     .keep = "unused"
   )
 
@@ -143,12 +144,14 @@ cropRotationRaw <- endDate %>%
                                   "comm" = "endCrop"))  %>% 
   mutate(
     revPart = if_else(is.na(meanRev), price_per_acre * acres, meanRev * acres),
-    waterPart = if_else(is.na(meanWater), water_use * acres, meanWater * acres),
+    waterPartAW = if_else(is.na(meanWaterAW), water_use_aw * acres, meanWaterAW * acres),
+    waterPartETc = if_else(is.na(meanWaterETc), water_use_etc * acres, meanWaterETc * acres),
     #add fallow marker for estimating fallowed field values
     fallow = if_else(comm %in% c("Unclassified Fallow", "Idle - Long Term", 
                                  "Idle - Short Term"), TRUE, FALSE),
   ) %>% 
-  select(-c(price_per_acre, meanRev, water_use, meanWater, area.x, area.y)) %>% 
+  select(-c(price_per_acre, meanRev, water_use_aw, meanWaterAW, 
+            water_use_etc, meanWaterETc, area.x, area.y)) %>% 
   select(uniqu_d, county, comm, acres, geo_grp:fallow) %>% 
   group_by(geo_grp)
 
@@ -175,10 +178,12 @@ cropRotation <- cropRotationRaw %>%
   # Clean columns and update per acre values
   mutate(
     revYear = revPart,
-    waterYear = waterPart,
+    waterYearAW = waterPartAW,
+    waterYearETc = waterPartETc,
     acres = acres,
     revPerAcre = revYear / acres,
-    waterPerAcre = waterYear / acres,
+    waterPerAcreAW = waterYearAW / acres,
+    waterPerAcreETc = waterYearETc / acres,
     .keep = "unused"
   ) %>%
   left_join(sjvGeo, by = "geo_grp") %>%
@@ -187,17 +192,18 @@ cropRotation <- cropRotationRaw %>%
 
 # Check values across all plots
 metrics(cropRotation$revPerAcre)
-
 metrics(cropRotation$revYear)
 
-metrics(cropRotation$waterYear)
+metrics(cropRotation$waterYearAW)
+metrics(cropRotation$waterYearETc)
 
-metrics(cropRotation$waterPerAcre)
+metrics(cropRotation$waterPerAcreAW)
+metrics(cropRotation$waterPerAcreETc)
 
 
 # Export
 write_sf(cropRotation, 
-         here("data/intermediate/5_cropRotation/sjvYearRotation/sjvYearRotation.shp"), 
+         here("data/intermediate/5_cropRotation/sjvYearRotation/sjvYearRotation.gpkg"), 
          append = FALSE)
 
 
