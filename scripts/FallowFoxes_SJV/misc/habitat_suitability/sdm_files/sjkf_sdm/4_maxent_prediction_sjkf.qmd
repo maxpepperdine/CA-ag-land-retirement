@@ -174,7 +174,7 @@ evalplot.stats(e = max.eval.sjkf,
 #                error.bars = FALSE)
 
 #==============================================================================
-# Best model: fc.LQ_rm.3
+# Best model: XXX
 #==============================================================================
 
 # save the evaluation results to avoid re-running the model
@@ -227,11 +227,11 @@ args <- c("jackknife=TRUE",      # assess variable importance
           "linear=TRUE",         # use linear features
           "quadratic=TRUE",      # use quadratic features
           "hinge=FALSE",         # do not use hinge features
-          "product=FALSE",       # do not use product features
+          "product=TRUE",       # do not use product features
           "threshold=FALSE",     # do not use threshold features
           "responsecurves=TRUE", # generate response curves
           "writeplotdata=TRUE",  # write output data used to make response curves 
-          "betamultiplier=3")  # this is the rm coefficient from ENMevaluate()
+          "betamultiplier=0.5")  # this is the rm coefficient from ENMevaluate()
 
 # path to save results
 path <- here("data/4_maxent_predictions/")
@@ -644,5 +644,5 @@ e <- dismo::evaluate(p = occ_coords,       # presence coordinates
 
 # calculate the threshold that maximizes sensitivity and specificity
 thresh <- dismo::threshold(e)
-thresh_spec_sens <- thresh$spec_sens   # 0.399
+thresh_spec_sens <- thresh$spec_sens   # 0.304
 ```
