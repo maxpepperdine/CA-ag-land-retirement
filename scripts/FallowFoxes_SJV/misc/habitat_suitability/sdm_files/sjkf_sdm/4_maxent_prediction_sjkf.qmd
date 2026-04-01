@@ -644,5 +644,6 @@ e <- dismo::evaluate(p = occ_coords,       # presence coordinates
 
 # calculate the threshold that maximizes sensitivity and specificity
 thresh <- dismo::threshold(e)
-thresh_spec_sens <- thresh$spec_sens   # 0.304
+thresh_spec_sens <- thresh$spec_sens   # 0.354 50km buffer - model: fc.QP_rm.1
+                                      # 0.225 100 km buffer - model fc.LQP_rm.0.5
 ```
