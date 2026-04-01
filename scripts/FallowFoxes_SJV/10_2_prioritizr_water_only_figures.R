@@ -227,7 +227,7 @@ fig2b <- ggplot(valley_plot, aes(x = scenario_label, y = revenue_cost_usd / 1e9)
             vjust = -0.5, size = 3.5, fontface = "bold") +
   scale_y_continuous(labels = function(x) paste0("$", x, "B"),
                      expand = expansion(mult = c(0, 0.12))) +
-  labs(title = "Revenue cost", x = NULL, y = "Billions USD") +
+  labs(title = "Foregone revenue", x = NULL, y = "$ billions") +
   theme_minimal(base_size = 12) +
   theme(
     plot.title = element_text(face = "bold", size = 12),
@@ -314,7 +314,7 @@ if (!is.null(base_sol)) {
       geom_sf(data = sjv_basins, fill = NA, color = "gray60", linewidth = 0.4) +
       # Non-selected fields (light gray, subtle)
       geom_sf(data = plot_data %>% filter(status == "Not selected"),
-              fill = "gray90", color = NA, linewidth = 0) +
+              fill = "gray85", color = NA, linewidth = 0) +
       # Selected fields (blue)
       geom_sf(data = plot_data %>% filter(status == "Selected"),
               fill = "#2166AC", color = NA, linewidth = 0) +
@@ -326,7 +326,11 @@ if (!is.null(base_sol)) {
       theme_void(base_size = 10) +
       theme(
         plot.title = element_text(face = "bold", size = 10, hjust = 0.5),
-        plot.margin = margin(5, 5, 5, 5)
+        plot.margin = margin(5, 5, 5, 5), 
+        panel.grid.major = element_line(color = "grey80", linewidth = 0.2),
+        panel.grid.minor = element_blank(),
+        axis.text        = element_text(size = 7, color = "grey30"),
+        axis.ticks       = element_line(color = "grey30")
       )
   }
   
@@ -341,10 +345,10 @@ if (!is.null(base_sol)) {
   
   # Define color palette: 0 = light gray, 1-3 = blue gradient
   freq_colors <- c(
-    "0" = "gray75",
-    "1" = "skyblue",
-    "2" = "#4292C6",
-    "3" = "#08306B"
+    "0" = "gray85",
+    "1" = "#FDE725",
+    "2" = "#21918C",
+    "3" = "#440154"
   )
   
   freq_labels <- c(
@@ -373,7 +377,11 @@ if (!is.null(base_sol)) {
       legend.position = "bottom",
       legend.title = element_text(face = "bold", size = 9),
       legend.text = element_text(size = 8),
-      plot.margin = margin(5, 5, 5, 5)
+      plot.margin = margin(5, 5, 5, 5), 
+      panel.grid.major = element_line(color = "grey80", linewidth = 0.2),
+      panel.grid.minor = element_blank(),
+      axis.text        = element_text(size = 7, color = "grey30"),
+      axis.ticks       = element_line(color = "grey30")
     ) +
     guides(fill = guide_legend(nrow = 1, override.aes = list(linewidth = 0.3, color = "gray40")))
   
@@ -381,7 +389,7 @@ if (!is.null(base_sol)) {
   fig3 <- (map_baseline + map_rcp45 + map_rcp85 + map_frequency) +
     plot_layout(ncol = 2) +
     plot_annotation(
-      title = "Spatial distribution of fields selected for retirement",
+      title = "Spatial distribution of fields selected for retirement (water savings only)",
       subtitle = "Valley-wide optimization under three climate scenarios with scenario-specific targets",
       theme = theme(
         plot.title = element_text(face = "bold", size = 14),
@@ -714,13 +722,6 @@ if (all(file.exists(unlist(valley_gpkg_paths)))) {
 
 
 cat("\n=== FIGURE AND TABLE GENERATION COMPLETE ===\n")
-
-
-
-
-
-
-
 
 
 
