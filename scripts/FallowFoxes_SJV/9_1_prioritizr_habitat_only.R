@@ -2,19 +2,19 @@
 # PRIORITIZR HABITAT CREATION (CROSS TEMPORAL) OPTIMIZATION
 # =============================================================================
 # Purpose: Use prioritizr to find optimal retirement configurations that
-#          meet habitat targets for BNLL and GKR across ALL climate
+#          meet habitat targets for BNLL, GKR, and SJKF across ALL climate
 #          scenarios/time periods simultaneously.
 #
 # Approach: Instead of running separate optimizations per time period
 #           (as in 10_prioritizr_sjv.R), we build problems where every
 #           climate projection is a separate feature with a 25,000-acre
 #           target. This forces the solver to select fields that provide
-#           adequate habitat for both species under ALL futures — ensuring
-#           that land retired today remains suitable as climate shifts.
+#           adequate habitat for all three species under ALL futures —
+#           ensuring that land retired today remains suitable as climate shifts.
 #
 # Two optimization problems:
-#   1. Suitable habitat: 10 features (BNLL + GKR × 5 time periods)
-#   2. High quality habitat: 10 features (BNLL + GKR × 5 time periods)
+#   1. Suitable habitat: 15 features (BNLL + GKR + SJKF × 5 time periods)
+#   2. High quality habitat: 15 features (BNLL + GKR + SJKF × 5 time periods)
 #   Each feature has a 25,000-acre target
 #
 # Cost layer: annual revenue per field (`revenue`)
@@ -86,7 +86,7 @@ field_data <- field_data %>%
   )
 
 # Replace NAs in habitat columns with 0
-habitat_cols_all <- names(field_data)[grepl("^(bnll|gkr)_", names(field_data))]
+habitat_cols_all <- names(field_data)[grepl("^(bnll|gkr|sjkf)_", names(field_data))]
 field_data <- field_data %>%
   mutate(across(all_of(habitat_cols_all), ~ replace_na(.x, 0)))
 
@@ -118,29 +118,33 @@ cat("Boundary matrix dimensions:", dim(bm), "\n")
 # SECTION 2: Define the 2 Cross-Temporal Optimization Problems
 # =============================================================================
 
-# Each problem includes ALL 5 time periods for both species = 10 features.
+# Each problem includes ALL 5 time periods for all three species = 15 features.
 # Every feature gets a 25,000-acre target, so the selected fields must
 # simultaneously meet habitat thresholds under all climate projections.
 
 habitat_target <- 25000
 
-# Suitable habitat features (10 total)
+# Suitable habitat features (15 total)
 suit_features <- c(
   "bnll_base_suit",      "bnll_rcp45_2049_suit", "bnll_rcp45_2069_suit",
   "bnll_rcp85_2049_suit", "bnll_rcp85_2069_suit",
   "gkr_base_suit",       "gkr_rcp45_2049_suit",  "gkr_rcp45_2069_suit",
-  "gkr_rcp85_2049_suit",  "gkr_rcp85_2069_suit"
+  "gkr_rcp85_2049_suit",  "gkr_rcp85_2069_suit",
+  "sjkf_base_suit",      "sjkf_rcp45_2049_suit", "sjkf_rcp45_2069_suit",
+  "sjkf_rcp85_2049_suit", "sjkf_rcp85_2069_suit"
 )
 
-# High quality habitat features (10 total)
+# High quality habitat features (15 total)
 hq_features <- c(
   "bnll_base_hq",      "bnll_rcp45_2049_hq", "bnll_rcp45_2069_hq",
   "bnll_rcp85_2049_hq", "bnll_rcp85_2069_hq",
   "gkr_base_hq",       "gkr_rcp45_2049_hq",  "gkr_rcp45_2069_hq",
-  "gkr_rcp85_2049_hq",  "gkr_rcp85_2069_hq"
+  "gkr_rcp85_2049_hq",  "gkr_rcp85_2069_hq",
+  "sjkf_base_hq",      "sjkf_rcp45_2049_hq", "sjkf_rcp45_2069_hq",
+  "sjkf_rcp85_2049_hq", "sjkf_rcp85_2069_hq"
 )
 
-# Targets: 25,000 acres for each of the 10 features
+# Targets: 25,000 acres for each of the 15 features
 suit_targets <- rep(habitat_target, length(suit_features))
 hq_targets   <- rep(habitat_target, length(hq_features))
 
@@ -190,7 +194,7 @@ cat("Total planning unit acres:",
 # SECTION 4: BLM Calibration (Suitable Habitat Problem)
 # =============================================================================
 
-# Calibrate BLM using the suitable habitat problem (10 features).
+# Calibrate BLM using the suitable habitat problem (15 features).
 # The chosen BLM will be applied to both problems.
 
 cat("\n========== BLM CALIBRATION (cross-temporal suitable) ==========\n\n")
@@ -255,7 +259,7 @@ blm_plot <- ggplot(blm_results, aes(x = total_cost, y = boundary)) +
   geom_text(aes(label = blm), vjust = -1, size = 3) +
   labs(
     title    = "BLM Calibration: Cost vs. Boundary Length",
-    subtitle = "Calibrated on cross-temporal suitable habitat problem (10 features)",
+    subtitle = "Calibrated on cross-temporal suitable habitat problem (15 features)",
     x        = "Total Revenue Cost ($)",
     y        = "Boundary Length (lower = more cohesive)"
   ) +
@@ -264,7 +268,7 @@ blm_plot <- ggplot(blm_results, aes(x = total_cost, y = boundary)) +
 print(blm_plot)
 
 # --- SELECT THE BEST BLM ---
-# Look for the "elbow" in the cost-boundary tradeoff.
+# this is the "elbow" in the cost-boundary tradeoff.
 chosen_blm <- 0.0025 
 
 cat("\nChosen BLM:", chosen_blm, "\n")
@@ -297,7 +301,7 @@ for (i in 1:nrow(scenarios)) {
   targs    <- scenarios$targets[[i]]
   
   cat(sprintf("--- Scenario %d/2: %s (%s) ---\n", i, scen, quality))
-  cat(sprintf("    Features: %d (BNLL + GKR × 5 time periods)\n", length(feats)))
+  cat(sprintf("    Features: %d (BNLL + GKR + SJKF × 5 time periods)\n", length(feats)))
   cat(sprintf("    Target: %s acres per feature\n", format(habitat_target, big.mark = ",")))
   
   # Build problem
@@ -395,7 +399,11 @@ for (i in 1:nrow(scenarios)) {
         scenario = scen,
         quality  = scenarios$quality[i],
         feature  = feat,
-        species  = ifelse(grepl("^bnll", feat), "BNLL", "GKR"),
+        species  = case_when(
+          grepl("^bnll", feat) ~ "BNLL",
+          grepl("^gkr", feat)  ~ "GKR",
+          grepl("^sjkf", feat) ~ "SJKF"
+        ),
         climate  = case_when(
           grepl("base", feat)      ~ "Baseline",
           grepl("rcp45_2049", feat) ~ "RCP 4.5 (2020-2049)",
@@ -467,7 +475,6 @@ write_csv(blm_results,
 cat("\n========== CROSS-TEMPORAL OPTIMIZATION COMPLETE — RESULTS SAVED ==========\n")
 cat("Load results for figures with:\n")
 cat('  load(here("data/intermediate/9_1_prioritizr_habitat_only/prioritizr_cross_temporal_results.RData"))\n')
-
 
 
 
