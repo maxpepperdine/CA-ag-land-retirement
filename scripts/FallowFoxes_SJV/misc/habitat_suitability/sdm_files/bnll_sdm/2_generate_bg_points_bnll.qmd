@@ -54,9 +54,6 @@ bnll_buffer_union <- st_union(bnll_buffer)
 
 # transform buffer back to WGS84
 bnll_buffer_wgs84 <- st_transform(bnll_buffer_union, crs = 4326)
-
-# # save buffer to file for testing
-# write_sf(bnll_buffer_wgs84, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points/bnll_50km_buffer.shp"))
 ```
 
 ```{r}
@@ -64,7 +61,7 @@ bnll_buffer_wgs84 <- st_transform(bnll_buffer_union, crs = 4326)
 bnll_buffer_wkt <- st_as_text(st_geometry(bnll_buffer_wgs84)[[1]])
 nchar(bnll_buffer_wkt)  # check length of WKT string
 
-# buffer is too long for rgbif, so simplify it
+# buffer is too long for rgbif, so simplify it (nchar ~ 1500 is ideal)
 buffer_simplify <- st_simplify(bnll_buffer_wgs84, dTolerance = 500)
 buffer_simplify_wkt <- st_as_text(st_geometry(buffer_simplify)[[1]])
 nchar(buffer_simplify_wkt)  # check length of WKT string
@@ -75,8 +72,8 @@ nchar(buffer_simplify_wkt)  # check length of WKT string
 ```{r}
 # set up GBIF credentials (one-time setup)
 options(gbif_user = "mpepperdine")
-options(gbif_pwd = " ")
-options(gbif_email = " ")
+options(gbif_pwd = "Pumbaason@20")
+options(gbif_email = "max.pepperdine@gmail.com")
 
 
 # # This works with occ_download and allows all three classes in one request
@@ -99,7 +96,7 @@ download_key <- occ_download(
   pred_gte("year", 1990),
   pred_lte("year", 2025),
   pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
-  pred_lte("coordinateUncertaintyInMeters", 2000),
+  pred_lte("coordinateUncertaintyInMeters", 5000),
   pred_within(buffer_simplify_wkt)  # Your buffer
 )
 
@@ -151,9 +148,9 @@ Save the data
 
 ```{r}
 # save SF to test
-write_sf(vertebrate_unique, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points/bnll_bg_points.shp"),
+write_sf(vertebrate_unique, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points_bnll/bnll_bg_points.shp"),
          append = FALSE)
 
 # save final background points to CSV
-write_csv(background_df, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points/bnll_bg_points.csv"))
+write_csv(background_df, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points_bnll/bnll_bg_points.csv"))
 ```

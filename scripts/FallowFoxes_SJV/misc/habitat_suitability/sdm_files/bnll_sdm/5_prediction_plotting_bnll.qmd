@@ -30,7 +30,7 @@ library(tmap)
 
 ```{r}
 # baseline BNLL model
-bnll_baseline <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_masked_lakes.tif"))
+bnll_baseline <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/maxent_bnll_pred_masked_lakes.tif"))
 
 # load SJV boundary for masking
 sjv_boundary <- read_sf(here("data/raw/sjv_counties/sjv_counties.shp"))

@@ -10,7 +10,7 @@ editor_options:
 
 ## Overview
 
-This script reads in the prepared BNLL occurrence records (produced in `1_extract_occ_env_data.qmd`) and background points (produced in `2_generate_bg_points.qmd` and `3_extract_bg_env_data.qmd`) to evaluate and generate MaxEnt models using the `dismo` package.
+This script reads in the prepared BNLL occurrence records (produced in `1_extract_occ_env_data_bnll.qmd`) and background points (produced in `2_generate_bg_points_bnll.qmd` and `3_extract_bg_env_data_bnll.qmd`) to evaluate and generate MaxEnt models using the `dismo` package.
 
 ```{r}
 rm(list = ls())
@@ -37,10 +37,10 @@ library(kableExtra) # for nice tables
 
 ```{r}
 # load occurrence data with env data extracted
-occ_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/1_extract_occ_env_data/bnll_occ_env_data.csv"))
+occ_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/1_extract_occ_env_data_bnll/bnll_occ_env_data.csv"))
 
 # load background data with env data extracted
-bg_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/3_extract_bg_env_data/bnll_bg_env_data.csv"))
+bg_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/3_extract_bg_env_data_bnll/bnll_bg_env_data.csv"))
 ```
 
 ```{r}
@@ -82,7 +82,7 @@ Assessing the correlation between environmental variables for MaxEnt. A Pearson 
 ```{r}
 # select only the environmental variables
 env_data_corr <- full_data %>%
-  dplyr::select(4:14)
+  dplyr::select(4:15)
 
 # create a correlation matrix
 cor_matrix <- cor(env_data_corr, # binded occ & bg data with only env variables
@@ -108,10 +108,10 @@ After selecting the best model, we can use the `maxent()` function from the `dis
 ```{r}
 # remove CWD from occ and bg data
 occ_data <- occ_data %>%
-  dplyr::select(-c(cwd1991_2020_ave, sand_pct_0_10cm, silt_pct_0_10cm, 
+  dplyr::select(-c(cwd1991_2020_ave, pet1991_2020_ave, sand_pct_0_10cm, silt_pct_0_10cm, 
                    tmn1991_2020_ave, tmx1991_2020_ave))
 bg_data <- bg_data %>%
-  dplyr::select(-c(cwd1991_2020_ave, sand_pct_0_10cm, silt_pct_0_10cm, 
+  dplyr::select(-c(cwd1991_2020_ave, pet1991_2020_ave, sand_pct_0_10cm, silt_pct_0_10cm, 
                    tmn1991_2020_ave, tmx1991_2020_ave))
 
 # set up the block for spatial partitioning
@@ -124,7 +124,9 @@ table(block$occs.grp)
 ## Evaluating the model
 max.eval.bnll <- ENMeval::ENMevaluate(occs = occ_data, 
                                       bg = bg_data, 
-                                      tune.args = list(fc = c("L", "LQ", "P"), 
+                                      tune.args = list(fc = c("L", "LQ", "LQP", 
+                                                              "LP", "Q", "QP", 
+                                                              "P"), 
                                                       rm = seq(0.5, 3, 0.5)),
                                       algorithm = "maxnet", 
                                       partitions = "block")
@@ -148,7 +150,7 @@ results <- eval.results(max.eval.bnll) %>%
 kable(results, row.names = FALSE) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
                 full_width = FALSE) %>%
-  row_spec(1, bold = TRUE)  # highlight the top model
+  row_spec(1, bold = TRUE)  # highlight the top model based on AIC
 
 
 # plot stat results across values of the tuning parameters
@@ -181,10 +183,10 @@ evalplot.stats(e = max.eval.filtered,
 
 # save the evaluation results to avoid re-running the model
 save(max.eval.bnll, 
-     file = here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/max_eval_bnll.rda"))
+     file = here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/max_eval_bnll.rda"))
 
 # load the evaluation results
-load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/max_eval_bnll.rda"))
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/max_eval_bnll.rda"))
 ```
 
 ## Running MaxEnt & generating predictions
@@ -206,8 +208,8 @@ These model objects are then used to predict baseline (historical) and future BN
 x <- full_data %>% 
   na.omit() %>%
   # select only the environmental variables
-  dplyr::select(4:14) %>% 
-  dplyr::select(-c(cwd1991_2020_ave, sand_pct_0_10cm, silt_pct_0_10cm, 
+  dplyr::select(4:15) %>% 
+  dplyr::select(-c(cwd1991_2020_ave, pet1991_2020_ave, sand_pct_0_10cm, silt_pct_0_10cm, 
                    tmn1991_2020_ave, tmx1991_2020_ave))
 
 # # examine how many presence and absence points were lost from NA removal
@@ -234,7 +236,7 @@ args <- c("jackknife=TRUE",      # assess variable importance
           "betamultiplier=0.5")  # this is the rm coefficient from ENMevaluate()
 
 # path to save results
-path <- here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/")
+path <- here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/")
 
 
 ## final model run
@@ -245,7 +247,7 @@ maxent_bnll <- maxent(x = x,
 
 # save model object for prediction rasters
 save(maxent_bnll, 
-     file = here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+     file = here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/maxent_prediction_bnll_sdm.rda"))
 ```
 
 #### Predict baseline (historical) BNLL occurrence probability
@@ -254,7 +256,7 @@ save(maxent_bnll,
 #### set up the prediction parameters
 
 ## load the model object
-load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/maxent_prediction_bnll_sdm.rda"))
 
 
 ## load the environmental data as a raster stack 
@@ -271,11 +273,11 @@ x_stack <- raster::stack(env_files)
 names(x_stack)
 # match the layer names to the predictor variable names in the SWD data
 names(x_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
-                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "ec_dS_m_0_10cm", "pet1991_2020_ave", "pH_0_10cm", "ppt1991_2020_ave", 
                         "sand_pct_0_10cm", "silt_pct_0_10cm", "slope", 
                         "tmn1991_2020_ave", "tmx1991_2020_ave")
 # get rid of cwd layer since it was not used in the model
-layers_to_drop <- c("cwd1991_2020_ave", "sand_pct_0_10cm", "silt_pct_0_10cm", 
+layers_to_drop <- c("cwd1991_2020_ave", "pet1991_2020_ave", "sand_pct_0_10cm", "silt_pct_0_10cm", 
                     "tmn1991_2020_ave", "tmx1991_2020_ave")
 x_stack <- dropLayer(x_stack, layers_to_drop)
 
@@ -302,7 +304,7 @@ stewart_bnll_ext <- extent(stewart_bnll_ext)
 
 
 ## define the filename path for the prediction raster
-filename_bnll <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_fillNAs.tif")
+filename_bnll <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/maxent_bnll_pred.tif")
 
 
 ## predict current HEC 
@@ -338,7 +340,7 @@ plot(bnll_habitat_masked)
 
 # save the masked raster
 writeRaster(bnll_habitat_masked, 
-            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_masked_lakes.tif"),
+            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/maxent_bnll_pred_masked_lakes.tif"),
             overwrite = TRUE)
 ```
 
@@ -346,7 +348,7 @@ writeRaster(bnll_habitat_masked,
 
 Transfer the model to future environmental data under `RCP4.5` and `RCP8.5` for two time periods (`2020-2049` and `2040-2069`) to predict future BNLL occurrence probability under projected environmental conditions.
 
-Produce 4 future prediction rasters for each RCP and time period combination.
+Produce 4 future prediction rasters: one for each RCP and time period combination.
 
 #### RCP45 -- 2020-2049
 
@@ -354,7 +356,7 @@ Produce 4 future prediction rasters for each RCP and time period combination.
 #### set up the prediction parameters
 
 ## load the model object trained with the baseline data
-load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/maxent_prediction_bnll_sdm.rda"))
 
 
 ## load the environmental data as a raster stack
@@ -396,7 +398,7 @@ stewart_bnll_ext <- st_transform(stewart_bnll_ext, crs(x_fut_stack))
 stewart_bnll_ext <- extent(stewart_bnll_ext)
 
 ## define the filename path for the future prediction raster
-filename_bnll_rcp45_2020_2049 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2020_2049.tif")
+filename_bnll_rcp45_2020_2049 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp45_2020_2049.tif")
 
 ## predict future HEC under RCP4.5 and 2020-2049
 dismo::predict(object = maxent_bnll,
@@ -420,7 +422,7 @@ plot(bnll_habitat_masked_rcp45_2020_2049,
 
 # save the masked future prediction raster
 writeRaster(bnll_habitat_masked_rcp45_2020_2049, 
-            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2020_2049_masked_lakes.tif"),
+            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp45_2020_2049_masked_lakes.tif"),
             overwrite = TRUE)
 ```
 
@@ -430,7 +432,7 @@ writeRaster(bnll_habitat_masked_rcp45_2020_2049,
 #### set up the prediction parameters
 
 ## load the model object trained with the baseline data
-load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/maxent_prediction_bnll_sdm.rda"))
 
 
 ## load the environmental data as a raster stack
@@ -472,7 +474,7 @@ stewart_bnll_ext <- st_transform(stewart_bnll_ext, crs(x_fut_stack))
 stewart_bnll_ext <- extent(stewart_bnll_ext)
 
 ## define the filename path for the future prediction raster
-filename_bnll_rcp45_2040_2069 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2040_2069.tif")
+filename_bnll_rcp45_2040_2069 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp45_2040_2069.tif")
 
 ## predict future HEC under RCP4.5 and 2040-2069
 dismo::predict(object = maxent_bnll,
@@ -496,7 +498,7 @@ plot(bnll_habitat_masked_rcp45_2040_2069,
 
 # save the masked future prediction raster
 writeRaster(bnll_habitat_masked_rcp45_2040_2069, 
-            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2040_2069_masked_lakes.tif"),
+            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp45_2040_2069_masked_lakes.tif"),
             overwrite = TRUE)
 ```
 
@@ -506,7 +508,7 @@ writeRaster(bnll_habitat_masked_rcp45_2040_2069,
 #### set up the prediction parameters
 
 ## load the model object trained with the baseline data
-load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/maxent_prediction_bnll_sdm.rda"))
 
 
 ## load the environmental data as a raster stack
@@ -548,7 +550,7 @@ stewart_bnll_ext <- st_transform(stewart_bnll_ext, crs(x_fut_stack))
 stewart_bnll_ext <- extent(stewart_bnll_ext)
 
 ## define the filename path for the future prediction raster
-filename_bnll_rcp85_2020_2049 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2020_2049.tif")
+filename_bnll_rcp85_2020_2049 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp85_2020_2049.tif")
 
 ## predict future HEC under RCP8.5 and 2020-2049
 dismo::predict(object = maxent_bnll,
@@ -572,7 +574,7 @@ plot(bnll_habitat_masked_rcp85_2020_2049,
 
 # save the masked future prediction raster
 writeRaster(bnll_habitat_masked_rcp85_2020_2049, 
-            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2020_2049_masked_lakes.tif"),
+            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp85_2020_2049_masked_lakes.tif"),
             overwrite = TRUE)
 ```
 
@@ -582,7 +584,7 @@ writeRaster(bnll_habitat_masked_rcp85_2020_2049,
 #### set up the prediction parameters
 
 ## load the model object trained with the baseline data
-load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_prediction_bnll_sdm.rda"))
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/maxent_prediction_bnll_sdm.rda"))
 
 
 ## load the environmental data as a raster stack
@@ -624,7 +626,7 @@ stewart_bnll_ext <- st_transform(stewart_bnll_ext, crs(x_fut_stack))
 stewart_bnll_ext <- extent(stewart_bnll_ext)
 
 ## define the filename path for the future prediction raster
-filename_bnll_rcp85_2040_2069 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2040_2069.tif")
+filename_bnll_rcp85_2040_2069 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp85_2040_2069.tif")
 
 ## predict future HEC under RCP8.5 and 2040-2069
 dismo::predict(object = maxent_bnll,
@@ -648,13 +650,13 @@ plot(bnll_habitat_masked_rcp85_2040_2069,
 
 # save the masked future prediction raster
 writeRaster(bnll_habitat_masked_rcp85_2040_2069, 
-            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2040_2069_masked_lakes.tif"),
+            here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp85_2040_2069_masked_lakes.tif"),
             overwrite = TRUE)
 ```
 
 ## Calculate MaxEnt threshold for binary predictions
 
-We will threshold continuous suitability values into suitable and non-suitable habitat using the threshold that maximizes the true positive and true negative rate. In other words, this is the threshold that **maximizes sensitivity and specificity**. This threshold will be applied to the continuous prediction rasters to create binary rasters of suitable vs. non-suitable habitat for BNLL under current and future conditions in `5_prediction_plotting.qmd`.
+We will threshold continuous suitability values into suitable and non-suitable habitat using the threshold that maximizes the true positive and true negative rate. In other words, this is the threshold that **maximizes sensitivity and specificity**. This threshold will be applied to the continuous prediction rasters to create binary rasters of suitable vs. non-suitable habitat for BNLL under current and future conditions in `5_prediction_plotting_bnll.qmd`.
 
 -   Sensitivity = proportion of presences correctly predicted as suitable habitat (true positive rate)
 -   Specificity = proportion of absences/background points correctly predicted as non-suitable habitat (true negative rate)
@@ -676,5 +678,8 @@ e <- dismo::evaluate(p = occ_coords,       # presence coordinates
 
 # calculate the threshold that maximizes sensitivity and specificity
 thresh <- dismo::threshold(e)
-thresh_spec_sens <- thresh$spec_sens   # 0.29
+thresh_spec_sens <- thresh$spec_sens   # 0.23
 ```
+
+**NOTE:** Realized this threshold is accessible/already included in the `../4_maxent_predictions_bnll/maxentResults.csv` file, but doesn't hurt to double check. 
+
