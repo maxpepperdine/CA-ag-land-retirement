@@ -197,7 +197,7 @@ This section generates a MaxEnt model using the selected feature class and regul
 
 These model objects are then used to predict baseline (historical) and future SJKF occurrence probabilities.
 
-#### Baseline (fc LQ and rm 3)
+#### Baseline (fc LQP and rm 1)
 
 ```{r}
 ## set up model parameters based on the evaluation results
@@ -231,7 +231,7 @@ args <- c("jackknife=TRUE",      # assess variable importance
           "threshold=FALSE",     # do not use threshold features
           "responsecurves=TRUE", # generate response curves
           "writeplotdata=TRUE",  # write output data used to make response curves 
-          "betamultiplier=0.5")  # this is the rm coefficient from ENMevaluate()
+          "betamultiplier=1")  # this is the rm coefficient from ENMevaluate()
 
 # path to save results
 path <- here("data/4_maxent_predictions/")
@@ -320,7 +320,7 @@ plot(pred_rast_sjkf)
 
 ```{r}
 # convert lakes sf object to SpatVector
-ca_lakes <- st_zm(ca_lakes, drop = TRUE, what = "ZM") # review what is Z dimention in multipolygon? 
+#ca_lakes <- st_zm(ca_lakes, drop = TRUE, what = "ZM") 
 ca_lakes_vect <- vect(ca_lakes)
 
 # rasterize the lakes

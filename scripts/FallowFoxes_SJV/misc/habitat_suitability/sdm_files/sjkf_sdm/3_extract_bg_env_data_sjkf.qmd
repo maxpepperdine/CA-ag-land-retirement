@@ -17,7 +17,7 @@ This script extracts environmental data to the GKR background points (created in
 -   Slope from USGS Open Topography
 
 ```{r}
-#rm(list=ls())
+rm(list=ls())
 ```
 
 ## Load packages

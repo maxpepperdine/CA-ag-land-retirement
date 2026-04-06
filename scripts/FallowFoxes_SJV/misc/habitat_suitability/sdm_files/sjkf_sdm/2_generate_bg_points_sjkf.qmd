@@ -38,7 +38,7 @@ ca_boundary <- read_sf(here("data/ca_state/ca_state_boundary_no_islands.shp"))
 
 ## Data processing
 
-#### Create 100 km buffer around SJKF occ points & then clip to SJV boundary 
+#### Create 50 km buffer around SJKF occ points (Stewart et al.)
 
 ```{r}
 # convert SJKF occ data to sf object
@@ -47,7 +47,7 @@ sjkf_sf <- st_as_sf(sjkf_occs,
                     crs = 3310)
 
 # create 50km km buffer around each occurrence point
-sjkf_buffer <- st_buffer(sjkf_sf, dist = 100000)
+sjkf_buffer <- st_buffer(sjkf_sf, dist = 50000)
 
 # combine buffers into a single polygon
 sjkf_buffer_union <- st_union(sjkf_buffer)
@@ -133,25 +133,13 @@ vertebrate_unique <- vertebrate_in_buffer %>%
   dplyr::select(gbifID, institutionCode, year, basisOfRecord, scientificName, class, 
          classKey, species)
 
-
-# clip to the SJV
-# read SJV shapefile
-sjv <- read_sf(here("data/sjv_counties/sjv_counties.shp"))
-
-# make sure CRS matches
-sjv <- st_transform(sjv, st_crs(vertebrate_unique))
-
-# keep only points within SJV
-vertebrate_sjv <- st_filter(vertebrate_unique, sjv)
-
-
 # extract coordinates for MaxEnt and env data extraction
-background_coords <- st_coordinates(vertebrate_sjv)
+background_coords <- st_coordinates(vertebrate_unique)
 colnames(background_coords) <- c("longitude", "latitude")
 
 # Create final dataframe
 background_df <- cbind(
-  as.data.frame(st_drop_geometry(vertebrate_sjv)),
+  as.data.frame(st_drop_geometry(vertebrate_unique)),
   background_coords
 )
 ```
@@ -197,7 +185,7 @@ Save the data
 
 ```{r}
 # save SF to test
-write_sf(vertebrate_sjv, here("data/sjkf_bg_points.shp"),
+write_sf(vertebrate_unique, here("data/sjkf_bg_points.shp"),
          append = FALSE)
 
 
