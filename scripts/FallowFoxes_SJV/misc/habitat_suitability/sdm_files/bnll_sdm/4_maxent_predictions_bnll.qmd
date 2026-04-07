@@ -124,9 +124,7 @@ table(block$occs.grp)
 ## Evaluating the model
 max.eval.bnll <- ENMeval::ENMevaluate(occs = occ_data, 
                                       bg = bg_data, 
-                                      tune.args = list(fc = c("L", "LQ", "LQP", 
-                                                              "LP", "Q", "QP", 
-                                                              "P"), 
+                                      tune.args = list(fc = c("L", "LQ", "Q"), 
                                                       rm = seq(0.5, 3, 0.5)),
                                       algorithm = "maxnet", 
                                       partitions = "block")
@@ -141,16 +139,25 @@ eval.results.partitions(max.eval.bnll) # assess model performance for each parti
 
 # clean results
 results <- eval.results(max.eval.bnll) %>%
-  dplyr::select(fc, rm, auc.train, auc.val.avg, AICc, delta.AICc, 
-                or.10p.avg, or.mtp.avg, cbi.val.avg) %>% 
-  arrange(AICc) %>% 
+  dplyr::select(fc, rm,
+                # higher better; demonstrates discriminatory performance on withheld data
+                auc.val.avg, 
+                # we want lower; models w/ low AUC diff likely transfer better
+                auc.diff.avg, 
+                # justify model selection; rewards fit to current data
+                delta.AICc, 
+                # good model should have a value close to 0.1
+                or.10p.avg, 
+                # measures performance on training data
+                cbi.val.avg) %>% 
+  arrange(delta.AICc) %>% 
   mutate(across(where(is.numeric), \(x) round(x, digits = 3)))
 
 # make a nice table
 kable(results, row.names = FALSE) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
                 full_width = FALSE) %>%
-  row_spec(1, bold = TRUE)  # highlight the top model based on AIC
+  row_spec(3, bold = TRUE)  # highlight the top model based on AIC
 
 
 # plot stat results across values of the tuning parameters
@@ -381,7 +388,7 @@ names(x_fut_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm",
 # make sure the raster stack is in EPSG:3310
 x_fut_stack <- projectRaster(x_fut_stack, crs = crs(env_raster))
 crs(x_fut_stack)
-plot(x_fut_stack)
+#plot(x_fut_stack)
 
 ## define the extent as the extent from the Stewart SDM
 
@@ -457,7 +464,7 @@ names(x_fut_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm",
 # make sure the raster stack is in EPSG:3310
 x_fut_stack <- projectRaster(x_fut_stack, crs = crs(env_raster))
 crs(x_fut_stack)
-plot(x_fut_stack)
+#plot(x_fut_stack)
 
 ## define the extent as the extent from the Stewart SDM
 
@@ -609,7 +616,7 @@ names(x_fut_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm",
 # make sure the raster stack is in EPSG:3310
 x_fut_stack <- projectRaster(x_fut_stack, crs = crs(env_raster))
 crs(x_fut_stack)
-plot(x_fut_stack)
+#plot(x_fut_stack)
 
 ## define the extent as the extent from the Stewart SDM
 
@@ -678,8 +685,7 @@ e <- dismo::evaluate(p = occ_coords,       # presence coordinates
 
 # calculate the threshold that maximizes sensitivity and specificity
 thresh <- dismo::threshold(e)
-thresh_spec_sens <- thresh$spec_sens   # 0.23
+thresh_spec_sens <- thresh$spec_sens   # 0.21
 ```
 
-**NOTE:** Realized this threshold is accessible/already included in the `../4_maxent_predictions_bnll/maxentResults.csv` file, but doesn't hurt to double check. 
-
+**NOTE:** Realized this threshold is accessible/already included in the `../4_maxent_predictions_bnll/maxentResults.csv` file, but doesn't hurt to double check.

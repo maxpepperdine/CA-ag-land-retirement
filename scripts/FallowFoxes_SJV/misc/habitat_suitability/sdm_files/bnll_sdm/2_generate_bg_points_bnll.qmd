@@ -30,7 +30,7 @@ library(sf)         # for spatial data processing
 
 ```{r}
 # Load BNLL occurrence data
-bnll_occs <- read_csv(here("data/raw/occurrence_points/bnll/wallace/bnll_occur_wallace.csv"))
+bnll_occs <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/1_extract_occ_env_data_bnll/bnll_occ_env_data.csv"))
 ```
 
 ## Data processing
@@ -41,13 +41,10 @@ bnll_occs <- read_csv(here("data/raw/occurrence_points/bnll/wallace/bnll_occur_w
 # convert BNLL occ data to sf object
 bnll_sf <- st_as_sf(bnll_occs, 
                     coords = c("longitude", "latitude"), 
-                    crs = 4326)
-
-# transform to projected CRS for buffering (EPSG:3310 - NAD83 / California Albers)
-bnll_sf_proj <- st_transform(bnll_sf, crs = 3310)
+                    crs = 3310)
 
 # create 50 km buffer around each occurrence point
-bnll_buffer <- st_buffer(bnll_sf_proj, dist = 50000)
+bnll_buffer <- st_buffer(bnll_sf, dist = 50000)
 
 # combine buffers into a single polygon
 bnll_buffer_union <- st_union(bnll_buffer)
@@ -119,7 +116,8 @@ vertebrate_sf <- st_as_sf(vertebrate_data,
                           coords = c("decimalLongitude", "decimalLatitude"),
                           crs = 4326) %>% 
   # remove all BNLL occ points
-  filter(species != "Gambelia sila")
+  filter(species != "Gambelia sila") %>% 
+  filter(taxonKey != 5227128)
 
 
 # intersect occ points with the original precise buffer
@@ -127,30 +125,25 @@ vertebrate_sf <- st_as_sf(vertebrate_data,
 vertebrate_in_buffer <- st_intersection(vertebrate_sf, bnll_buffer_wgs84)
 
 # remove duplicates
-vertebrate_unique <- vertebrate_in_buffer %>%
-  distinct(geometry, .keep_all = TRUE) %>% 
-  # save relevant columns only
-  dplyr::select(gbifID, institutionCode, year, basisOfRecord, scientificName, class, 
-         classKey, species)
+vertebrate_coords <- vertebrate_in_buffer %>%
+  st_drop_geometry() %>%
+  bind_cols(
+    st_coordinates(vertebrate_in_buffer) %>%
+      as.data.frame() %>%
+      rename(longitude = X, latitude = Y)
+  )
 
-# extract coordinates for MaxEnt and env data extraction
-background_coords <- st_coordinates(vertebrate_unique)
-colnames(background_coords) <- c("longitude", "latitude")
-
-# Create final dataframe
-background_df <- cbind(
-  as.data.frame(st_drop_geometry(vertebrate_unique)),
-  background_coords
-)
+# de-duplicate on numeric coords
+background_df <- vertebrate_coords %>%
+  distinct(longitude, latitude, .keep_all = TRUE) %>%
+  dplyr::select(gbifID, institutionCode, year, basisOfRecord, 
+                scientificName, class, classKey, species,
+                longitude, latitude)
 ```
 
 Save the data
 
 ```{r}
-# save SF to test
-write_sf(vertebrate_unique, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points_bnll/bnll_bg_points.shp"),
-         append = FALSE)
-
 # save final background points to CSV
 write_csv(background_df, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/2_generate_bg_points_bnll/bnll_bg_points.csv"))
 ```

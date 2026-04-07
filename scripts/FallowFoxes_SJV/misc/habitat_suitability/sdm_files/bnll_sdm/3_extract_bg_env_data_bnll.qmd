@@ -11,9 +11,9 @@ editor_options:
 
 This script extracts environmental data to the BNLL background points (created in `2_generate_bg_points_bnll.qmd`) for use in MaxEnt modeling. The environmental data includes:
 
--   BCM climate (AET, PPT)
--   gSSURGO soil data (pH, % clay, EC)
--   Slope
+-   BCM climate (AET, CWD, PPT, TMN, TMX)
+-   gSSURGO soil data (pH, % clay, % silt, % sand, EC)
+-   Slope from USGS Open Topography
 
 ```{r}
 rm(list=ls())
@@ -42,7 +42,7 @@ names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave
                         "ec_dS_m_0_10cm", "pet1991_2020_ave", "pH_0_10cm", "ppt1991_2020_ave", 
                         "sand_pct_0_10cm", "silt_pct_0_10cm", "slope", 
                         "tmn1991_2020_ave", "tmx1991_2020_ave")
-plot(env_rasters)
+#plot(env_rasters)
 ```
 
 #### BNLL background points (created in `2_generate_bg_points_bnll.qmd`)
@@ -61,86 +61,23 @@ bnll_bg_vect <- project(bnll_bg_vect, crs(env_rasters))
 crs(bnll_bg_vect)
 ```
 
-#### Spatial thinning of background points (1 km)
+#### Spatial thinning of background points (270 m)
 
-Thin background points by 1 km to reduce spatial autocorrelation.
-
-```{r}
-# # convert back to lat/lon for spThin (it requires decimal degrees)
-# bnll_bg_latlon <- project(bnll_bg_vect, "EPSG:4326")
-# bnll_bg_df <- as.data.frame(bnll_bg_latlon, geom = "XY")
-# # add species dummy column for spThin
-# bnll_bg_df$species <- "background"
-# 
-# # run spatial thinning with 1 km distance
-# thinned_data <- spThin::thin(
-#   loc.data = bnll_bg_df,
-#   lat.col = "y",  # latitude column
-#   long.col = "x", # longitude column
-#   spec.col = "species", # dummy species column
-#   thin.par = 1,   # thinning distance in km
-#   reps = 10,     # number of replications
-#   locs.thinned.list.return = TRUE,
-#   write.files = FALSE,
-#   write.log.file = FALSE
-# )
-# 
-# # select the thinned dataset with the most points
-# max_points <- which.max(sapply(thinned_data, nrow))
-# bnll_bg_thinned_df <- thinned_data[[max_points]]
-# 
-# # convert thinned points back to SpatVector and match original CRS
-# bnll_bg_thinned_vect <- vect(bnll_bg_thinned_df, 
-#                              geom = c("Longitude", "Latitude"), 
-#                              crs = "EPSG:4326")
-# 
-# # project to match env rasters
-# bnll_bg_thinned_vect <- project(bnll_bg_thinned_vect, crs(env_rasters))
-# crs(bnll_bg_thinned_vect)  # check crs
-```
-
-Having RAM issues when using `spThin` on larger datasets, so using grid-based thinning instead.
+Thin background points to one per 270 m raster cell to match occurrence thinning and environmental predictor resolution.
 
 ```{r}
-# convert back to lat/lon
-bnll_bg_latlon <- project(bnll_bg_vect, "EPSG:4326")
-bnll_bg_df <- as.data.frame(bnll_bg_latlon, geom = "XY")
+# Thin background points to one per raster cell (270 m)
+# get the raster cell ID for each background point
+cell_ids <- terra::cellFromXY(env_rasters[[1]], crds(bnll_bg_vect))
 
-# convert to sf object
-bnll_bg_sf <- st_as_sf(bnll_bg_df, 
-                      coords = c("x", "y"), 
-                      crs = 4326)
+# shuffle so the kept point per cell is random
+set.seed(123)
+random_order <- sample(seq_len(nrow(bnll_bg_vect)))
+bnll_bg_shuffled <- bnll_bg_vect[random_order, ]
+cell_ids_shuffled <- cell_ids[random_order]
 
-# project to EPSG 3310 for distance calculations
-bnll_bg_projected <- st_transform(bnll_bg_sf, crs = 3310)
-
-# create a grid ID based on 1km cells
-grid_size <- 1000  # 1 km in meters
-
-bnll_bg_projected <- bnll_bg_projected %>%
-  mutate(
-    grid_x = floor(st_coordinates(.)[,1] / grid_size),
-    grid_y = floor(st_coordinates(.)[,2] / grid_size),
-    grid_id = paste(grid_x, grid_y, sep = "_")
-  )
-
-# keep one random point per grid cell
-set.seed(123)  # for reproducibility
-bnll_bg_thinned_sf <- bnll_bg_projected %>%
-  group_by(grid_id) %>%
-  slice_sample(n = 1) %>%
-  ungroup() %>%
-  dplyr::select(-grid_x, -grid_y, -grid_id)
-
-# transform back to WGS84
-bnll_bg_thinned_sf <- st_transform(bnll_bg_thinned_sf, crs = 4326)
-
-# convert thinned points back to SpatVector and match original CRS
-bnll_bg_thinned_vect <- vect(bnll_bg_thinned_sf)
-
-# project to match env rasters
-bnll_bg_thinned_vect <- project(bnll_bg_thinned_vect, crs(env_rasters))
-crs(bnll_bg_thinned_vect)  # check crs
+# keep first (random) point per cell
+bnll_bg_thinned_vect <- bnll_bg_shuffled[!duplicated(cell_ids_shuffled), ]
 ```
 
 ## Extract environmental data to background points
@@ -168,8 +105,4 @@ bnll_bg_env_df <- bnll_bg_env_sf %>%
 ```{r}
 # save final background points with env data to CSV
 write_csv(bnll_bg_env_df, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/3_extract_bg_env_data_bnll/bnll_bg_env_data.csv"))
-
-# # save SF object
-# write_sf(bnll_bg_env_sf, here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/3_extract_bg_env_data_bnll/bnll_bg_env_data.shp"),
-#          append = FALSE)
 ```
