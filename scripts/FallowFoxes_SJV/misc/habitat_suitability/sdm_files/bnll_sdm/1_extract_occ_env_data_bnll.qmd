@@ -16,7 +16,7 @@ This script extracts environmental data to blunt-nosed leopard lizard (BNLL) occ
 -   gSSURGO soil data (pH, % clay, % silt, % sand, EC)
 -   Slope from USGS Open Topography
 
-We will also spatially thin the occurrence points by 1 km to reduce spatial autocorrelation.
+We will also spatially thin the occurrence points to on epoint per 270 m grid cell to reduce spatial autocorrelation.
 
 ```{r}
 rm(list=ls())

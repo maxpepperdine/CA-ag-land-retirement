@@ -15,7 +15,7 @@ rm(list = ls())
 
 ## Overview
 
-This script generates the bg data for habitat suitability modeling for the giant kangaroo rat (*Dipodomys ingens*) in the San Joaquin Valley, CA. It will load our GKR occurrence data, generate a 50 km buffer around each occurrence point, and then find all geographically unique vertebrate (phylum Vertebrata) occurrence points within that buffer. These will be the background points for the GKR MaxEnt model.
+This script generates the bg data for habitat suitability modeling for the SJKF in the San Joaquin Valley, CA. It will load our SJKF occurrence data, generate a 50 km buffer around each occurrence point, and then find all geographically unique vertebrate (phylum Vertebrata) occurrence points within that buffer. These will be the background points for the SJKF MaxEnt model.
 
 ## Load packages
 
@@ -30,10 +30,7 @@ library(sf)         # for spatial data processing
 
 ```{r}
 # Load SJFK occurrence data
-sjkf_occs <- read_csv(here("data/sjkf_occ_env_data.csv"))
-
-# CA boundary
-ca_boundary <- read_sf(here("data/ca_state/ca_state_boundary_no_islands.shp"))
+sjkf_occs <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/1_extract_occ_env_data_sjkf/sjkf_occ_env_data.csv"))
 ```
 
 ## Data processing
@@ -52,16 +49,8 @@ sjkf_buffer <- st_buffer(sjkf_sf, dist = 50000)
 # combine buffers into a single polygon
 sjkf_buffer_union <- st_union(sjkf_buffer)
 
-# clip to CA boundary to remove ocean areas
-sjkf_buffer_union <- st_intersection(sjkf_buffer_union, 
-                                    st_transform(ca_boundary, crs = 3310)) 
-
 # transform buffer back to WGS84
 sjkf_buffer_wgs84 <- st_transform(sjkf_buffer_union, crs = 4326)
-
-# # save buffer to file for testing
-# write_sf(gkr_buffer_wgs84, here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/2_generate_bg_points_gkr/gkr_100km_buffer.shp"), 
-#          append = FALSE)
 ```
 
 ```{r}
@@ -69,13 +58,11 @@ sjkf_buffer_wgs84 <- st_transform(sjkf_buffer_union, crs = 4326)
 sjkf_buffer_wkt <- st_as_text(st_geometry(sjkf_buffer_wgs84)[[1]])
 nchar(sjkf_buffer_wkt)  # check length of WKT string
 
-
-st_geometry_type(sjkf_buffer_wgs84)
-st_is_valid(sjkf_buffer_wgs84)
-
+# st_geometry_type(sjkf_buffer_wgs84)
+# st_is_valid(sjkf_buffer_wgs84)
 
 # buffer is too long for rgbif, so simplify it
-buffer_simplify <- st_simplify(sjkf_buffer_wgs84, dTolerance = 1000)
+buffer_simplify <- st_simplify(sjkf_buffer_wgs84, dTolerance = 750)
 buffer_simplify_wkt <- st_as_text(st_geometry(buffer_simplify)[[1]])
 nchar(buffer_simplify_wkt)  # check length of WKT string
 ```
@@ -84,9 +71,9 @@ nchar(buffer_simplify_wkt)  # check length of WKT string
 
 ```{r}
 # set up GBIF credentials (one-time setup)
-options(gbif_user = "stellawing")
-options(gbif_pwd = "Lire54321$")
-options(gbif_email = "stellawing@ucsb.edu")
+options(gbif_user = "mpepperdine")
+options(gbif_pwd = "Pumbaason@20")
+options(gbif_email = "max.pepperdine@gmail.com")
 
 # use rgbif::occ_download to acquire background points
 download_key <- occ_download(
@@ -96,7 +83,7 @@ download_key <- occ_download(
   pred_gte("year", 1990),
   pred_lte("year", 2025),
   pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "MACHINE_OBSERVATION", "OBSERVATION")),
-  pred_lte("coordinateUncertaintyInMeters", 200),
+  pred_lte("coordinateUncertaintyInMeters", 100),
   pred_within(buffer_simplify_wkt)  # Your buffer
 )
 
@@ -118,7 +105,6 @@ vertebrate_sf <- st_as_sf(vertebrate_data,
                           coords = c("decimalLongitude", "decimalLatitude"),
                           crs = 4326) %>% 
   # remove all SJKF occ points
-  filter(species != "Vulpes macrotis") %>% 
   filter(taxonKey != 6164308)
 
 
@@ -127,68 +113,61 @@ vertebrate_sf <- st_as_sf(vertebrate_data,
 vertebrate_in_buffer <- st_intersection(vertebrate_sf, sjkf_buffer_wgs84)
 
 # remove duplicates
-vertebrate_unique <- vertebrate_in_buffer %>%
-  distinct(geometry, .keep_all = TRUE) %>% 
-  # save relevant columns only
-  dplyr::select(gbifID, institutionCode, year, basisOfRecord, scientificName, class, 
-         classKey, species)
+vertebrate_coords <- vertebrate_in_buffer %>%
+  st_drop_geometry() %>%
+  bind_cols(
+    st_coordinates(vertebrate_in_buffer) %>%
+      as.data.frame() %>%
+      rename(longitude = X, latitude = Y)
+  )
 
-# extract coordinates for MaxEnt and env data extraction
-background_coords <- st_coordinates(vertebrate_unique)
-colnames(background_coords) <- c("longitude", "latitude")
-
-# Create final dataframe
-background_df <- cbind(
-  as.data.frame(st_drop_geometry(vertebrate_unique)),
-  background_coords
-)
+# de-duplicate on numeric coords
+background_df <- vertebrate_coords %>%
+  distinct(longitude, latitude, .keep_all = TRUE) %>%
+  dplyr::select(gbifID, institutionCode, year, basisOfRecord, 
+                scientificName, class, classKey, species,
+                longitude, latitude)
 ```
 
 ```{r}
-# checking  bg pointy locations 
-
-library(terra)
-
-env_rasters <- rast(list.files(here("data/baseline/sjkf"), 
-                               pattern = ".tif$", 
-                               full.names = TRUE))
-# fix names
-names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
-                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
-                        "sand_pct_0_10cm", "silt_pct_0_10cm", "slope", 
-                        "tmn1991_2020_ave", "tmx1991_2020_ave")
-
-# Select precipitation raster
-r <- env_rasters[["ppt1991_2020_ave"]]
-
-# Convert background_df to SpatVector
-bg_vect <- vect(background_df,
-                geom = c("longitude", "latitude"),
-                crs = "EPSG:4326")
-
-# Reproject to match raster CRS
-bg_vect <- project(bg_vect, crs(r))
-
-# Plot raster
-plot(r,
-     main = "Background Points on Mean Annual Precipitation")
-
-# Add background points
-points(bg_vect,
-       pch = 16,
-       col = "red",
-       cex = 0.4)
-
+# # checking bg points locations 
+# 
+# library(terra)
+# 
+# env_rasters <- rast(list.files(here("data/baseline/sjkf"), 
+#                                pattern = ".tif$", 
+#                                full.names = TRUE))
+# # fix names
+# names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
+#                         "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+#                         "sand_pct_0_10cm", "silt_pct_0_10cm", "slope", 
+#                         "tmn1991_2020_ave", "tmx1991_2020_ave")
+# 
+# # Select precipitation raster
+# r <- env_rasters[["ppt1991_2020_ave"]]
+# 
+# # Convert background_df to SpatVector
+# bg_vect <- vect(background_df,
+#                 geom = c("longitude", "latitude"),
+#                 crs = "EPSG:4326")
+# 
+# # Reproject to match raster CRS
+# bg_vect <- project(bg_vect, crs(r))
+# 
+# # Plot raster
+# plot(r,
+#      main = "Background Points on Mean Annual Precipitation")
+# 
+# # Add background points
+# points(bg_vect,
+#        pch = 16,
+#        col = "red",
+#        cex = 0.4)
 ```
 
 Save the data
 
 ```{r}
-# save SF to test
-write_sf(vertebrate_unique, here("data/sjkf_bg_points.shp"),
-         append = FALSE)
-
-
 # save final background points to CSV
-write_csv(background_df, here("data/sjkf_bg_points.csv"))
+write_csv(background_df, here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/2_generate_bg_points_sjkf/sjkf_bg_points.csv"))
 ```

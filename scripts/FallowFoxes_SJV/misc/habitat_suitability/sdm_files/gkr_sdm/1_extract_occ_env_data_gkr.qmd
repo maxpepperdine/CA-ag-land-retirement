@@ -78,7 +78,7 @@ gkr_occ_vect <- project(gkr_occ_vect, crs(env_rasters))
 
 #### Spatial thinning of occurrence points
 
-Thin occurrence points to 270 m. This reduces spatial autocorrelation and sampling bias, and matches the resolution of our environmental data.
+Thin occurrence points to one per 270 m grid cell. This reduces spatial autocorrelation and sampling bias, and matches the resolution of our environmental data.
 
 ```{r}
 # Thin occurrence points to one per raster cell (270 m)

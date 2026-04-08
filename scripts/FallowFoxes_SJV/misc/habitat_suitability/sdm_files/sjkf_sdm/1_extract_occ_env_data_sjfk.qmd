@@ -12,11 +12,11 @@ editor_options:
 
 This script acquires San Joaquin Kit Fox (SJKF) occurrence points from GBIF using the `rgbif` package, and then extracts environmental data to the SJKF occurrence points for use in MaxEnt modeling. The environmental data includes:
 
--   BCM climate (AET, CWD, PPT)
--   gSSURGO soil data (pH, % clay, % silt, EC)
+-   BCM climate (AET, CWD, PPT, TMN, TMX)
+-   gSSURGO soil data (pH, % clay, % silt, % sand, EC)
 -   Slope from USGS Open Topography
 
-We will also spatially thin the occurrence points by 1 km to reduce spatial autocorrelation.
+We will also spatially thin the occurrence points to on epoint per 270 m grid cell to reduce spatial autocorrelation.
 
 ```{r}
 rm(list=ls())
@@ -39,12 +39,12 @@ library(rgbif)      # for GBIF data download
 
 ```{r}
 # load all env rasters
-env_rasters <- rast(list.files(here("data/baseline/sjkf"), 
+env_rasters <- rast(list.files(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline"), 
                                pattern = ".tif$", 
                                full.names = TRUE))
 # fix names
 names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
-                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "ec_dS_m_0_10cm", "pet1991_2020_ave", "pH_0_10cm", "ppt1991_2020_ave", 
                         "sand_pct_0_10cm", "silt_pct_0_10cm", "slope", 
                         "tmn1991_2020_ave", "tmx1991_2020_ave")
 plot(env_rasters)
@@ -59,27 +59,26 @@ sjkf_occs <- occ_search(
   hasCoordinate = TRUE,
   hasGeospatialIssue = FALSE,
   year = "1990,2025", 
-  basisOfRecord = "HUMAN_OBSERVATION;OBSERVATION;MACHINE_OBSERVATION",
+  basisOfRecord = "HUMAN_OBSERVATION;OBSERVATION",
   limit = 10000
 )
 
 # convert to data frame
 sjkf_occ_df <- sjkf_occs$data %>%
-  dplyr::select(gbifID, decimalLongitude, decimalLatitude, institutionCode, year, 
+  dplyr::select(gbifID, decimalLongitude, decimalLatitude, institutionCode, year,
          basisOfRecord, scientificName)
 
 # convert occ points to SpatVector
-sjkf_occ_vect <- vect(sjkf_occ_df, 
-                     geom = c("decimalLongitude", "decimalLatitude"), 
+sjkf_occ_vect <- vect(sjkf_occ_df,
+                     geom = c("decimalLongitude", "decimalLatitude"),
                      crs = "EPSG:4326")
 
 # make sure crs matches env rasters
 sjkf_occ_vect <- project(sjkf_occ_vect, crs(env_rasters))
-
 ```
 
 ```{r}
-# checking  occ pointy locations 
+# QC: checking occ points locations 
 
 # Select one raster layer by name
 r <- env_rasters[["ppt1991_2020_ave"]]
@@ -93,48 +92,68 @@ points(sjkf_occ_vect,
        pch = 20,
        col = "red",
        cex = 0.6)
-
 ```
 
 #### Spatial thinning of occurrence points
 
-Thin occurrence points to 1 km minimum distance. This reduces spatial autocorrelation and sampling bias.
+Thin occurrence points to one per 270 m grid cell. This reduces spatial autocorrelation and sampling bias, and matches the resolution of our environmental data.
 
 ```{r}
-# convert back to lat/lon for spThin (it requires decimal degrees)
-sjkf_occ_latlon <- project(sjkf_occ_vect, "EPSG:4326")
-sjkf_occ_df <- as.data.frame(sjkf_occ_latlon, geom = "XY")
+# Thin occurrence points to one per raster cell (270 m)
+# This ensures thinning matches the resolution of the environmental predictors
 
-# run spatial thinning with 1 km distance
-# thin.par = 1 means 1 km minimum distance between points
-# reps = 100 means run 100 iterations to find best thinning solution
-# locs.thinned.list.return = TRUE returns all replicates
-# write.files = FALSE prevents writing files automatically
-thinned_data <- spThin::thin(
-  loc.data = sjkf_occ_df,
-  lat.col = "y",  # latitude column
-  long.col = "x", # longitude column
-  spec.col = "scientificName", 
-  thin.par = 1,   # thinning distance in km
-  reps = 100,     # number of replications
-  locs.thinned.list.return = TRUE,
-  write.files = FALSE,
-  write.log.file = FALSE
-)
+# get the raster cell ID for each occurrence point
+cell_ids <- terra::cellFromXY(env_rasters[[1]], crds(sjkf_occ_vect))
 
-# select the thinned dataset with the most points
-# (spThin returns a list of different thinning solutions)
-max_points <- which.max(sapply(thinned_data, nrow))
-sjkf_thinned_df <- thinned_data[[max_points]]
+# shuffle points so the "kept" point per cell is random
+set.seed(123)
+random_order <- sample(seq_len(nrow(sjkf_occ_vect)))
+sjkf_occ_shuffled <- sjkf_occ_vect[random_order, ]
+cell_ids_shuffled <- cell_ids[random_order]
 
-# convert thinned points back to SpatVector and match original CRS
-sjkf_thinned_vect <- vect(sjkf_thinned_df, 
-                          geom = c("Longitude", "Latitude"), 
-                          crs = "EPSG:4326")
+# keep first (now random) point per cell
+sjkf_thinned_vect <- sjkf_occ_shuffled[!duplicated(cell_ids_shuffled), ]
+crs(sjkf_thinned_vect)
 
-# project to match env rasters
-sjkf_thinned_vect <- project(sjkf_thinned_vect, crs(env_rasters))
-crs(sjkf_thinned_vect)  # check crs
+
+#===============================================================================
+# old thinning approach; remove later
+#===============================================================================
+
+# # convert back to lat/lon for spThin (it requires decimal degrees)
+# sjkf_occ_latlon <- project(sjkf_occ_vect, "EPSG:4326")
+# sjkf_occ_df <- as.data.frame(sjkf_occ_latlon, geom = "XY")
+# 
+# # run spatial thinning with 1 km distance
+# # thin.par = 1 means 1 km minimum distance between points
+# # reps = 100 means run 100 iterations to find best thinning solution
+# # locs.thinned.list.return = TRUE returns all replicates
+# # write.files = FALSE prevents writing files automatically
+# thinned_data <- spThin::thin(
+#   loc.data = sjkf_occ_df,
+#   lat.col = "y",  # latitude column
+#   long.col = "x", # longitude column
+#   spec.col = "scientificName", 
+#   thin.par = 1,   # thinning distance in km
+#   reps = 100,     # number of replications
+#   locs.thinned.list.return = TRUE,
+#   write.files = FALSE,
+#   write.log.file = FALSE
+# )
+# 
+# # select the thinned dataset with the most points
+# # (spThin returns a list of different thinning solutions)
+# max_points <- which.max(sapply(thinned_data, nrow))
+# sjkf_thinned_df <- thinned_data[[max_points]]
+# 
+# # convert thinned points back to SpatVector and match original CRS
+# sjkf_thinned_vect <- vect(sjkf_thinned_df, 
+#                           geom = c("Longitude", "Latitude"), 
+#                           crs = "EPSG:4326")
+# 
+# # project to match env rasters
+# sjkf_thinned_vect <- project(sjkf_thinned_vect, crs(env_rasters))
+# crs(sjkf_thinned_vect)  # check crs
 ```
 
 ## Extract environmental data to occurrence points
@@ -153,16 +172,13 @@ sjkf_occ_env_df <- sjkf_occ_env_sf %>%
   mutate(longitude = st_coordinates(sjkf_occ_env_sf)[,1],
          latitude = st_coordinates(sjkf_occ_env_sf)[,2], 
          .before = "aet1991_2020_ave") %>%
-  st_drop_geometry()
+  st_drop_geometry() %>% 
+  dplyr::select(6:19)
 ```
 
 ## Save the data
 
 ```{r}
 # save final occurrence points with env data to CSV
-write_csv(sjkf_occ_env_df, here("data/sjkf_occ_env_data.csv")) # edit pathway
-
-# save SF object
-# write_sf(sjkf_occ_env_df, here("data/sjkf_occ_env_data.shp"), # edit pathway
-         # append = FALSE)
+write_csv(sjkf_occ_env_df, here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/1_extract_occ_env_data_sjkf/sjkf_occ_env_data.csv"))
 ```
