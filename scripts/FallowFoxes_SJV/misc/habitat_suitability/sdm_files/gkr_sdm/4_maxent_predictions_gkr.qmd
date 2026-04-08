@@ -157,7 +157,7 @@ results <- eval.results(max.eval.gkr) %>%
 kable(results, row.names = FALSE) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
                 full_width = FALSE) %>%
-  row_spec(5, bold = TRUE)  # highlight the top model
+  row_spec(3, bold = TRUE)  # highlight the top model
 
 
 # plot stat results across values of the tuning parameters
@@ -184,7 +184,7 @@ evalplot.stats(e = max.eval.gkr,
 
 
 #==============================================================================
-# Best model: fc.LQ_rm.2.5
+# Best model: fc.LQ_rm.3
 #==============================================================================
 
 
@@ -202,11 +202,11 @@ After identifying the best model based on the evaluation results, we'll run the 
 
 #### Run MaxEnt with the selected model
 
-This section generates a MaxEnt model using the selected feature class and regularization multiplier from the evaluation results above that produced the highest performing models (`fc.LQ_rm.2.5`).
+This section generates a MaxEnt model using the selected feature class and regularization multiplier from the evaluation results above that produced the highest performing models (`fc.LQ_rm.3`).
 
 These model objects are then used to predict baseline (historical) and future GKR occurrence probabilities.
 
-#### Baseline (`fc.LQ_rm.2.5`)
+#### Baseline (`fc.LQ_rm.3`)
 
 ```{r}
 ## set up model parameters based on the evaluation results
@@ -235,7 +235,7 @@ args <- c("jackknife=TRUE",      # assess variable importance
           "threshold=FALSE",     # do not use threshold features
           "responsecurves=TRUE", # generate response curves
           "writeplotdata=TRUE",  # write output data used to make response curves 
-          "betamultiplier=2.5")  # this is the rm coefficient from ENMevaluate()
+          "betamultiplier=3")    # this is the rm coefficient from ENMevaluate()
 
 # path to save results
 path <- here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/")
@@ -405,7 +405,7 @@ x_fut_stack <- dropLayer(x_fut_stack, layers_to_drop)
 # make sure the raster stack is in EPSG:3310
 x_fut_stack <- projectRaster(x_fut_stack, crs = crs(env_raster))
 crs(x_fut_stack)
-plot(x_fut_stack)
+#plot(x_fut_stack)
 
 
 ## define the filename path for the future prediction raster
@@ -647,7 +647,7 @@ e <- dismo::evaluate(p = occ_coords,       # presence coordinates
 
 # calculate the threshold that maximizes sensitivity and specificity
 thresh <- dismo::threshold(e)
-thresh_spec_sens <- thresh$spec_sens   # 0.42
+thresh_spec_sens <- thresh$spec_sens   # 0.47
 ```
 
 **NOTE:** Realized this threshold is accessible/already included in the `../4_maxent_predictions_gkr/maxentResults.csv` file, but doesn't hurt to double check.

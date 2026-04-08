@@ -157,8 +157,7 @@ results <- eval.results(max.eval.bnll) %>%
 kable(results, row.names = FALSE) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
                 full_width = FALSE) %>%
-  row_spec(3, bold = TRUE)  # highlight the top model based on AIC
-
+  row_spec(1, bold = TRUE)  # highlight the selected model
 
 # plot stat results across values of the tuning parameters
 evalplot.stats(e = max.eval.bnll, 
@@ -540,7 +539,7 @@ names(x_fut_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm",
 # make sure the raster stack is in EPSG:3310
 x_fut_stack <- projectRaster(x_fut_stack, crs = crs(env_raster))
 crs(x_fut_stack)
-plot(x_fut_stack)
+#plot(x_fut_stack)
 
 ## define the extent as the extent from the Stewart SDM
 

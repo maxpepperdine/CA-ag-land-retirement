@@ -3,6 +3,8 @@ title: "SJKF MaxEnt prediction generation 2.0"
 author: "Stella Wing"
 format: html
 editor: visual
+editor_options: 
+  chunk_output_type: console
 ---
 
 ## Overview
@@ -34,20 +36,20 @@ library(kableExtra) # for nice tables
 
 ```{r}
 # load occurrence data with env data extracted
-occ_data <- read_csv(here("data/sjkf_occ_env_data.csv"))
+occ_data <- read_csv("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/1_extract_occ_env_data_sjkf/sjkf_occ_env_data.csv")
 
 # load background data with env data extracted
-bg_data <- read_csv(here("data/sjkf_bg_env_data.csv"))
+bg_data <- read_csv(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/3_extract_bg_env_data_sjkf/sjkf_bg_env_data.csv"))
 ```
 
 ```{r}
 # env pred raster for reprojecting
-env_raster <- rast(here("data/baseline/sjkf/aet1991_2020_ave_CA_270m.tif"))
+env_raster <- rast(here("data/intermediate/misc/habitat_suitability/env_predictors/baseline/aet1991_2020_ave_CA_270m.tif"))
 ```
 
 ```{r}
 # CA lakes shapefile for masking the final prediction rasters
-ca_lakes <- read_sf(here("data/California_Lakes/California_Lakes.shp")) %>% 
+ca_lakes <- read_sf(here("data/raw/California_Lakes/California_Lakes.shp")) %>%
   st_transform(crs(env_raster))
 ```
 
@@ -79,7 +81,7 @@ Assessing the correlation between environmental variables for MaxEnt. A Pearson 
 ```{r}
 # select only the environmental variables
 env_data_corr <- full_data %>%
-  dplyr::select(4:14)
+  dplyr::select(4:15)
 
 # create a correlation matrix
 cor_matrix <- cor(env_data_corr, # binded occ & bg data with only env variables
@@ -105,10 +107,10 @@ After selecting the best model, we can use the `maxent()` function from the `dis
 ```{r}
 # remove unwanted variables from occ & bg data
 occ_data <- occ_data %>%
-  dplyr::select(-c(sand_pct_0_10cm, silt_pct_0_10cm, 
+  dplyr::select(-c(sand_pct_0_10cm, silt_pct_0_10cm, pet1991_2020_ave, 
                    tmn1991_2020_ave, tmx1991_2020_ave))
 bg_data <- bg_data %>%
-  dplyr::select(-c(sand_pct_0_10cm, silt_pct_0_10cm, 
+  dplyr::select(-c(sand_pct_0_10cm, silt_pct_0_10cm, pet1991_2020_ave, 
                    tmn1991_2020_ave, tmx1991_2020_ave))
 
 # set up the block for spatial partitioning
@@ -121,9 +123,7 @@ table(block$occs.grp)
 ## Evaluating the model
 max.eval.sjkf <- ENMeval::ENMevaluate(occs = occ_data, 
                                       bg = bg_data, 
-                                      tune.args = list(fc = c("L", "LQ", "LQP", 
-                                                              "LP", "Q", "QP", 
-                                                              "P"), 
+                                      tune.args = list(fc = c("L", "LQ", "Q"), 
                                                       rm = seq(0.5, 3, 0.5)),
                                       algorithm = "maxnet", 
                                       partitions = "block")
@@ -139,9 +139,18 @@ eval.results.partitions(max.eval.sjkf) # assess model performance for each parti
 
 # clean results
 results <- eval.results(max.eval.sjkf) %>%
-  dplyr::select(fc, rm, tune.args, auc.train, auc.val.avg, AICc, delta.AICc, 
-                or.10p.avg, or.mtp.avg, cbi.val.avg) %>% 
-  arrange(AICc) %>% 
+  dplyr::select(fc, rm,
+                # higher better; demonstrates discriminatory performance on withheld data
+                auc.val.avg, 
+                # we want lower; models w/ low AUC diff likely transfer better
+                auc.diff.avg, 
+                # justify model selection; rewards fit to current data
+                delta.AICc, 
+                # good model should have a value close to 0.1
+                or.10p.avg, 
+                # measures performance on training data
+                cbi.val.avg) %>% 
+  arrange(delta.AICc) %>% 
   mutate(across(where(is.numeric), \(x) round(x, digits = 3)))
 
 
@@ -149,7 +158,7 @@ results <- eval.results(max.eval.sjkf) %>%
 kable(results, row.names = FALSE) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
                 full_width = FALSE) %>%
-  row_spec(1, bold = TRUE)  # highlight the top model
+  row_spec(6, bold = TRUE)  # highlight the top model
 
 # plot stat results across values of the tuning parameters
 evalplot.stats(e = max.eval.sjkf, 
@@ -174,17 +183,15 @@ evalplot.stats(e = max.eval.sjkf,
 #                error.bars = FALSE)
 
 #==============================================================================
-# Best model: XXX
+# Best model: `fc.LQ_rm.3`
 #==============================================================================
 
 # save the evaluation results to avoid re-running the model
 save(max.eval.sjkf, 
-     file = here("data/max_eval_sjkf.rda"))
+     file = here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/max_eval_sjkf.rda"))
 
 # load the evaluation results
-load(here("data/max_eval_sjkf.rda"))
-
-
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/max_eval_sjkf.rda"))
 ```
 
 ## Running MaxEnt & generating predictions
@@ -197,7 +204,7 @@ This section generates a MaxEnt model using the selected feature class and regul
 
 These model objects are then used to predict baseline (historical) and future SJKF occurrence probabilities.
 
-#### Baseline (fc LQP and rm 1)
+#### Baseline (`fc.LQ_rm.3`)
 
 ```{r}
 ## set up model parameters based on the evaluation results
@@ -206,8 +213,8 @@ These model objects are then used to predict baseline (historical) and future SJ
 x <- full_data %>% 
   na.omit() %>%
   # select only the environmental variables
-  dplyr::select(4:14) %>% 
-  dplyr::select(-c(sand_pct_0_10cm, silt_pct_0_10cm, 
+  dplyr::select(4:15) %>% 
+  dplyr::select(-c(sand_pct_0_10cm, silt_pct_0_10cm, pet1991_2020_ave,
                    tmn1991_2020_ave, tmx1991_2020_ave)) 
 
 # # examine how many presence and absence points were lost from NA removal
@@ -227,14 +234,14 @@ args <- c("jackknife=TRUE",      # assess variable importance
           "linear=TRUE",         # use linear features
           "quadratic=TRUE",      # use quadratic features
           "hinge=FALSE",         # do not use hinge features
-          "product=TRUE",       # do not use product features
+          "product=FALSE",       # do not use product features
           "threshold=FALSE",     # do not use threshold features
           "responsecurves=TRUE", # generate response curves
           "writeplotdata=TRUE",  # write output data used to make response curves 
-          "betamultiplier=1")  # this is the rm coefficient from ENMevaluate()
+          "betamultiplier=3")  # this is the rm coefficient from ENMevaluate()
 
 # path to save results
-path <- here("data/4_maxent_predictions/")
+path <- here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/")
 
 
 ## final model run
@@ -245,7 +252,7 @@ maxent_sjkf <- maxent(x = x,
 
 # save model object for prediction rasters
 save(maxent_sjkf, 
-     file = here("data/4_maxent_predictions/maxent_prediction_sjkf_sdm.rda"))
+     file = here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/maxent_prediction_sjkf_sdm.rda"))
 ```
 
 #### Predict baseline (historical) SJKF occurrence probability
@@ -254,13 +261,13 @@ save(maxent_sjkf,
 #### set up the prediction parameters
 
 ## load the model object
-load(here("data/4_maxent_predictions/maxent_prediction_sjkf_sdm.rda"))
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/maxent_prediction_sjkf_sdm.rda"))
 
 
 ## load the environmental data as a raster stack 
 
 # define the path to the predictor variable rasters
-env_path <- here("data/baseline/sjkf")
+env_path <- here("data/intermediate/misc/habitat_suitability/env_predictors/baseline")
 env_files <- list.files(env_path, 
                         pattern = ".tif$", 
                         full.names = TRUE)
@@ -271,24 +278,24 @@ x_stack <- raster::stack(env_files)
 names(x_stack)
 # match the layer names to the predictor variable names in the SWD data
 names(x_stack) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
-                        "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
+                        "ec_dS_m_0_10cm", "pet1991_2020_ave", "pH_0_10cm", "ppt1991_2020_ave", 
                         "sand_pct_0_10cm", "silt_pct_0_10cm", "slope", 
                         "tmn1991_2020_ave", "tmx1991_2020_ave")
 
 # get rid of clay and silt 
-layers_to_drop <- c("sand_pct_0_10cm", "silt_pct_0_10cm", 
+layers_to_drop <- c("sand_pct_0_10cm", "silt_pct_0_10cm", "pet1991_2020_ave",
                     "tmn1991_2020_ave", "tmx1991_2020_ave")
 x_stack <- dropLayer(x_stack, layers_to_drop)
 
 # make sure the raster stack is in EPSG:3310
 x_stack <- projectRaster(x_stack, crs = crs(env_raster))
 crs(x_stack)
-plot(x_stack)
+#plot(x_stack)
 
 ## define the extent as the extent from the Stewart SDM
 
 # load the Stewart BNLL extent shapefile
-stewart_bnll_ext_path <- here("data/stewart_sdm_ext/stewart_sdm_ext.shp")
+stewart_bnll_ext_path <- here("data/raw/extent_range_boundaries/stewart_sdm_ext/stewart_sdm_ext.shp")
 
 stewart_bnll_ext <- read_sf(stewart_bnll_ext_path) %>% 
   sf::st_make_valid() # make sure the geometry is valid
@@ -301,7 +308,7 @@ stewart_bnll_ext <- extent(stewart_bnll_ext)
 
 
 ## define the filename path for the prediction raster
-filename_sjkf <- here::here("data/4_maxent_predictions/maxent_sjkf_pred.tif")
+filename_sjkf <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/maxent_sjkf_pred.tif")
 
 
 ## predict current HEC 
@@ -320,7 +327,6 @@ plot(pred_rast_sjkf)
 
 ```{r}
 # convert lakes sf object to SpatVector
-#ca_lakes <- st_zm(ca_lakes, drop = TRUE, what = "ZM") 
 ca_lakes_vect <- vect(ca_lakes)
 
 # rasterize the lakes
@@ -338,7 +344,7 @@ plot(sjkf_habitat_masked,
 
 # save the masked raster
 writeRaster(sjkf_habitat_masked,
-            here("data/4_maxent_predictions/maxent_sjkf_pred_masked_lakes.tif"),
+            here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/maxent_sjkf_pred_masked_lakes.tif"),
             overwrite = TRUE)
 ```
 
@@ -354,18 +360,18 @@ Produce 4 future prediction rasters for each RCP and time period combination.
 # ==============================================================================
 
 ## load the best performing model object trained with the baseline data
-load(here("data/4_maxent_predictions/maxent_prediction_sjkf_sdm.rda"))
+load(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/maxent_prediction_sjkf_sdm.rda"))
 
 
 ## define the extent as the extent from the Stewart SDM
 # load the Stewart BNLL extent shapefile
-stewart_bnll_ext_path <- here("data/stewart_sdm_ext/stewart_sdm_ext.shp")
+stewart_bnll_ext_path <- here("data/raw/extent_range_boundaries/stewart_sdm_ext/stewart_sdm_ext.shp")
 
 stewart_bnll_ext <- read_sf(stewart_bnll_ext_path) %>% 
   sf::st_make_valid() # make sure the geometry is valid
 
 # assign the correct CRS
-stewart_bnll_ext <- st_transform(stewart_bnll_ext, crs(x_fut_stack)) # this was the issue, need to run after running bottom code chunk
+stewart_bnll_ext <- st_transform(stewart_bnll_ext, crs(x_stack)) # this was the issue, need to run after running bottom code chunk
 
 # extent object required for dismo
 stewart_bnll_ext <- extent(stewart_bnll_ext)
@@ -376,8 +382,8 @@ stewart_bnll_ext <- extent(stewart_bnll_ext)
 ```{r}
 #### set up the prediction parameters
 
-## load the environmental data as a raster stack
-env_fut_folder <- here("data/future/sjkf/rcp45_2020_2049")
+## load the environmental data as a raster stack (same data as GKR model)
+env_fut_folder <- here("data/intermediate/misc/habitat_suitability/env_predictors/future/maxent_ready/gkr/rcp45_2020_2049")
 
 # define the path to the predictor variable rasters for RCP4.5 and 2020-2049
 env_fut_files <- list.files(path = env_fut_folder, 
@@ -406,7 +412,7 @@ plot(x_fut_stack)
 
 
 ## define the filename path for the future prediction raster
-filename_sjkf_rcp45_2020_2049 <- here::here("data/4_maxent_predictions/maxent_sjkf_pred_rcp45_2020_2049.tif")
+filename_sjkf_rcp45_2020_2049 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2020_2049.tif")
 
 ## predict future HEC under RCP4.5 and 2020-2049
 dismo::predict(object = maxent_sjkf,
@@ -430,7 +436,7 @@ plot(sjkf_habitat_masked_rcp45_2020_2049,
 
 # save the masked future prediction raster
 writeRaster(sjkf_habitat_masked_rcp45_2020_2049, 
-            here("data/4_maxent_predictions/maxent_sjkf_pred_rcp45_2020_2049_masked_lakes.tif"),
+            here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2020_2049_masked_lakes.tif"),
             overwrite = TRUE)
 ```
 
@@ -440,7 +446,7 @@ writeRaster(sjkf_habitat_masked_rcp45_2020_2049,
 #### set up the prediction parameters
 
 ## load the environmental data as a raster stack
-env_fut_folder <- here("data/future/sjkf/rcp45_2040_2069")
+env_fut_folder <- here("data/intermediate/misc/habitat_suitability/env_predictors/future/maxent_ready/gkr/rcp45_2040_2069")
 
 # define the path to the predictor variable rasters for RCP4.5 and 2040-2069
 env_fut_files <- list.files(path = env_fut_folder, 
@@ -468,7 +474,7 @@ crs(x_fut_stack)
 
 
 ## define the filename path for the future prediction raster
-filename_sjkf_rcp45_2040_2069 <- here::here("data/future/maxent_sjkf_pred_rcp45_2040_2069.tif")
+filename_sjkf_rcp45_2040_2069 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2040_2069.tif")
 
 ## predict future HEC under RCP4.5 and 2040-2069
 dismo::predict(object = maxent_sjkf,
@@ -492,7 +498,7 @@ plot(sjkf_habitat_masked_rcp45_2040_2069,
 
 # save the masked future prediction raster
 writeRaster(sjkf_habitat_masked_rcp45_2040_2069, 
-            here("data/4_maxent_predictions/maxent_sjkf_pred_rcp45_2040_2069_masked_lakes.tif"),
+            here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2040_2069_masked_lakes.tif"),
             overwrite = TRUE)
 ```
 
@@ -502,7 +508,7 @@ writeRaster(sjkf_habitat_masked_rcp45_2040_2069,
 #### set up the prediction parameters
 
 ## load the environmental data as a raster stack
-env_fut_folder <- here("data/future/sjkf/rcp85_2020_2049")
+env_fut_folder <- here("data/intermediate/misc/habitat_suitability/env_predictors/future/maxent_ready/gkr/rcp85_2020_2049")
 
 # define the path to the predictor variable rasters for RCP8.5 and 2020-2049
 env_fut_files <- list.files(path = env_fut_folder, 
@@ -530,7 +536,7 @@ crs(x_fut_stack)
 
 
 ## define the filename path for the future prediction raster
-filename_sjkf_rcp85_2020_2049 <- here::here("data/4_maxent_predictions/maxent_sjkf_pred_rcp85_2020_2049.tif")
+filename_sjkf_rcp85_2020_2049 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2020_2049.tif")
 
 ## predict future HEC under RCP8.5 and 2020-2049
 dismo::predict(object = maxent_sjkf,
@@ -554,7 +560,7 @@ plot(sjkf_habitat_masked_rcp85_2020_2049,
 
 # save the masked future prediction raster
 writeRaster(sjkf_habitat_masked_rcp85_2020_2049, 
-            here("data/4_maxent_predictions/maxent_sjkf_pred_rcp85_2020_2049_masked_lakes.tif"),
+            here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2020_2049_masked_lakes.tif"),
             overwrite = TRUE)
 ```
 
@@ -564,7 +570,7 @@ writeRaster(sjkf_habitat_masked_rcp85_2020_2049,
 #### set up the prediction parameters
 
 ## load the environmental data as a raster stack
-env_fut_folder <- here("data/future/sjkf/rcp85_2040_2069")
+env_fut_folder <- here("data/intermediate/misc/habitat_suitability/env_predictors/future/maxent_ready/gkr/rcp85_2040_2069")
 
 # define the path to the predictor variable rasters for RCP8.5 and 2040-2069
 env_fut_files <- list.files(path = env_fut_folder, 
@@ -592,7 +598,7 @@ crs(x_fut_stack)
 
 
 ## define the filename path for the future prediction raster
-filename_sjkf_rcp85_2040_2069 <- here::here("data/4_maxent_predictions/maxent_sjkf_pred_rcp85_2040_2069.tif")
+filename_sjkf_rcp85_2040_2069 <- here::here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2040_2069.tif")
 
 ## predict future HEC under RCP8.5 and 2040-2069
 dismo::predict(object = maxent_sjkf,
@@ -616,7 +622,7 @@ plot(sjkf_habitat_masked_rcp85_2040_2069,
 
 # save the masked future prediction raster
 writeRaster(sjkf_habitat_masked_rcp85_2040_2069, 
-            here("data/4_maxent_predictions/maxent_sjkf_pred_rcp85_2040_2069_masked_lakes.tif"),
+            here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2040_2069_masked_lakes.tif"),
             overwrite = TRUE)
 ```
 
@@ -644,6 +650,7 @@ e <- dismo::evaluate(p = occ_coords,       # presence coordinates
 
 # calculate the threshold that maximizes sensitivity and specificity
 thresh <- dismo::threshold(e)
-thresh_spec_sens <- thresh$spec_sens   # 0.354 50km buffer - model: fc.QP_rm.1
-                                      # 0.225 100 km buffer - model fc.LQP_rm.0.5
+thresh_spec_sens <- thresh$spec_sens   # 0.38
 ```
+
+**NOTE:** Realized this threshold is accessible/already included in the `../4_maxent_predictions_sjkf/maxentResults.csv` file, but doesn't hurt to double check.

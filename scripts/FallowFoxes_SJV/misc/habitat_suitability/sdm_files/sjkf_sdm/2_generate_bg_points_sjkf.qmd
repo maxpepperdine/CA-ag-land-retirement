@@ -72,8 +72,8 @@ nchar(buffer_simplify_wkt)  # check length of WKT string
 ```{r}
 # set up GBIF credentials (one-time setup)
 options(gbif_user = "mpepperdine")
-options(gbif_pwd = "Pumbaason@20")
-options(gbif_email = "max.pepperdine@gmail.com")
+options(gbif_pwd = " ")
+options(gbif_email = " ")
 
 # use rgbif::occ_download to acquire background points
 download_key <- occ_download(

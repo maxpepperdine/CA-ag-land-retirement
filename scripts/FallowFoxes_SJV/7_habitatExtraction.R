@@ -27,20 +27,20 @@ library(gt)
 
 # Read in Extract layer from 6_estimateFallowing_median.R
 # SJV fields with revenue and water data, fully estimated
-field_data <- read_sf(here("data/intermediate/6_estimateFallowing/sjvAddFallow/sjvAddFallow.shp"))
+field_data <- read_sf(here("data/intermediate/6_estimateFallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.gpkg"))
 crs(field_data) # make sure EPSG:3310
 
 
 # Read in blunt-nosed leopard lizard baseline habitat raster
-bnll_baseline <- rast(here("data/intermediate/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/maxent_bnll_pred_masked_lakes.tif"))
+bnll_baseline <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/maxent_bnll_pred_masked_lakes.tif"))
 crs(bnll_baseline)
 
 # Read in giant kangaroo rat habitat raster
-gkr_baseline <- rast(here("data/intermediate/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/maxent_gkr_pred_masked_lakes.tif"))
+gkr_baseline <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/maxent_gkr_pred_masked_lakes.tif"))
 crs(gkr_baseline)
 
 # Read in San Joaquin kit fox habitat raster
-sjkf_baseline <- rast(here("data/intermediate/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/maxent_sjkf_pred_masked_lakes.tif"))
+sjkf_baseline <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/maxent_sjkf_pred_masked_lakes.tif"))
 crs(sjkf_baseline)
 
 
@@ -49,22 +49,22 @@ crs(sjkf_baseline)
 # =============================================================================
 
 # BNLL ------------------------------------------------
-bnll_rcp45_2049 <- rast(here("data/intermediate/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2020_2049_masked_lakes.tif"))
-bnll_rcp45_2069 <- rast(here("data/intermediate/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2040_2069_masked_lakes.tif"))
-bnll_rcp85_2049 <- rast(here("data/intermediate/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2020_2049_masked_lakes.tif"))
-bnll_rcp85_2069 <- rast(here("data/intermediate/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2040_2069_masked_lakes.tif"))
+bnll_rcp45_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp45_2020_2049_masked_lakes.tif"))
+bnll_rcp45_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp45_2040_2069_masked_lakes.tif"))
+bnll_rcp85_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp85_2020_2049_masked_lakes.tif"))
+bnll_rcp85_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp85_2040_2069_masked_lakes.tif"))
 
 # GKR ------------------------------------------------
-gkr_rcp45_2049 <- rast(here("data/intermediate/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp45_2020_2049_masked_lakes.tif"))
-gkr_rcp45_2069 <- rast(here("data/intermediate/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp45_2040_2069_masked_lakes.tif"))
-gkr_rcp85_2049 <- rast(here("data/intermediate/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp85_2020_2049_masked_lakes.tif"))
-gkr_rcp85_2069 <- rast(here("data/intermediate/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp85_2040_2069_masked_lakes.tif"))
+gkr_rcp45_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp45_2020_2049_masked_lakes.tif"))
+gkr_rcp45_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp45_2040_2069_masked_lakes.tif"))
+gkr_rcp85_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp85_2020_2049_masked_lakes.tif"))
+gkr_rcp85_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/gkr_sdm/4_maxent_predictions_gkr/future/maxent_gkr_pred_rcp85_2040_2069_masked_lakes.tif"))
 
 # SJKF ------------------------------------------------
-sjkf_rcp45_2049 <- rast(here("data/intermediate/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2020_2049_masked_lakes.tif"))
-sjkf_rcp45_2069 <- rast(here("data/intermediate/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2040_2069_masked_lakes.tif"))
-sjkf_rcp85_2049 <- rast(here("data/intermediate/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2020_2049_masked_lakes.tif"))
-sjkf_rcp85_2069 <- rast(here("data/intermediate/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2040_2069_masked_lakes.tif"))
+sjkf_rcp45_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2020_2049_masked_lakes.tif"))
+sjkf_rcp45_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp45_2040_2069_masked_lakes.tif"))
+sjkf_rcp85_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2020_2049_masked_lakes.tif"))
+sjkf_rcp85_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/sjkf_sdm/4_maxent_predictions_sjkf/future/maxent_sjkf_pred_rcp85_2040_2069_masked_lakes.tif"))
 
 
 
@@ -74,7 +74,7 @@ sjkf_rcp85_2069 <- rast(here("data/intermediate/habitat_suitability/sdm_files/sj
 # =============================================================================
 
 # load SJV boundary 
-sjv_counties <- read_sf(here("data/sjv_counties/sjv_counties.shp")) #data/raw...
+sjv_counties <- read_sf(here("data/raw/sjv_counties/sjv_counties.shp")) 
 
 # transform SJV boundary to EPSG:3310
 sjv_counties <- st_transform(sjv_counties, crs = crs(bnll_baseline))
@@ -83,7 +83,7 @@ sjv_counties <- st_transform(sjv_counties, crs = crs(bnll_baseline))
 sjv_vect <- vect(sjv_counties)
 
 
-# Crop habitat rasters to SJV --------------------------------------------
+# Crop baseline habitat rasters to SJV ---------------------------------------
 
 # BNLL
 bnll_baseline_sjv <- bnll_baseline %>% 
@@ -104,7 +104,7 @@ sjkf_baseline_sjv <- sjkf_baseline %>%
 plot(sjkf_baseline_sjv) 
 
 
-# Crop future habitat rasters to SJV --------------------------------------------
+# Crop future habitat rasters to SJV -----------------------------------------
 
 # BNLL
 bnll_rcp45_2049_sjv <- bnll_rcp45_2049 %>% 
@@ -155,39 +155,39 @@ sjkf_rcp85_2069_sjv <- sjkf_rcp85_2069 %>%
 # Mask out unsuitable habitat for each species
 # We'll classify suitability using the threshold maximizing sensitivity and specificity
 
-# BNLL: 0.23
-# GKR: 0.31
-# SJKF: 0.39
+# BNLL: 0.21
+# GKR: 0.47
+# SJKF: 0.38
 
 
 # BNLL -------------------------------------------------
 
 # Isolate suitable habitat for BNLL rasters
-bnll_baseline_suit <- ifel(bnll_baseline_sjv > 0.23, 1, NA)
-bnll_rcp45_2049_suit <- ifel(bnll_rcp45_2049_sjv > 0.23, 1, NA)
-bnll_rcp45_2069_suit <- ifel(bnll_rcp45_2069_sjv > 0.23, 1, NA)
-bnll_rcp85_2049_suit <- ifel(bnll_rcp85_2049_sjv > 0.23, 1, NA)
-bnll_rcp85_2069_suit <- ifel(bnll_rcp85_2069_sjv > 0.23, 1, NA)
+bnll_baseline_suit <- ifel(bnll_baseline_sjv > 0.21, 1, NA)
+bnll_rcp45_2049_suit <- ifel(bnll_rcp45_2049_sjv > 0.21, 1, NA)
+bnll_rcp45_2069_suit <- ifel(bnll_rcp45_2069_sjv > 0.21, 1, NA)
+bnll_rcp85_2049_suit <- ifel(bnll_rcp85_2049_sjv > 0.21, 1, NA)
+bnll_rcp85_2069_suit <- ifel(bnll_rcp85_2069_sjv > 0.21, 1, NA)
 
 
 # GKR -------------------------------------------------
 
 # Isolate suitable habitat for GKR rasters
-gkr_baseline_suit <- ifel(gkr_baseline_sjv > 0.31, 1, NA)
-gkr_rcp45_2049_suit <- ifel(gkr_rcp45_2049_sjv > 0.31, 1, NA)
-gkr_rcp45_2069_suit <- ifel(gkr_rcp45_2069_sjv > 0.31, 1, NA)
-gkr_rcp85_2049_suit <- ifel(gkr_rcp85_2049_sjv > 0.31, 1, NA)
-gkr_rcp85_2069_suit <- ifel(gkr_rcp85_2069_sjv > 0.31, 1, NA)
+gkr_baseline_suit <- ifel(gkr_baseline_sjv > 0.47, 1, NA)
+gkr_rcp45_2049_suit <- ifel(gkr_rcp45_2049_sjv > 0.47, 1, NA)
+gkr_rcp45_2069_suit <- ifel(gkr_rcp45_2069_sjv > 0.47, 1, NA)
+gkr_rcp85_2049_suit <- ifel(gkr_rcp85_2049_sjv > 0.47, 1, NA)
+gkr_rcp85_2069_suit <- ifel(gkr_rcp85_2069_sjv > 0.47, 1, NA)
 
 
 # SJKF -------------------------------------------------
 
-# Isolate suitable habitat for GKR rasters
-sjkf_baseline_suit <- ifel(sjkf_baseline_sjv > 0.31, 1, NA)
-sjkf_rcp45_2049_suit <- ifel(sjkf_rcp45_2049_sjv > 0.39, 1, NA)
-sjkf_rcp45_2069_suit <- ifel(sjkf_rcp45_2069_sjv > 0.39, 1, NA)
-sjkf_rcp85_2049_suit <- ifel(sjkf_rcp85_2049_sjv > 0.39, 1, NA)
-sjkf_rcp85_2069_suit <- ifel(sjkf_rcp85_2069_sjv > 0.39, 1, NA)
+# Isolate suitable habitat for SJKF rasters
+sjkf_baseline_suit <- ifel(sjkf_baseline_sjv > 0.38, 1, NA)
+sjkf_rcp45_2049_suit <- ifel(sjkf_rcp45_2049_sjv > 0.38, 1, NA)
+sjkf_rcp45_2069_suit <- ifel(sjkf_rcp45_2069_sjv > 0.38, 1, NA)
+sjkf_rcp85_2049_suit <- ifel(sjkf_rcp85_2049_sjv > 0.38, 1, NA)
+sjkf_rcp85_2069_suit <- ifel(sjkf_rcp85_2069_sjv > 0.38, 1, NA)
 
 
 # =============================================================================
@@ -686,14 +686,16 @@ for (sp in c("Blunt-nosed Leopard Lizard", "Giant Kangaroo Rat", "San Joaquin Ki
 field_data_long_hq <- field_data %>%
   pivot_longer(
     cols      = c(bnll_base_hq, bnll_rcp45_2049_hq, bnll_rcp45_2069_hq, bnll_rcp85_2049_hq, bnll_rcp85_2069_hq,
-                  gkr_base_hq,  gkr_rcp45_2049_hq,  gkr_rcp45_2069_hq,  gkr_rcp85_2049_hq,  gkr_rcp85_2069_hq),
+                  gkr_base_hq, gkr_rcp45_2049_hq, gkr_rcp45_2069_hq, gkr_rcp85_2049_hq, gkr_rcp85_2069_hq, 
+                  sjkf_base_hq, sjkf_rcp45_2049_hq, sjkf_rcp45_2069_hq, sjkf_rcp85_2049_hq, sjkf_rcp85_2069_hq),
     names_to  = "column",
     values_to = "hq_acres"
   ) %>%
   mutate(
     species  = case_when(
       startsWith(column, "bnll") ~ "Blunt-nosed Leopard Lizard",
-      startsWith(column, "gkr")  ~ "Giant Kangaroo Rat"
+      startsWith(column, "gkr")  ~ "Giant Kangaroo Rat", 
+      startsWith(column, "sjkf")  ~ "San Joaquin Kit Fox"
     ),
     scenario = case_when(
       endsWith(column, "base_hq")      ~ "Baseline",
@@ -712,7 +714,7 @@ field_data_long_hq <- field_data %>%
                           right          = FALSE)
   )
 
-for (sp in c("Blunt-nosed Leopard Lizard", "Giant Kangaroo Rat")) {
+for (sp in c("Blunt-nosed Leopard Lizard", "Giant Kangaroo Rat", "San Joaquin Kit Fox")) {
   
   p <- field_data_long_hq %>%
     filter(species == sp) %>%

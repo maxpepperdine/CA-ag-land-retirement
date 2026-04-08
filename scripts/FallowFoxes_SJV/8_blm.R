@@ -67,9 +67,11 @@ habitatExtract2 <- habitatExtract %>%
 # Export ------------------------------------------------------------------
 
 # Land IQ fields with habitat area extracted to each field, with missing fields removed
-write_sf(habitatExtract2, here("data/intermediate/8_blm/cleanShapes/cleanShapes.gpkg"))
+write_sf(habitatExtract2, here("data/intermediate/8_blm/cleanShapes/cleanShapes.gpkg"), 
+         append = FALSE)
 
-write_sf(reVector, here("data/intermediate/8_blm/blmShapes/blmShapes.shp"))
+write_sf(reVector, here("data/intermediate/8_blm/blmShapes/blmShapes.shp"), 
+         append = FALSE)
 
 
 
