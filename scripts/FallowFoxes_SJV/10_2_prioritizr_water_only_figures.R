@@ -182,7 +182,7 @@ fig1 <- ggplot(fig1_data, aes(x = basin, y = value, fill = scenario_label)) +
     x = NULL,
     y = NULL
   ) +
-  theme_grey(base_size = 11) +
+  theme_minimal(base_size = 11) +
   theme(
     plot.title = element_text(face = "bold", size = 13),
     plot.subtitle = element_text(color = "gray40", size = 10),
@@ -196,7 +196,7 @@ fig1 <- ggplot(fig1_data, aes(x = basin, y = value, fill = scenario_label)) +
 fig1
 
 ggsave(file.path(fig_dir, "fig1_basin_results_by_scenario.png"), fig1,
-       width = 13, height = 8, dpi = 500, bg = "white")
+       width = 13, height = 8, dpi = 600, bg = "white")
 cat("  Saved: fig1_basin_results_by_scenario.png\n")
 
 
@@ -254,7 +254,7 @@ fig2c <- ggplot(valley_plot, aes(x = scenario_label)) +
 fig2 <- fig2a + fig2b + fig2c +
   plot_annotation(
     title = "Valley-wide optimization results across climate scenarios",
-    subtitle = "Each scenario uses a climate-adjusted overdraft reduction target (Baseline: 1,849 TAF; RCP4.5: ~1,966 TAF; RCP8.5: ~2,049 TAF)",
+    subtitle = "Each RCP scenario uses a climate-adjusted overdraft reduction target (Baseline: 1,849 TAF; RCP4.5: ~1,966 TAF; RCP8.5: ~2,049 TAF)",
     theme = theme(
       plot.title = element_text(face = "bold", size = 14),
       plot.subtitle = element_text(color = "gray40", size = 11)
@@ -263,7 +263,7 @@ fig2 <- fig2a + fig2b + fig2c +
 fig2
 
 ggsave(file.path(fig_dir, "fig2_valley_scenario_comparison.png"), fig2,
-       width = 12, height = 6, dpi = 500, bg = "white")
+       width = 12, height = 6, dpi = 600, bg = "white")
 cat("  Saved: fig2_valley_scenario_comparison.png\n")
 
 
@@ -399,7 +399,7 @@ if (!is.null(base_sol)) {
   fig3
   
   ggsave(file.path(fig_dir, "fig3_spatial_maps.png"), fig3,
-         width = 9.5, height = 10, dpi = 500, bg = "white")
+         width = 9.5, height = 10, dpi = 600, bg = "white")
   cat("  Saved: fig3_spatial_maps.png\n")
   
 } else {
@@ -444,6 +444,138 @@ if (!is.null(base_sol)) {
 # ggsave(file.path(fig_dir, "fig4_revenue_efficiency.png"), fig4,
 #        width = 12, height = 7, dpi = 500, bg = "white")
 # cat("  Saved: fig4_revenue_efficiency.png\n")
+
+
+# ==============================================================================
+# FIGURE 5: Retirement totals by crop type across scenarios
+# ==============================================================================
+# Top 10 crop types by acres retired (baseline), with "All other crops" category.
+# Three-panel faceted horizontal bar chart: acres, revenue, water savings.
+
+cat("Creating Figure 5: Retirement totals by crop type...\n")
+
+# --- Extract selected fields by scenario with correct S_net column ---
+crop_results_list <- list()
+
+scenario_snet_cols <- c(
+  Baseline        = "Snet_baseline_AF",
+  RCP45_2020_2049 = "Snet_RCP45_near_AF",
+  RCP85_2020_2049 = "Snet_RCP85_near_AF"
+)
+
+scenario_labels <- c(
+  Baseline        = "Baseline",
+  RCP45_2020_2049 = "RCP4.5 (2020-2049)",
+  RCP85_2020_2049 = "RCP8.5 (2020-2049)"
+)
+
+for (scen in names(valley_solutions)) {
+  sol <- valley_solutions[[scen]]
+  if (is.null(sol)) next
+  
+  snet_col <- scenario_snet_cols[[scen]]
+  
+  selected <- sol %>%
+    st_drop_geometry() %>%
+    filter(solution_1 == 1) %>%
+    mutate(
+      scenario = scenario_labels[[scen]],
+      snet_af = .data[[snet_col]]
+    ) %>%
+    select(comm, acres, revenue, snet_af, scenario)
+  
+  crop_results_list[[scen]] <- selected
+}
+
+crop_results <- bind_rows(crop_results_list)
+
+# --- Identify top 10 crops by baseline acres retired ---
+top_crops <- crop_results %>%
+  filter(scenario == "Baseline") %>%
+  group_by(comm) %>%
+  summarise(total_acres = sum(acres, na.rm = TRUE), .groups = "drop") %>%
+  arrange(desc(total_acres)) %>%
+  slice_head(n = 10) %>%
+  pull(comm)
+
+# --- Aggregate by crop type, lumping non-top-10 into "All other crops" ---
+crop_summary <- crop_results %>%
+  mutate(
+    crop_group = ifelse(comm %in% top_crops, comm, "All other crops")
+  ) %>%
+  group_by(crop_group, scenario) %>%
+  summarise(
+    acres_retired = sum(acres, na.rm = TRUE),
+    revenue_millions = sum(revenue, na.rm = TRUE) / 1e6,
+    snet_taf = sum(snet_af, na.rm = TRUE) / 1000,
+    .groups = "drop"
+  )
+
+# --- Set crop order: top 10 by baseline acres, "All other crops" at bottom ---
+crop_order <- crop_results %>%
+  filter(scenario == "Baseline") %>%
+  mutate(crop_group = ifelse(comm %in% top_crops, comm, "All other crops")) %>%
+  group_by(crop_group) %>%
+  summarise(total_acres = sum(acres, na.rm = TRUE), .groups = "drop") %>%
+  arrange(total_acres) %>%
+  pull(crop_group)
+
+# Ensure "All other crops" is at the bottom (first in factor for coord_flip)
+crop_order <- c("All other crops", crop_order[crop_order != "All other crops"])
+
+crop_summary$crop_group <- factor(crop_summary$crop_group, levels = crop_order)
+crop_summary$scenario <- factor(crop_summary$scenario,
+                                levels = c("Baseline", "RCP4.5 (2020-2049)", "RCP8.5 (2020-2049)"))
+
+# --- Reshape for faceted plot ---
+fig5_data <- crop_summary %>%
+  pivot_longer(
+    cols = c(acres_retired, revenue_millions, snet_taf),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric,
+                    levels = c("acres_retired", "revenue_millions", "snet_taf"),
+                    labels = c("Acres retired", "Foregone revenue ($ millions)", "Water savings (TAF)"))
+  )
+
+# --- Build figure ---
+fig5 <- ggplot(fig5_data, aes(x = crop_group, y = value, fill = scenario)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7) +
+  coord_flip() +
+  facet_wrap(~ metric, scales = "free_x", ncol = 3) +
+  scale_fill_manual(values = scenario_colors, name = "Scenario") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.08)),
+                     labels = label_comma()) +
+  labs(
+    title = "Retirement totals by crop type across climate scenarios",
+    subtitle = "Top 10 crop types by baseline acres retired, with remaining types grouped",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(color = "gray40", size = 10),
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 11),
+    strip.background = element_rect(fill = "gray95", color = NA),
+    # Italicize "All other crops" to visually distinguish it
+    axis.text.y = element_text(
+      face = ifelse(levels(crop_summary$crop_group) == "All other crops", "italic", "plain"),
+      size = 10
+    )
+  )
+fig5
+
+ggsave(file.path(fig_dir, "fig5_retirement_by_crop_type.png"), fig5,
+       width = 11, height = 7, dpi = 600, bg = "white")
+cat("  Saved: fig5_retirement_by_crop_type.png\n")
+
 
 
 # ==============================================================================
