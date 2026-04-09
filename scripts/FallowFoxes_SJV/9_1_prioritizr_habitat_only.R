@@ -5,11 +5,10 @@
 #          meet habitat targets for BNLL, GKR, and SJKF across ALL climate
 #          scenarios/time periods simultaneously.
 #
-# Approach: Instead of running separate optimizations per time period
-#           (as in 10_prioritizr_sjv.R), we build problems where every
-#           climate projection is a separate feature with a 25,000-acre
-#           target. This forces the solver to select fields that provide
-#           adequate habitat for all three species under ALL futures —
+# Approach: Instead of running separate optimizations per time period, we build 
+#           problems where every climate projection is a separate feature with a 
+#           25,000-acre target. This forces the solver to select fields that 
+#           provide adequate habitat for all three species under ALL futures —
 #           ensuring that land retired today remains suitable as climate shifts.
 #
 # Two optimization problems:
@@ -50,11 +49,11 @@ options(scipen = 999)
 # =============================================================================
 
 # --- Planning units: SJV fields with habitat extractions ---
-field_data_all <- read_sf(here("data/intermediate/8_blm/cleanShapes/cleanShapes.gpkg")) %>%
+field_data_all <- read_sf(here("data/intermediate/7_habitatExtraction/sjvHabitatExtractions/sjvHabitatExtractions.gpkg")) %>%
   st_make_valid()
 
 # --- BLM shapes for boundary matrix ---
-blm_shapes_all <- read_sf(here("data/intermediate/8_blm/blmShapes/blmShapes.shp"))
+# blm_shapes_all <- read_sf(here("data/intermediate/8_blm/blmShapes/blmShapes.shp"))
 
 
 # --- Subset to non-retired fields ---
@@ -68,7 +67,9 @@ candidate_ids <- field_data_all %>%
 field_data <- field_data_all %>%
   filter(id %in% candidate_ids)
 
-blm_shapes <- blm_shapes_all %>%
+
+# BLM shaped for boundary matrix
+blm_shapes <- field_data_all %>%
   filter(id %in% candidate_ids)
 
 # Verify alignment
@@ -199,7 +200,7 @@ cat("Total planning unit acres:",
 
 cat("\n========== BLM CALIBRATION (cross-temporal suitable) ==========\n\n")
 
-blm_values <- c(0, 0.0001, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.05)
+blm_values <- c(0, 0.0001, 0.0005, 0.001, 0.003, 0.005, 0.01, 0.05)
 
 blm_results <- tibble(
   blm         = numeric(),
@@ -269,7 +270,7 @@ print(blm_plot)
 
 # --- SELECT THE BEST BLM ---
 # this is the "elbow" in the cost-boundary tradeoff.
-chosen_blm <- 0.0025 
+chosen_blm <- 0.003 
 
 cat("\nChosen BLM:", chosen_blm, "\n")
 
@@ -283,14 +284,14 @@ cat("\n========== RUNNING 2 CROSS-TEMPORAL OPTIMIZATIONS ==========\n\n")
 solutions <- list()
 
 summary_all <- tibble(
-  scenario_name = character(),
-  quality       = character(),
-  n_features    = numeric(),
-  n_selected    = numeric(),
-  total_cost    = numeric(),
-  total_acres   = numeric(),
-  total_water   = numeric(),
-  boundary      = numeric()
+  scenario_name   = character(),
+  quality         = character(),
+  n_features      = numeric(),
+  n_selected      = numeric(),
+  total_cost      = numeric(),
+  total_acres     = numeric(),
+  total_water_AW  = numeric(),
+  boundary        = numeric()
 )
 
 for (i in 1:nrow(scenarios)) {
@@ -339,14 +340,14 @@ for (i in 1:nrow(scenarios)) {
   # Append summary
   summary_all <- summary_all %>%
     add_row(
-      scenario_name = scen,
-      quality       = quality,
-      n_features    = length(feats),
-      n_selected    = nrow(sel),
-      total_cost    = sum(sel$revenue, na.rm = TRUE),
-      total_acres   = sum(sel$acres, na.rm = TRUE),
-      total_water   = sum(sel$water, na.rm = TRUE),
-      boundary      = boundary_length
+      scenario_name   = scen,
+      quality         = quality,
+      n_features      = length(feats),
+      n_selected      = nrow(sel),
+      total_cost      = sum(sel$revenue, na.rm = TRUE),
+      total_acres     = sum(sel$acres, na.rm = TRUE),
+      total_water_AW  = sum(sel$waterAW, na.rm = TRUE),
+      boundary        = boundary_length
     )
   
   # Print summary

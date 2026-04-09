@@ -37,7 +37,7 @@
 #   - Results are reported in original units (USD and AF)
 #
 # INPUTS:
-#   - Snet_PathA_Mechanistic.gpkg (fields with S_net, AW, revenue, fallow status)
+#   - fields_Snet_estimation.gpkg (fields with S_net, revenue, fallow status)
 #   - DWR groundwater basin boundaries shapefile
 #
 # OUTPUTS:
@@ -63,7 +63,7 @@ library(here)
 # File paths -----------------------------------------------------------
 
 # S_net fields from Path A workflow
-fields_path <- here("data/intermediate/misc/minimal_irrigation/2_option_A_mechanistic_Snet/Snet_PathA_Mechanistic.gpkg")
+fields_path <- here("data/intermediate/8_Snet_estimation/prioritizr_water_only/fields_Snet_estimation.gpkg")
 
 # DWR groundwater basin boundaries
 basins_path <- here("data/raw/i08_B118_CA_GroundwaterBasins/i08_B118_CA_GroundwaterBasins.shp")
@@ -88,8 +88,13 @@ basins_raw <- st_read(basins_path)
 cat("Assigning fields to groundwater basins...\n")
 
 # Filter basins to SJV only (Basin_Su_1 starts with "SAN JOAQUIN VALLEY")
+# Also remove basins we don't have PPIC targets for
 sjv_basins <- basins_raw %>%
-  filter(grepl("^SAN JOAQUIN VALLEY", Basin_Su_1))
+  filter(grepl("^SAN JOAQUIN VALLEY", Basin_Su_1)) %>% 
+  filter(!Basin_Su_1 %in% c("SAN JOAQUIN VALLEY - EAST CONTRA COSTA", 
+                            "SAN JOAQUIN VALLEY - KETTLEMAN PLAIN", 
+                            "SAN JOAQUIN VALLEY - COSUMNES", 
+                            "SAN JOAQUIN VALLEY - PLEASANT VALLEY"))
 
 cat("  SJV basins found:", nrow(sjv_basins), "\n")
 cat("  Basin names:\n")
@@ -294,19 +299,6 @@ planning_units <- planning_units %>%
     Snet_RCP45_near_TAF = Snet_RCP45_near_AF / 1000,
     Snet_RCP85_near_TAF = Snet_RCP85_near_AF / 1000
   )
-
-# Check total S_net available per scenario vs targets
-cat("\nFeasibility check (S_net available vs target):\n")
-for (i in 1:nrow(scenarios)) {
-  col_orig <- scenarios$snet_col_orig[i]
-  total_snet <- sum(planning_units[[col_orig]], na.rm = TRUE)
-  target <- scenarios$valley_target_taf[i] * 1000  # convert target to AF for comparison
-  headroom_pct <- round((total_snet / target - 1) * 100, 1)
-  cat("  ", scenarios$scenario_name[i], ":",
-      format(round(total_snet), big.mark = ","), "AF available |",
-      format(round(target), big.mark = ","), "AF target |",
-      "headroom:", headroom_pct, "%\n")
-}
 
 
 # ==============================================================================

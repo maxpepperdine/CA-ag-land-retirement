@@ -35,6 +35,8 @@ source(here("scripts/FallowFoxes_SJV/0_startup/0_2_functions.R"))
 # Print full numbers
 options(scipen = 999)
 
+# figure directory
+fig_dir <- here("data/intermediate/10_1_prioritizr_habitat_only_figures/")
 
 # =============================================================================
 # SECTION 1: Load Results
@@ -76,7 +78,7 @@ overall_summary <- summary_all %>%
     `Fields Selected`  = format(n_selected, big.mark = ","),
     `Acres Retired`    = format(round(total_acres), big.mark = ","),
     `Revenue Cost ($)` = paste0("$", format(round(total_cost), big.mark = ",")),
-    `Water Saved (af)` = format(round(total_water), big.mark = ","),
+    `Water Saved (af)` = format(round(total_water_AW), big.mark = ","),
     `Boundary Length`  = format(round(boundary), big.mark = ",")
   ) %>%
   dplyr::select(Quality, `Fields Selected`, `Acres Retired`,
@@ -134,7 +136,7 @@ for (scen in names(solutions)) {
       n_fields    = n(),
       total_acres = sum(acres, na.rm = TRUE),
       total_rev   = sum(revenue, na.rm = TRUE),
-      total_water = sum(water, na.rm = TRUE),
+      total_water_AW = sum(waterAW, na.rm = TRUE),
       .groups = "drop"
     ) %>%
     mutate(scenario = scen) %>%
@@ -160,7 +162,7 @@ all_combos <- expand.grid(
 
 county_summary_all <- county_summary_all %>%
   right_join(all_combos, by = c("county", "quality")) %>%
-  mutate(across(c(n_fields, total_acres, total_rev, total_water), ~ replace_na(.x, 0)))
+  mutate(across(c(n_fields, total_acres, total_rev, total_water_AW), ~ replace_na(.x, 0)))
 
 
 # Pivot to long format for faceting by metric
@@ -193,12 +195,12 @@ county_combined_plot <- ggplot(county_long,
   scale_fill_manual(values = c("Suitable" = "darkseagreen", "High Quality" = "darkgreen")) +
   labs(
     title    = "Optimal retirement by county (habitat only)",
-    subtitle = "Fields must meet 25,000-acre targets for BNLL & GKR across all climate scenarios",
+    subtitle = "Fields must meet 25,000-acre targets for BNLL, GKR & SJKF across all climate scenarios",
     x        = NULL,
     y        = NULL,
     fill     = "Habitat Quality"
   ) +
-  theme_bw(base_size = 10) +
+  theme_minimal(base_size = 10) +
   theme(
     plot.title    = element_text(face = "bold", hjust = 0),
     plot.subtitle = element_text(hjust = 0, size = 9),
@@ -209,6 +211,10 @@ county_combined_plot <- ggplot(county_long,
   )
 
 print(county_combined_plot)
+
+# save the plot
+ggsave(file.path(fig_dir, "retirement_by_county.png"), county_combined_plot,
+       width = 8, height = 5, dpi = 600, bg = "white")
 
 
 # =============================================================================
@@ -230,13 +236,13 @@ cost_compare_plot <- ggplot(comparison_data, aes(x = quality, y = total_cost, fi
   scale_fill_manual(values = c("Suitable" = "darkseagreen", "High Quality" = "darkgreen"),
                     guide = "none") +
   labs(
-    title = "Total Foregone Revenue",
+    title = "A",
     x     = NULL,
     y     = "Foregone revenue ($M)"
   ) +
   theme_minimal(base_size = 12) +
   theme(
-    plot.title = element_text(face = "bold", hjust = 0.5)
+    plot.title = element_text(face = "bold", hjust = 0)
   )
 
 # Acres comparison
@@ -249,7 +255,7 @@ acres_compare_plot <- ggplot(comparison_data, aes(x = quality, y = total_acres, 
   scale_fill_manual(values = c("Suitable" = "darkseagreen", "High Quality" = "darkgreen"),
                     guide = "none") +
   labs(
-    title = "Total Acres Retired",
+    title = "B",
     x     = NULL,
     y     = "Acres retired"
   ) +
@@ -262,7 +268,7 @@ acres_compare_plot <- ggplot(comparison_data, aes(x = quality, y = total_acres, 
 cost_acres_combined <- cost_compare_plot + acres_compare_plot +
   plot_annotation(
     title    = "Retirement optimization: suitable vs. high quality habitat",
-    subtitle = "Meeting 25,000-acre targets for BNLL & GKR across all 5 climate scenarios",
+    subtitle = "Meeting 25,000-acre targets for BNLL, GKR & SJKF across all 5 climate scenarios",
     theme    = theme(
       plot.title    = element_text(face = "bold", hjust = 0, size = 14),
       plot.subtitle = element_text(hjust = 0, size = 11)
@@ -271,9 +277,236 @@ cost_acres_combined <- cost_compare_plot + acres_compare_plot +
 
 print(cost_acres_combined)
 
+# save the plot
+ggsave(file.path(fig_dir, "total_revenue_acreage.png"), cost_acres_combined,
+       width = 7, height = 5, dpi = 600, bg = "white")
+
 
 # =============================================================================
 # SECTION 5: Side-by-Side Spatial Maps — Suitable vs. High Quality
+# =============================================================================
+
+# Bounding box for consistent extent
+field_bbox <- st_bbox(field_data)
+
+# Build maps for both solutions
+map_list <- list()
+
+for (scen in names(solutions)) {
+  
+  sol <- solutions[[scen]]
+  quality_label <- ifelse(grepl("suit", scen), "Suitable", "High Quality")
+  
+  sol_join <- field_data_all %>%
+    dplyr::select(-any_of("solution_1")) %>%
+    left_join(
+      sol %>% st_drop_geometry() %>% dplyr::select(id, solution_1),
+      by = "id"
+    ) %>%
+    mutate(
+      solution_1 = replace_na(solution_1, 0),
+      status = case_when(
+        # 1. prioritize existing retired status
+        retired == 1 ~ "Retired",
+        
+        # 2. Group Selected: (Cultivated OR Short-term Fallow) AND Selected
+        solution_1 == 1 ~ "Cultivated or short-term fallow (selected)",
+        
+        # 3. Group Not Selected: Everything else (Cultivated OR Short-term Fallow)
+        TRUE ~ "Cultivated or short-term fallow (not selected)"
+      )
+    )
+  
+  p <- ggplot() +
+    geom_sf(data = sjv_counties, fill = "grey90", color = "grey40", alpha = 0.75, linewidth = 0.3) +
+    geom_sf(data = sol_join, aes(fill = status), color = NA, linewidth = 0) +
+    geom_sf(data = sjv_counties, fill = NA, color = "grey40", linewidth = 0.3) +
+    coord_sf(xlim = field_bbox[c(1,3)], ylim = field_bbox[c(2,4)], expand = FALSE,
+             datum = sf::st_crs(4326)) +
+    scale_fill_manual(
+      values = c(
+        "Cultivated or short-term fallow (selected)"      = "forestgreen",
+        "Cultivated or short-term fallow (not selected)"  = "wheat1",
+        "Retired"                                         = "grey70"
+      ),
+      labels = c(
+        "Cultivated or short-term fallow (selected)"     = "Cultivated or short-term\nfallow (selected)",
+        "Cultivated or short-term fallow (not selected)" = "Cultivated or short-term\nfallow (not selected)",
+        "Retired"                                        = "Retired"
+      ),
+      name = "Field Status"
+    ) +
+    labs(title = quality_label) +
+    theme_minimal(base_size = 10) +
+    theme(
+      plot.title       = element_text(face = "bold", hjust = 0, size = 13),
+      panel.grid.major = element_line(color = "grey80", linewidth = 0.2),
+      panel.grid.minor = element_blank(),
+      axis.text        = element_text(size = 7, color = "grey30"),
+      axis.ticks       = element_line(color = "grey30"),
+      panel.background = element_rect(fill = "white", color = NA), 
+      legend.key.height = unit(1, "cm")
+    )
+  
+  map_list[[quality_label]] <- p
+}
+
+# Combine side-by-side with patchwork
+# Use a shared legend
+combined_map <- map_list[["Suitable"]] + map_list[["High Quality"]] +
+  plot_layout(guides = "collect") +
+  plot_annotation(
+    title    = "Optimal retirement configuration (habitat only)",
+    subtitle = paste0("minimizing foregone revenue | 25,000 ac target per species × 5 climate periods | BLM = ", chosen_blm),
+    theme    = theme(
+      plot.title    = element_text(face = "bold", hjust = 0, size = 14),
+      plot.subtitle = element_text(hjust = 0, size = 10)
+    )
+  )
+
+# look at the map
+print(combined_map)
+
+# save the map
+ggsave(file.path(fig_dir, "spatial_maps.png"), combined_map,
+       width = 11, height = 6, dpi = 600, bg = "white")
+
+
+# --- Zoomed maps: Kern, Fresno, Kings, Tulare focus area ---
+
+# Define bounding box in WGS84, then transform to field_data CRS
+zoom_bbox <- st_bbox(c(xmin = -121, ymin = 34.75, xmax = -118.5, ymax = 37.25),
+                     crs = st_crs(4326)) %>%
+  st_as_sfc() %>%
+  st_transform(st_crs(field_data)) %>%
+  st_bbox()
+
+zoom_map_list <- list()
+
+for (scen in names(solutions)) {
+  
+  sol <- solutions[[scen]]
+  quality_label <- ifelse(grepl("suit", scen), "Suitable", "High Quality")
+  
+  sol_join <- field_data_all %>%
+    dplyr::select(-any_of("solution_1")) %>%
+    left_join(
+      sol %>% st_drop_geometry() %>% dplyr::select(id, solution_1),
+      by = "id"
+    ) %>%
+    mutate(
+      solution_1 = replace_na(solution_1, 0),
+      status = case_when(
+        # 1. prioritize existing retired status
+        retired == 1 ~ "Retired",
+        
+        # 2. Group Selected: (Cultivated OR Short-term Fallow) AND Selected
+        solution_1 == 1 ~ "Cultivated or short-term fallow (selected)",
+        
+        # 3. Group Not Selected: Everything else (Cultivated OR Short-term Fallow)
+        TRUE ~ "Cultivated or short-term fallow (not selected)"
+      )
+    )
+  
+  p <- ggplot() +
+    geom_sf(data = sjv_counties, fill = "grey90", color = "grey40", alpha = 0.75, linewidth = 0.3) +
+    geom_sf(data = sol_join, aes(fill = status), color = NA, linewidth = 0) +
+    geom_sf(data = sjv_counties, fill = NA, color = "grey40", linewidth = 0.3) +
+    coord_sf(xlim = zoom_bbox[c(1,3)], ylim = zoom_bbox[c(2,4)], expand = FALSE,
+             datum = sf::st_crs(4326)) +
+    scale_fill_manual(
+      values = c(
+        "Cultivated or short-term fallow (selected)"      = "forestgreen",
+        "Cultivated or short-term fallow (not selected)"  = "wheat1",
+        "Retired"                                         = "grey70"
+      ),
+      labels = c(
+        "Cultivated or short-term fallow (selected)"     = "Cultivated or short-term\nfallow (selected)",
+        "Cultivated or short-term fallow (not selected)" = "Cultivated or short-term\nfallow (not selected)",
+        "Retired"                                        = "Retired"
+      ),
+      name = "Field Status"
+    ) +
+    labs(title = quality_label) +
+    theme_minimal(base_size = 10) +
+    theme(
+      plot.title       = element_text(face = "bold", hjust = 0, size = 13),
+      panel.grid.major = element_line(color = "grey80", linewidth = 0.2),
+      panel.grid.minor = element_blank(),
+      axis.text        = element_text(size = 7, color = "grey30"),
+      axis.ticks       = element_line(color = "grey30"),
+      panel.background = element_rect(fill = "white", color = NA), 
+      legend.key.height = unit(1, "cm")
+    )
+  
+  zoom_map_list[[quality_label]] <- p
+}
+
+combined_zoom_map <- zoom_map_list[["Suitable"]] + zoom_map_list[["High Quality"]] +
+  plot_layout(guides = "collect") +
+  plot_annotation(
+    title    = "Optimal retirement configuration (habitat only)",
+    subtitle = "Kern, Fresno, Kings, and Tulare counties",
+    theme    = theme(
+      plot.title    = element_text(face = "bold", hjust = 0, size = 14),
+      plot.subtitle = element_text(hjust = 0, size = 10)
+    )
+  )
+# look at the map
+print(combined_zoom_map)
+
+# save the map
+ggsave(file.path(fig_dir, "spatial_maps_zoom.png"), combined_zoom_map,
+       width = 10, height = 6, dpi = 600, bg = "white")
+
+
+# =============================================================================
+# SECTION 6: BLM Calibration Plot
+# =============================================================================
+
+blm_results <- blm_results %>% 
+  mutate(total_cost_M = round(total_cost / 1e6, 3))
+
+blm_plot <- ggplot(blm_results, aes(x = total_cost_M, y = boundary)) +
+  geom_point(size = 3) +
+  geom_line() +
+  geom_text(aes(label = blm), vjust = -1, size = 3) +
+  labs(
+    title    = "BLM Calibration: Cost vs. Boundary Length",
+    subtitle = "Calibrated on cross-temporal suitable habitat problem (10 features)",
+    x        = "Foregone revenue ($M)",
+    y        = "Boundary Length (lower = more cohesive)"
+  ) +
+  theme_classic()
+
+print(blm_plot)
+
+# save the plot
+ggsave(file.path(fig_dir, "blm_calibration.png"), blm_plot,
+       width = 7, height = 5.5, dpi = 600, bg = "white")
+
+
+# =============================================================================
+# SECTION 7: Export
+# =============================================================================
+
+write_csv(county_summary_all,
+          here("data/intermediate/9_1_prioritizr_habitat_only/county_summaries.csv"))
+write_csv(target_summary,
+          here("data/intermediate/9_1_prioritizr_habitat_only/target_achievement.csv"))
+
+
+cat("\n========== ALL FIGURES GENERATED ==========\n")
+
+
+
+
+# =============================================================================
+# ARCHIVE
+# ============================================================================= 
+
+# =============================================================================
+# OLD Side-by-Side Spatial Maps — Suitable vs. High Quality
 # =============================================================================
 
 # Bounding box for consistent extent
@@ -323,7 +556,7 @@ for (scen in names(solutions)) {
     labs(title = quality_label) +
     theme_minimal(base_size = 10) +
     theme(
-      plot.title       = element_text(face = "bold", hjust = 0.5, size = 13),
+      plot.title       = element_text(face = "bold", hjust = 0, size = 13),
       panel.grid.major = element_line(color = "grey80", linewidth = 0.2),
       panel.grid.minor = element_blank(),
       axis.text        = element_text(size = 7, color = "grey30"),
@@ -425,42 +658,6 @@ combined_zoom_map <- zoom_map_list[["Suitable"]] + zoom_map_list[["High Quality"
   )
 
 print(combined_zoom_map)
-
-
-
-# =============================================================================
-# SECTION 6: BLM Calibration Plot
-# =============================================================================
-
-blm_plot <- ggplot(blm_results, aes(x = total_cost, y = boundary)) +
-  geom_point(size = 3) +
-  geom_line() +
-  geom_text(aes(label = blm), vjust = -1, size = 3) +
-  labs(
-    title    = "BLM Calibration: Cost vs. Boundary Length",
-    subtitle = "Calibrated on cross-temporal suitable habitat problem (10 features)",
-    x        = "Total Revenue Cost ($)",
-    y        = "Boundary Length (lower = more cohesive)"
-  ) +
-  theme_minimal()
-
-print(blm_plot)
-
-
-# =============================================================================
-# SECTION 7: Export
-# =============================================================================
-
-write_csv(county_summary_all,
-          here("data/intermediate/9_1_prioritizr_habitat_only/county_summaries.csv"))
-write_csv(target_summary,
-          here("data/intermediate/9_1_prioritizr_habitat_only/target_achievement.csv"))
-
-
-cat("\n========== ALL FIGURES GENERATED ==========\n")
-
-
-
 
 
 
