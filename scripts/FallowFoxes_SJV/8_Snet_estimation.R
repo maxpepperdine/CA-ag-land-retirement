@@ -438,11 +438,3 @@ st_write(combined_field_data, comb_output_path, delete_dsn = TRUE)
 
 
 
-
-
-
-
-
-
-
-

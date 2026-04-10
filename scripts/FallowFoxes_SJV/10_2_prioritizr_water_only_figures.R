@@ -411,39 +411,39 @@ if (!is.null(base_sol)) {
 # FIGURE 4: Revenue efficiency by basin and scenario ($/AF saved)
 # ==============================================================================
 
-# cat("Creating Figure 4: Revenue efficiency by basin...\n")
-# 
-# fig4_data <- basin_results %>%
-#   filter(!is.na(basin), snet_achieved_af > 0) %>%
-#   mutate(
-#     efficiency = revenue_cost_usd / snet_achieved_af
-#   )
-# 
-# fig4 <- ggplot(fig4_data, aes(x = basin, y = efficiency, fill = scenario_label)) +
-#   geom_col(position = position_dodge(width = 0.75), width = 0.7) +
-#   coord_flip() +
-#   scale_fill_manual(values = scenario_colors, name = "Scenario") +
-#   scale_y_continuous(labels = label_dollar(), expand = expansion(mult = c(0, 0.08))) +
-#   labs(
-#     title = "Revenue efficiency of land retirement by basin",
-#     subtitle = "Cost per acre-foot of net basin water savings ($/AF) — lower values indicate more efficient retirement",
-#     x = NULL,
-#     y = "Revenue cost per AF saved ($/AF)"
-#   ) +
-#   theme_minimal(base_size = 11) +
-#   theme(
-#     plot.title = element_text(face = "bold", size = 13),
-#     plot.subtitle = element_text(color = "gray40", size = 10),
-#     legend.position = "top",
-#     legend.justification = "left",
-#     panel.grid.major.y = element_blank(),
-#     panel.grid.minor = element_blank()
-#   )
-# fig4
-# 
-# ggsave(file.path(fig_dir, "fig4_revenue_efficiency.png"), fig4,
-#        width = 12, height = 7, dpi = 500, bg = "white")
-# cat("  Saved: fig4_revenue_efficiency.png\n")
+cat("Creating Figure 4: Revenue efficiency by basin...\n")
+
+fig4_data <- basin_results %>%
+  filter(!is.na(basin), snet_achieved_af > 0) %>%
+  mutate(
+    efficiency = revenue_cost_usd / snet_achieved_af
+  )
+
+fig4 <- ggplot(fig4_data, aes(x = basin, y = efficiency, fill = scenario_label)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7) +
+  coord_flip() +
+  scale_fill_manual(values = scenario_colors, name = "Scenario") +
+  scale_y_continuous(labels = label_dollar(), expand = expansion(mult = c(0, 0.08))) +
+  labs(
+    title = "Revenue efficiency of land retirement by basin",
+    subtitle = "Cost per acre-foot of net basin water savings ($/AF) — lower values indicate more efficient retirement",
+    x = NULL,
+    y = "Revenue cost per AF saved ($/AF)"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(color = "gray40", size = 10),
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+fig4
+
+ggsave(file.path(fig_dir, "fig4_revenue_efficiency.png"), fig4,
+       width = 12, height = 7, dpi = 500, bg = "white")
+cat("  Saved: fig4_revenue_efficiency.png\n")
 
 
 # ==============================================================================
