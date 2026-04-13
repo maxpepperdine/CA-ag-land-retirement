@@ -442,7 +442,7 @@ fig4 <- ggplot(fig4_data, aes(x = basin, y = efficiency, fill = scenario_label))
 fig4
 
 ggsave(file.path(fig_dir, "fig4_revenue_efficiency.png"), fig4,
-       width = 12, height = 7, dpi = 500, bg = "white")
+       width = 12, height = 7, dpi = 600, bg = "white")
 cat("  Saved: fig4_revenue_efficiency.png\n")
 
 

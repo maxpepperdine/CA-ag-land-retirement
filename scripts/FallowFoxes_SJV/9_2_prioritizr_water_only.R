@@ -260,6 +260,18 @@ cat("\nBasin-specific targets (TAF):\n")
 print(as.data.frame(basin_targets))
 
 
+# Get some baseline retirement stats by basin --------------------
+retired_fields <- fields %>% 
+  st_drop_geometry() %>% 
+  filter(retired == 1)
+
+# retirement by basin
+retirement_by_basin <- retired_fields %>% 
+  group_by(basin) %>% 
+  summarise(field_count = n(), 
+            sum_acres = sum(acres))
+
+
 # ==============================================================================
 # SECTION 4: Define S_net scenario columns & map to targets (scaled to TAF)
 # ==============================================================================

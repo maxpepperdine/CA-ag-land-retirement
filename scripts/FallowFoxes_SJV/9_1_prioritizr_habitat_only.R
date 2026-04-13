@@ -67,6 +67,35 @@ candidate_ids <- field_data_all %>%
 field_data <- field_data_all %>%
   filter(id %in% candidate_ids)
 
+#================================================================
+
+# --- Subset to retired fields ---
+retired_fields <- field_data_all %>% 
+  filter(retired == 1)
+
+# Get some summary stats ------
+
+# total acreage
+retired_ac <- sum(retired_fields$acres)
+# % of total area
+non_retired_ac <- sum(field_data$acres)
+pct_retired <- (retired_ac / non_retired_ac) * 100
+
+# last comm class
+retired_last_comm <- retired_fields %>% 
+  st_drop_geometry() %>% 
+  group_by(last_comm) %>% 
+  summarise(field_count = n(), 
+            sum_acres = sum(acres))
+
+# retirement by county
+retire_by_county <- retired_fields %>% 
+  st_drop_geometry() %>% 
+  group_by(county) %>% 
+  summarise(field_count = n(), 
+            sum_acres = sum(acres))
+
+#================================================================
 
 # BLM shaped for boundary matrix
 blm_shapes <- field_data_all %>%
