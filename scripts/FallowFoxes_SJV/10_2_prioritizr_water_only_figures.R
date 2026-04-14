@@ -210,29 +210,35 @@ cat("Creating Figure 2: Valley-wide scenario comparison...\n")
 fig2a <- ggplot(valley_plot, aes(x = scenario_label, y = acres_selected)) +
   geom_col(fill = "#854F0B", width = 0.6) +
   geom_text(aes(label = format(acres_selected, big.mark = ",")),
-            vjust = -0.5, size = 3.5, fontface = "bold") +
+            vjust = -0.5, size = 5.5, fontface = "bold") +
   scale_y_continuous(labels = label_comma(), expand = expansion(mult = c(0, 0.12))) +
-  labs(title = "Acres retired", x = NULL, y = "Acres") +
-  theme_minimal(base_size = 12) +
+  labs(title = "A", x = NULL, y = "Acres") +
+  theme_minimal() +
   theme(
-    plot.title = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", size = 22),
     panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank()
+    panel.grid.minor = element_blank(), 
+    axis.text.x = element_text(size = 16, angle = 45, hjust = 1), # Adjusts x-axis tick labels
+    axis.text.y = element_text(size = 16), # Adjusts y-axis tick labels
+    axis.title.y = element_text(size = 18) # Adjusts "Acres" title size
   )
 
 # Revenue panel
 fig2b <- ggplot(valley_plot, aes(x = scenario_label, y = revenue_cost_usd / 1e9)) +
   geom_col(fill = "#0F6E56", width = 0.6) +
-  geom_text(aes(label = paste0("$", round(revenue_cost_usd / 1e9, 2), "B")),
-            vjust = -0.5, size = 3.5, fontface = "bold") +
+  geom_text(aes(label = paste0("$", round(revenue_cost_usd / 1e6, 0), "M")),
+            vjust = -0.5, size = 5.5, fontface = "bold") +
   scale_y_continuous(labels = function(x) paste0("$", x, "B"),
                      expand = expansion(mult = c(0, 0.12))) +
-  labs(title = "Foregone revenue", x = NULL, y = "$ billions") +
-  theme_minimal(base_size = 12) +
+  labs(title = "B", x = NULL, y = "$ millions") +
+  theme_minimal() +
   theme(
-    plot.title = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", size = 22),
     panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank()
+    panel.grid.minor = element_blank(), 
+    axis.text.x = element_text(size = 16, angle = 45, hjust = 1), # Adjusts x-axis tick labels
+    axis.text.y = element_text(size = 16), # Adjusts y-axis tick labels
+    axis.title.y = element_text(size = 18) # Adjusts "Acres" title size
   )
 
 # Water savings panel (show target vs achieved)
@@ -240,15 +246,18 @@ fig2c <- ggplot(valley_plot, aes(x = scenario_label)) +
   geom_col(aes(y = snet_achieved_af / 1000), fill = "#3266ad", width = 0.6) +
   geom_text(aes(y = snet_achieved_af / 1000,
                 label = paste0(round(snet_achieved_af / 1000), " TAF")),
-            vjust = -0.5, size = 3.5, fontface = "bold") +
+            vjust = -0.5, size = 5.5, fontface = "bold") +
   scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
-  labs(title = "Water savings achieved", x = NULL, y = "TAF/yr") +
-  theme_minimal(base_size = 12) +
+  labs(title = "C", x = NULL, y = "TAF/yr") +
+  theme_minimal() +
   theme(
-    plot.title = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", size = 22),
     plot.caption = element_text(size = 9, color = "gray50"),
     panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank()
+    panel.grid.minor = element_blank(), 
+    axis.text.x = element_text(size = 16, angle = 45, hjust = 1), # Adjusts x-axis tick labels
+    axis.text.y = element_text(size = 16), # Adjusts y-axis tick labels
+    axis.title.y = element_text(size = 18) # Adjusts "Acres" title size
   )
 
 fig2 <- fig2a + fig2b + fig2c +
@@ -263,7 +272,7 @@ fig2 <- fig2a + fig2b + fig2c +
 fig2
 
 ggsave(file.path(fig_dir, "fig2_valley_scenario_comparison.png"), fig2,
-       width = 12, height = 6, dpi = 600, bg = "white")
+       width = 15, height = 8, dpi = 600, bg = "white")
 cat("  Saved: fig2_valley_scenario_comparison.png\n")
 
 
@@ -297,9 +306,9 @@ if (!is.null(base_sol)) {
   
   # Scenario label mapping
   scenario_map_labels <- c(
-    "selected_baseline" = "Baseline (target: 1,849 TAF)",
-    "selected_rcp45"    = "RCP 4.5 (target: ~1,966 TAF)",
-    "selected_rcp85"    = "RCP 8.5 (target: ~2,049 TAF)"
+    "selected_baseline" = "A: Baseline (target: 1,849 TAF)",
+    "selected_rcp45"    = "B: RCP 4.5 (target: ~1,966 TAF)",
+    "selected_rcp85"    = "C: RCP 8.5 (target: ~2,049 TAF)"
   )
   
   # --- Individual scenario maps (3a, 3b, 3c) ---
@@ -325,13 +334,15 @@ if (!is.null(base_sol)) {
       labs(title = title_text) +
       theme_void(base_size = 10) +
       theme(
-        plot.title = element_text(face = "bold", size = 10, hjust = 0.5),
+        plot.title = element_text(face = "bold", size = 12, hjust = 0),
         plot.margin = margin(5, 5, 5, 5), 
         panel.grid.major = element_line(color = "grey80", linewidth = 0.2),
         panel.grid.minor = element_blank(),
-        axis.text        = element_text(size = 7, color = "grey30"),
+        axis.text        = element_text(size = 10, color = "grey30"),
         axis.ticks       = element_line(color = "grey30")
-      )
+      ) + 
+      scale_y_continuous(n.breaks = 4) + 
+      scale_x_continuous(n.breaks = 4)
   }
   
   map_baseline <- make_scenario_map(selection_data, "selected_baseline",
@@ -370,20 +381,25 @@ if (!is.null(base_sol)) {
              ylim = c(map_bbox["ymin"], map_bbox["ymax"])) +
     scale_fill_manual(values = freq_colors, labels = freq_labels,
                       name = "Selection frequency", drop = FALSE) +
-    labs(title = "Selection frequency across scenarios") +
+    labs(title = "D: Selection frequency") +
     theme_void(base_size = 10) +
     theme(
-      plot.title = element_text(face = "bold", size = 10, hjust = 0.5),
+      plot.title = element_text(face = "bold", size = 12, hjust = 0),
       legend.position = "bottom",
-      legend.title = element_text(face = "bold", size = 9),
-      legend.text = element_text(size = 8),
+      legend.title = element_text(face = "bold", size = 12),
+      legend.text = element_text(size = 12),
       plot.margin = margin(5, 5, 5, 5), 
       panel.grid.major = element_line(color = "grey80", linewidth = 0.2),
       panel.grid.minor = element_blank(),
-      axis.text        = element_text(size = 7, color = "grey30"),
-      axis.ticks       = element_line(color = "grey30")
+      axis.text        = element_text(size = 10, color = "grey30"),
+      axis.ticks       = element_line(color = "grey30"), 
+      legend.margin = margin(t = 10),
+      legend.spacing.y = unit(0.2, "cm")
     ) +
-    guides(fill = guide_legend(nrow = 1, override.aes = list(linewidth = 0.3, color = "gray40")))
+    scale_y_continuous(n.breaks = 4) + 
+    scale_x_continuous(n.breaks = 4) +
+    guides(fill = guide_legend(nrow = 2, byrow = TRUE,
+                               override.aes = list(linewidth = 0.3, color = "gray40")))
   
   # --- Combine into 4-panel figure ---
   fig3 <- (map_baseline + map_rcp45 + map_rcp85 + map_frequency) +
@@ -399,7 +415,7 @@ if (!is.null(base_sol)) {
   fig3
   
   ggsave(file.path(fig_dir, "fig3_spatial_maps.png"), fig3,
-         width = 9.5, height = 10, dpi = 600, bg = "white")
+         width = 10, height = 10, dpi = 600, bg = "white")
   cat("  Saved: fig3_spatial_maps.png\n")
   
 } else {
@@ -420,7 +436,7 @@ fig4_data <- basin_results %>%
   )
 
 fig4 <- ggplot(fig4_data, aes(x = basin, y = efficiency, fill = scenario_label)) +
-  geom_col(position = position_dodge(width = 0.75), width = 0.7) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.75) +
   coord_flip() +
   scale_fill_manual(values = scenario_colors, name = "Scenario") +
   scale_y_continuous(labels = label_dollar(), expand = expansion(mult = c(0, 0.08))) +
@@ -430,19 +446,28 @@ fig4 <- ggplot(fig4_data, aes(x = basin, y = efficiency, fill = scenario_label))
     x = NULL,
     y = "Revenue cost per AF saved ($/AF)"
   ) +
-  theme_minimal(base_size = 11) +
+  theme_minimal() +
   theme(
     plot.title = element_text(face = "bold", size = 13),
     plot.subtitle = element_text(color = "gray40", size = 10),
     legend.position = "top",
     legend.justification = "left",
     panel.grid.major.y = element_blank(),
-    panel.grid.minor = element_blank()
+    panel.grid.minor = element_blank(), 
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14), 
+    axis.title.x = element_text(size = 16), 
+    legend.title = element_text(face = "bold", size = 14),
+    legend.text = element_text(size = 12),
+    # legend.margin removes space around the legend items
+    legend.margin = margin(b = -3), 
+    # legend.box.margin adjusts the space between the legend box and the plot area
+    legend.box.margin = margin(t = 0, b = -5),
   )
 fig4
 
 ggsave(file.path(fig_dir, "fig4_revenue_efficiency.png"), fig4,
-       width = 12, height = 7, dpi = 600, bg = "white")
+       width = 10, height = 9, dpi = 600, bg = "white")
 cat("  Saved: fig4_revenue_efficiency.png\n")
 
 
@@ -488,6 +513,14 @@ for (scen in names(valley_solutions)) {
 }
 
 crop_results <- bind_rows(crop_results_list)
+
+# clean up comm names
+crop_results <- crop_results %>% 
+  mutate(comm = case_match(comm,
+                           "Alfalfa & Alfalfa Mixtures" ~ "Alfalfa",
+                           "Miscellaneous Grasses"      ~ "Misc. Grasses",
+                           .default = comm  # This keeps all other values unchanged
+  ))
 
 # --- Identify top 10 crops by baseline acres retired ---
 top_crops <- crop_results %>%
@@ -554,7 +587,7 @@ fig5 <- ggplot(fig5_data, aes(x = crop_group, y = value, fill = scenario)) +
     x = NULL,
     y = NULL
   ) +
-  theme_minimal(base_size = 11) +
+  theme_minimal() +
   theme(
     plot.title = element_text(face = "bold", size = 13),
     plot.subtitle = element_text(color = "gray40", size = 10),
@@ -562,18 +595,22 @@ fig5 <- ggplot(fig5_data, aes(x = crop_group, y = value, fill = scenario)) +
     legend.justification = "left",
     panel.grid.major.y = element_blank(),
     panel.grid.minor = element_blank(),
-    strip.text = element_text(face = "bold", size = 11),
+    strip.text = element_text(face = "bold", size = 13),
     strip.background = element_rect(fill = "gray95", color = NA),
     # Italicize "All other crops" to visually distinguish it
     axis.text.y = element_text(
       face = ifelse(levels(crop_summary$crop_group) == "All other crops", "italic", "plain"),
-      size = 10
-    )
+      size = 12
+    ), 
+    axis.text.x = element_text(size = 12), 
+    legend.title = element_text(face = "bold", size = 12),
+    legend.text = element_text(size = 11),
+    panel.spacing.x = unit(1.5, "lines")
   )
 fig5
 
 ggsave(file.path(fig_dir, "fig5_retirement_by_crop_type.png"), fig5,
-       width = 11, height = 7, dpi = 600, bg = "white")
+       width = 12, height = 7, dpi = 600, bg = "white")
 cat("  Saved: fig5_retirement_by_crop_type.png\n")
 
 
