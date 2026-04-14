@@ -341,7 +341,7 @@ if (!is.null(base_sol)) {
         axis.text        = element_text(size = 10, color = "grey30"),
         axis.ticks       = element_line(color = "grey30")
       ) + 
-      scale_y_continuous(n.breaks = 4) + 
+      scale_y_continuous(n.breaks = 7) + 
       scale_x_continuous(n.breaks = 4)
   }
   
@@ -396,7 +396,7 @@ if (!is.null(base_sol)) {
       legend.margin = margin(t = 10),
       legend.spacing.y = unit(0.2, "cm")
     ) +
-    scale_y_continuous(n.breaks = 4) + 
+    scale_y_continuous(n.breaks = 7) + 
     scale_x_continuous(n.breaks = 4) +
     guides(fill = guide_legend(nrow = 2, byrow = TRUE,
                                override.aes = list(linewidth = 0.3, color = "gray40")))
