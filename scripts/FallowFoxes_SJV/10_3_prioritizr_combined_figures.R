@@ -147,46 +147,73 @@ fig1_data <- summary_all %>%
 # Panel A: Acres retired
 fig1a <- ggplot(fig1_data, aes(x = water_scenario, y = total_acres, fill = quality)) +
   geom_col(position = position_dodge(width = 0.7), width = 0.6, color = "black", linewidth = 0.3) +
-  geom_text(aes(label = format(round(total_acres), big.mark = ","),
-                x = as.numeric(water_scenario) + ifelse(quality == "Suitable", -0.22, 0.22)),
-            vjust = -0.5, size = 3, fontface = "bold") +
-  labs(title = "Acres retired", x = NULL, y = "Acres") +
-  theme_minimal(base_size = 11) +
+  labs(title = "A", x = NULL, y = "Acres") +
+  theme_minimal() +
   theme(
-    plot.title = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", size = 18),
     panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank()
+    panel.grid.minor = element_blank(), 
+    axis.text.x = element_text(size = 14, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 14), 
+    axis.title.y = element_text(size = 16),
+    axis.title.x = element_text(size = 16), 
+    legend.title = element_text(face = "bold", size = 16),
+    legend.text = element_text(size = 14)
   )
+
+# to add bar totals text back
+# geom_text(aes(label = format(round(total_acres), big.mark = ","),
+#               x = as.numeric(water_scenario) + ifelse(quality == "Suitable", -0.22, 0.22)),
+#           vjust = -0.5, size = 3, fontface = "bold") +
+
 
 # Panel B: Foregone revenue
 fig1b <- ggplot(fig1_data, aes(x = water_scenario, y = total_cost / 1e6, fill = quality)) +
   geom_col(position = position_dodge(width = 0.7), width = 0.6, color = "black", linewidth = 0.3) +
-  geom_text(aes(label = paste0("$", round(total_cost / 1e6), "M"),
-                x = as.numeric(water_scenario) + ifelse(quality == "Suitable", -0.22, 0.22)),
-            vjust = -0.5, size = 3, fontface = "bold") +
   scale_y_continuous(labels = dollar_format(suffix = "M"), expand = expansion(mult = c(0, 0.15))) +
-  labs(title = "Foregone revenue", x = NULL, y = "$ millions") +
-  theme_minimal(base_size = 11) +
+  labs(title = "B", x = NULL, y = "$ millions") +
+  theme_minimal() +
   theme(
-    plot.title = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", size = 18),
     panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank()
+    panel.grid.minor = element_blank(), 
+    axis.text.x = element_text(size = 14, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 14), 
+    axis.title.y = element_text(size = 16),
+    axis.title.x = element_text(size = 16), 
+    legend.title = element_text(face = "bold", size = 16),
+    legend.text = element_text(size = 14)
   )
+
+# to add bar totals text back
+# geom_text(aes(label = paste0("$", round(total_cost / 1e6), "M"),
+#               x = as.numeric(water_scenario) + ifelse(quality == "Suitable", -0.22, 0.22)),
+#           vjust = -0.5, size = 3, fontface = "bold") +
+
 
 # Panel C: Water savings achieved
 fig1c <- ggplot(fig1_data, aes(x = water_scenario, y = total_Snet_AF / 1000, fill = quality)) +
   geom_col(position = position_dodge(width = 0.7), width = 0.6, color = "black", linewidth = 0.3) +
-  geom_text(aes(label = paste0(round(total_Snet_AF / 1000), " TAF"),
-                x = as.numeric(water_scenario) + ifelse(quality == "Suitable", -0.22, 0.22)),
-            vjust = -0.5, size = 3, fontface = "bold") +
   scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
-  labs(title = "Water savings achieved", x = NULL, y = "TAF/yr") +
-  theme_minimal(base_size = 11) +
+  labs(title = "C", x = NULL, y = "TAF/yr") +
+  theme_minimal() +
   theme(
-    plot.title = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", size = 18),
     panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank()
+    panel.grid.minor = element_blank(), 
+    axis.text.x = element_text(size = 14, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 14),
+    axis.title.y = element_text(size = 16),
+    axis.title.x = element_text(size = 16), 
+    legend.title = element_text(face = "bold", size = 16),
+    legend.text = element_text(size = 14)
   )
+
+# to add bar totals text back
+# geom_text(aes(label = paste0(round(total_Snet_AF / 1000), " TAF"),
+#               x = as.numeric(water_scenario) + ifelse(quality == "Suitable", -0.22, 0.22)),
+#           vjust = -0.5, size = 3, fontface = "bold") +
+
 
 # combine
 fig1 <- fig1a + fig1b + fig1c +
@@ -206,7 +233,7 @@ fig1
 
 
 ggsave(file.path(fig_dir, "fig1_scenario_comparison.png"), fig1,
-       width = 12, height = 6, dpi = 600, bg = "white")
+       width = 12, height = 8, dpi = 600, bg = "white")
 cat("  Saved: fig1_scenario_comparison.png\n")
 
 
