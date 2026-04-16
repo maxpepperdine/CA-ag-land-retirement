@@ -35,6 +35,7 @@ library(here)
 library(scales)
 library(patchwork)
 library(kableExtra)
+library(cowplot)
 
 
 # Load helper functions
@@ -417,7 +418,7 @@ build_scenario_map <- function(scen, title_text) {
       plot.title       = element_text(face = "bold", hjust = 0.5, size = 11),
       panel.grid.major = element_line(color = "grey80", linewidth = 0.2),
       panel.grid.minor = element_blank(),
-      axis.text        = element_text(size = 7, color = "grey30"),
+      axis.text        = element_text(size = 10, color = "grey30"),
       axis.ticks       = element_line(color = "grey30"),
       panel.background = element_rect(fill = "white", color = NA),
       legend.key.height = unit(1, "cm")
@@ -446,6 +447,225 @@ print(fig3)
 ggsave(file.path(fig_dir, "fig3_spatial_maps.png"), fig3,
        width = 15, height = 6, dpi = 600, bg = "white")
 cat("  Saved: fig3_spatial_maps.png\n")
+
+
+# =============================================================================
+# FIGURE 3b: 4-Panel Spatial Maps — 3 Scenarios + Selection Frequency
+# =============================================================================
+# Panels A–C: Baseline, RCP 4.5, RCP 8.5 (HQ) with Field Status legend
+# Panel D: Selection frequency across 3 water scenarios with frequency legend
+# Styled to match the water-only Figure 3 layout (2×2 grid).
+
+cat("\nCreating Figure 3b: 4-panel spatial maps + selection frequency...\n")
+
+# --- Bounding box (with buffer, reuse from Fig 3) ---
+field_bbox <- st_bbox(field_data)
+x_buffer <- (field_bbox["xmax"] - field_bbox["xmin"]) * 0.1
+y_buffer <- (field_bbox["ymax"] - field_bbox["ymin"]) * 0.1
+plot_bbox <- c(
+  xmin = field_bbox["xmin"] - x_buffer,
+  ymin = field_bbox["ymin"] - y_buffer,
+  xmax = field_bbox["xmax"] + x_buffer,
+  ymax = field_bbox["ymax"] + y_buffer
+)
+
+# --- Scenario definitions ---
+fig3b_scenarios <- tibble(
+  scen  = c("combined_baseline_hq", "combined_rcp45_hq", "combined_rcp85_hq"),
+  title = c("A: Baseline (1,849 TAF)",
+            "B: RCP 4.5 (1,966 TAF)",
+            "C: RCP 8.5 (2,049 TAF)")
+)
+
+# --- Helper: scenario map (selected/not selected/retired) ---
+build_status_map <- function(scen, title_text) {
+  
+  sol <- solutions[[scen]]
+  
+  sol_join <- field_data_all %>%
+    filter(!is.na(basin)) %>%
+    dplyr::select(-any_of("solution_1")) %>%
+    left_join(
+      sol %>% st_drop_geometry() %>% dplyr::select(id, solution_1),
+      by = "id"
+    ) %>%
+    mutate(
+      solution_1 = replace_na(solution_1, 0),
+      status = case_when(
+        retired == 1    ~ "Retired",
+        solution_1 == 1 ~ "Cultivated or short-term fallow (selected)",
+        TRUE            ~ "Cultivated or short-term fallow (not selected)"
+      )
+    )
+  
+  ggplot() +
+    geom_sf(data = sjv_basins, fill = "grey90", color = "grey40",
+            alpha = 0.75, linewidth = 0.3) +
+    geom_sf(data = sol_join, aes(fill = status), color = NA, linewidth = 0) +
+    geom_sf(data = sjv_basins, fill = NA, color = "grey40", linewidth = 0.3) +
+    coord_sf(xlim = plot_bbox[c("xmin", "xmax")],
+             ylim = plot_bbox[c("ymin", "ymax")],
+             expand = FALSE, datum = sf::st_crs(4326)) +
+    scale_fill_manual(
+      values = c(
+        "Cultivated or short-term fallow (selected)"     = "forestgreen",
+        "Cultivated or short-term fallow (not selected)" = "wheat1",
+        "Retired"                                         = "grey70"
+      ),
+      labels = c(
+        "Cultivated or short-term fallow (selected)"     = "Cultivated or short-term\nfallow (selected)",
+        "Cultivated or short-term fallow (not selected)" = "Cultivated or short-term\nfallow (not selected)",
+        "Retired"                                         = "Retired"
+      ),
+      name = "Field Status"
+    ) +
+    labs(title = title_text) +
+    theme_void(base_size = 10) +
+    theme(
+      plot.title       = element_text(face = "bold", size = 12, hjust = 0),
+      plot.margin      = margin(5, 5, 5, 5),
+      panel.grid.major = element_line(color = "grey80", linewidth = 0.2),
+      panel.grid.minor = element_blank(),
+      axis.text        = element_text(size = 11, color = "grey30"),
+      axis.ticks       = element_line(color = "grey30"),
+      legend.position  = "bottom",
+      legend.title     = element_text(face = "bold", size = 10),
+      legend.text      = element_text(size = 10)
+    ) +
+    scale_y_continuous(n.breaks = 7) +
+    scale_x_continuous(n.breaks = 4) +
+    guides(fill = guide_legend(nrow = 1,
+                               override.aes = list(linewidth = 0.3, color = "gray40")))
+}
+
+# --- Build 3 scenario maps ---
+map3b_base  <- build_status_map("combined_baseline_hq", fig3b_scenarios$title[1])
+map3b_rcp45 <- build_status_map("combined_rcp45_hq",    fig3b_scenarios$title[2])
+map3b_rcp85 <- build_status_map("combined_rcp85_hq",    fig3b_scenarios$title[3])
+
+# --- Build selection frequency (HQ only) ---
+hq_scenarios <- c("combined_baseline_hq", "combined_rcp45_hq", "combined_rcp85_hq")
+
+freq_hq_3b <- field_data %>%
+  filter(!is.na(basin)) %>%
+  dplyr::select(id) %>%
+  mutate(n_selected = 0L)
+
+for (scen in hq_scenarios) {
+  if (scen %in% names(solutions)) {
+    sel_ids <- solutions[[scen]] %>%
+      filter(solution_1 == 1) %>%
+      st_drop_geometry() %>%
+      pull(id)
+    freq_hq_3b <- freq_hq_3b %>%
+      mutate(n_selected = n_selected + as.integer(id %in% sel_ids))
+  }
+}
+
+freq_hq_3b <- freq_hq_3b %>%
+  mutate(n_selected_fct = factor(n_selected, levels = c("0", "1", "2", "3")))
+
+# Frequency color palette
+freq_colors_3b <- c(
+  "0" = "gray85",
+  "1" = "#FDE725",
+  "2" = "#21918C",
+  "3" = "#440154"
+)
+
+freq_labels_3b <- c(
+  "0" = "Not selected (0)",
+  "1" = "1 scenario",
+  "2" = "2 scenarios",
+  "3" = "All 3 scenarios"
+)
+
+map3b_freq <- ggplot() +
+  geom_sf(data = sjv_basins, fill = NA, color = "gray60", linewidth = 0.4) +
+  geom_sf(data = freq_hq_3b, aes(fill = n_selected_fct),
+          color = NA, linewidth = 0) +
+  geom_sf(data = sjv_basins, fill = NA, color = "gray40", linewidth = 0.3) +
+  coord_sf(xlim = plot_bbox[c("xmin", "xmax")],
+           ylim = plot_bbox[c("ymin", "ymax")],
+           expand = FALSE, datum = sf::st_crs(4326)) +
+  scale_fill_manual(values = freq_colors_3b, labels = freq_labels_3b,
+                    name = "Selection frequency", drop = FALSE) +
+  labs(title = "D: Selection frequency") +
+  theme_void(base_size = 10) +
+  theme(
+    plot.title       = element_text(face = "bold", size = 12, hjust = 0),
+    plot.margin      = margin(5, 5, 5, 5),
+    panel.grid.major = element_line(color = "grey80", linewidth = 0.2),
+    panel.grid.minor = element_blank(),
+    axis.text        = element_text(size = 11, color = "grey30"),
+    axis.ticks       = element_line(color = "grey30"),
+    legend.position  = "bottom",
+    legend.title     = element_text(face = "bold", size = 10),
+    legend.text      = element_text(size = 10),
+    legend.margin    = margin(t = 10),
+    legend.spacing.y = unit(0.2, "cm")
+  ) +
+  scale_y_continuous(n.breaks = 7) +
+  scale_x_continuous(n.breaks = 4) +
+  guides(fill = guide_legend(nrow = 2, byrow = TRUE,
+                             override.aes = list(linewidth = 0.3, color = "gray40")))
+
+# --- Combine into 2×2 grid with separate legends ---
+# Strip legends from all 4 maps
+map3b_base_nl  <- map3b_base  + theme(legend.position = "none")
+map3b_rcp45_nl <- map3b_rcp45 + theme(legend.position = "none")
+map3b_rcp85_nl <- map3b_rcp85 + theme(legend.position = "none")
+map3b_freq_nl  <- map3b_freq  + theme(legend.position = "none")
+
+# Extract Field Status legend (from any scenario map, with 2-row layout)
+status_legend <- get_legend(
+  map3b_base +
+    guides(fill = guide_legend(nrow = 2, byrow = TRUE,
+                               override.aes = list(linewidth = 0.3, color = "gray40"))) +
+    theme(legend.position = "bottom",
+          legend.title = element_text(face = "bold", size = 10),
+          legend.text = element_text(size = 10),
+          legend.key.height = unit(0.6, "cm"))
+)
+
+# Extract Selection Frequency legend
+freq_legend <- get_legend(
+  map3b_freq +
+    guides(fill = guide_legend(nrow = 2, byrow = TRUE,
+                               override.aes = list(linewidth = 0.3, color = "gray40"))) +
+    theme(legend.position = "bottom",
+          legend.title = element_text(face = "bold", size = 10),
+          legend.text = element_text(size = 10),
+          legend.key.height = unit(0.6, "cm"))
+)
+
+# 2×2 map grid
+map_grid <- (map3b_base_nl + map3b_rcp45_nl + map3b_rcp85_nl + map3b_freq_nl) +
+  plot_layout(ncol = 2) &
+  theme(plot.margin = margin(10, 20, 10, 20))
+
+# Legend row: side by side
+legend_row <- plot_grid(status_legend, freq_legend, ncol = 2, rel_widths = c(1, 1))
+
+# Stack maps + legends
+fig3b <- plot_grid(
+  map_grid, legend_row,
+  ncol = 1, rel_heights = c(1, 0.1)
+)
+
+# Add title/subtitle via ggdraw
+fig3b_titled <- ggdraw() +
+  draw_plot(fig3b, y = 0, height = 0.94) +
+  draw_label("Spatial distribution of fields selected for retirement (combined water + habitat, high quality)",
+             x = 0.02, y = 0.98, hjust = 0, vjust = 1, fontface = "bold", size = 14) +
+  draw_label(paste0("Valley-wide optimization under three climate scenarios with scenario-specific targets | BLM = ", chosen_blm),
+             x = 0.02, y = 0.95, hjust = 0, vjust = 1, color = "gray40", size = 11)
+
+print(fig3b_titled)
+
+ggsave(file.path(fig_dir, "fig3b_spatial_maps_frequency.png"), fig3b_titled,
+       width = 10, height = 10, dpi = 600, bg = "white")
+cat("  Saved: fig3b_spatial_maps_frequency.png\n")
 
 
 # =============================================================================
@@ -656,13 +876,14 @@ print(comparison, width = Inf)
 write_csv(comparison, file.path(fig_dir, "fig5_cost_comparison_data.csv"))
 
 
-# --- Build figure: Focus on Baseline scenario comparison ---
-# Compare: Water-only Baseline, Habitat-only (Suit & HQ), Combined Baseline (Suit & HQ)
+# --- Build figure: Baseline (top row) + RCP 4.5 (bottom row) ---
+# Compare: Water-only, Habitat-only (Suit & HQ), Combined (Suit & HQ)
+
 fig5_data <- comparison %>%
   filter(
-    (analysis == "Water only" & water_label == "Baseline") |
+    (analysis == "Water only" & water_label %in% c("Baseline", "RCP45")) |
       (analysis == "Habitat only") |
-      (analysis == "Combined" & water_label == "Baseline")
+      (analysis == "Combined" & water_label %in% c("Baseline", "RCP45"))
   ) %>%
   mutate(
     bar_label = case_when(
@@ -683,47 +904,71 @@ fig5_data <- comparison %>%
       analysis == "Habitat only" & quality == "High Quality" ~ "darkgreen",
       analysis == "Combined"     & quality == "Suitable"     ~ "#B07CD8",
       analysis == "Combined"     & quality == "High Quality" ~ "#6A1B9A"
+    ),
+    scenario_row = case_when(
+      water_label == "Baseline" | (analysis == "Habitat only") ~ "Baseline",
+      water_label == "RCP45" ~ "RCP 4.5 (2020-2049)"
     )
   )
 
+# Split into Baseline and RCP 4.5 subsets
+fig5_baseline <- fig5_data %>% filter(scenario_row == "Baseline")
+fig5_rcp45    <- fig5_data %>%
+  filter(scenario_row == "RCP 4.5 (2020-2049)" | analysis == "Habitat only")
+
 fill_values <- setNames(fig5_data$bar_fill, fig5_data$bar_label)
 
-# Revenue comparison
-fig5a <- ggplot(fig5_data, aes(x = bar_label, y = total_cost / 1e6, fill = bar_label)) +
-  geom_col(width = 0.65, color = "black", linewidth = 0.3) +
-  geom_text(aes(label = paste0("$", format(round(total_cost / 1e6), big.mark = ","), "M")),
-            vjust = -0.5, size = 3.2, fontface = "bold") +
-  scale_y_continuous(labels = dollar_format(suffix = "M"), expand = expansion(mult = c(0, 0.15))) +
-  scale_fill_manual(values = fill_values, guide = "none") +
-  labs(title = "A. Foregone revenue", x = NULL, y = "$ millions") +
-  theme_minimal(base_size = 11) +
-  theme(
-    plot.title = element_text(face = "bold", size = 12),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank(),
-    axis.text.x = element_text(size = 8)
-  )
+# --- Helper function to build cost/acres panels ---
+make_revenue_panel <- function(df, title_text) {
+  ggplot(df, aes(x = bar_label, y = total_cost / 1e6, fill = bar_label)) +
+    geom_col(width = 0.65, color = "black", linewidth = 0.3) +
+    geom_text(aes(label = paste0("$", format(round(total_cost / 1e6), big.mark = ","), "M")),
+              vjust = -0.5, size = 4, fontface = "bold") +
+    scale_y_continuous(labels = dollar_format(suffix = "M"), expand = expansion(mult = c(0, 0.15))) +
+    scale_fill_manual(values = fill_values, guide = "none") +
+    labs(title = title_text, x = NULL, y = "$ millions") +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 13),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.text.x = element_text(size = 11, angle = 45, hjust = 1), 
+      axis.title.x = element_text(size = 12), 
+      axis.text.y = element_text(size = 11),
+      axis.title.y = element_text(size = 12)
+    )
+}
 
-# Acres comparison
-fig5b <- ggplot(fig5_data, aes(x = bar_label, y = total_acres, fill = bar_label)) +
-  geom_col(width = 0.65, color = "black", linewidth = 0.3) +
-  geom_text(aes(label = format(round(total_acres), big.mark = ",")),
-            vjust = -0.5, size = 3.2, fontface = "bold") +
-  scale_y_continuous(labels = label_comma(), expand = expansion(mult = c(0, 0.15))) +
-  scale_fill_manual(values = fill_values, guide = "none") +
-  labs(title = "B. Acres retired", x = NULL, y = "Acres") +
-  theme_minimal(base_size = 11) +
-  theme(
-    plot.title = element_text(face = "bold", size = 12),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank(),
-    axis.text.x = element_text(size = 8)
-  )
+make_acres_panel <- function(df, title_text) {
+  ggplot(df, aes(x = bar_label, y = total_acres, fill = bar_label)) +
+    geom_col(width = 0.65, color = "black", linewidth = 0.3) +
+    geom_text(aes(label = format(round(total_acres), big.mark = ",")),
+              vjust = -0.5, size = 4, fontface = "bold") +
+    scale_y_continuous(labels = label_comma(), expand = expansion(mult = c(0, 0.15))) +
+    scale_fill_manual(values = fill_values, guide = "none") +
+    labs(title = title_text, x = NULL, y = "Acres") +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 13),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.text.x = element_text(size = 11, angle = 45, hjust = 1), 
+      axis.title.x = element_text(size = 12), 
+      axis.text.y = element_text(size = 11),
+      axis.title.y = element_text(size = 12)
+    )
+}
 
-fig5 <- fig5a + fig5b +
+# Build 4 panels
+fig5a <- make_revenue_panel(fig5_baseline, "A. Foregone revenue (Baseline)")
+fig5b <- make_acres_panel(fig5_baseline,   "B. Acres retired (Baseline)")
+fig5c <- make_revenue_panel(fig5_rcp45,    "C. Foregone revenue (RCP 4.5)")
+fig5d <- make_acres_panel(fig5_rcp45,      "D. Acres retired (RCP 4.5)")
+
+fig5 <- (fig5a + fig5b) / (fig5c + fig5d) +
   plot_annotation(
-    title = "Cost of co-optimization: combined vs. individual objective solutions (Baseline scenario)",
-    subtitle = "Comparing water-only, habitat-only, and combined optimization costs and land area requirements",
+    title = "Cost of co-optimization: combined vs. individual objective solutions",
+    subtitle = "Comparing water-only, habitat-only, and combined optimization under Baseline and RCP 4.5 scenarios",
     theme = theme(
       plot.title    = element_text(face = "bold", size = 13),
       plot.subtitle = element_text(color = "gray40", size = 10)
@@ -733,7 +978,7 @@ fig5 <- fig5a + fig5b +
 print(fig5)
 
 ggsave(file.path(fig_dir, "fig5_cost_premium.png"), fig5,
-       width = 12, height = 6, dpi = 600, bg = "white")
+       width = 10, height = 10, dpi = 600, bg = "white")
 cat("  Saved: fig5_cost_premium.png\n")
 
 
