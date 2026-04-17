@@ -148,6 +148,7 @@ fig1_data <- summary_all %>%
 # Panel A: Acres retired
 fig1a <- ggplot(fig1_data, aes(x = water_scenario, y = total_acres, fill = quality)) +
   geom_col(position = position_dodge(width = 0.7), width = 0.6, color = "black", linewidth = 0.3) +
+  scale_y_continuous(labels = label_comma(), expand = expansion(mult = c(0, 0.15))) +
   labs(title = "A", x = NULL, y = "Acres") +
   theme_minimal() +
   theme(
