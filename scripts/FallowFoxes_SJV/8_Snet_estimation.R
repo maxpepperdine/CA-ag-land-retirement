@@ -344,6 +344,17 @@ fields %>%
   print(n = 50)
 
 
+# clean up & generate new AW columns (AF) for prioritizr
+fields_AW <- fields %>% 
+  mutate(
+    AW_baseline_AF = waterAW, 
+    AW_RCP45_near_AF = AW_RCP45_near * acres, 
+    AW_RCP45_mid_AF = AW_RCP45_mid * acres, 
+    AW_RCP85_near_AF = AW_RCP85_near * acres,
+    AW_RCP85_mid_AF = AW_RCP85_mid * acres
+  )
+
+
 # ==============================================================================
 # SECTION 8: Export for prioritizr
 # ==============================================================================
@@ -377,7 +388,7 @@ cat("\nExporting for prioritizr...\n")
 #   )
 
 # final data for water only prioritizr runs
-prioritizr_water_final <- fields %>% 
+prioritizr_water_final <- fields_AW %>% 
   select(
     # identifiers
     id, comm, county, acres, fallow, retired,
@@ -389,6 +400,10 @@ prioritizr_water_final <- fields %>%
     Snet_baseline_AF,
     # S_net future scenarios (AF)
     starts_with("Snet_") & ends_with("_AF"),
+    # AW baseline (AF)
+    AW_baseline_AF, 
+    # AW future scenarios (AF)
+    starts_with("AW") & ends_with("_AF")
   )
 
 # Write GeoPackage
@@ -424,7 +439,7 @@ comb_output_path <- file.path(output_dir, "prioritizr_water_habitat/fields_water
 st_write(combined_field_data, comb_output_path, delete_dsn = TRUE)
 
 
-
+# save a sample
 
 
 
