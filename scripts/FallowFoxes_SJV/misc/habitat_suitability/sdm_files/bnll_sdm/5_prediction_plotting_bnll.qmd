@@ -61,16 +61,16 @@ ca_vect <- vect(ca_boundary)
 
 ```{r}
 # RCP 4.5 (2020-2049)
-bnll_rcp45_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2020_2049_masked_lakes.tif"))
+bnll_rcp45_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp45_2020_2049_masked_lakes.tif"))
 
 # RCP 4.5 (2040-2069)
-bnll_rcp45_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp45_2040_2069_masked_lakes.tif"))
+bnll_rcp45_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp45_2040_2069_masked_lakes.tif"))
 
 # RCP 8.5 (2020-2049)
-bnll_rcp85_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2020_2049_masked_lakes.tif"))
+bnll_rcp85_2049 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp85_2020_2049_masked_lakes.tif"))
 
 # RCP 8.5 (2040-2069)
-bnll_rcp85_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions/future/maxent_bnll_pred_rcp85_2040_2069_masked_lakes.tif"))
+bnll_rcp85_2069 <- rast(here("data/intermediate/misc/habitat_suitability/sdm_files/bnll_sdm/4_maxent_predictions_bnll/future/maxent_bnll_pred_rcp85_2040_2069_masked_lakes.tif"))
 ```
 
 #### Calculate continuous difference rasters
@@ -99,12 +99,12 @@ cont_diff_rcp85_2069_sjv <- cont_diff_rcp85_2069 %>%
 
 #### Reclassify the future predictions & calculate binary difference rasters
 
-Calculated in `4_maxent_predictions.qmd`, reclassify continuous habitat suitability layers into binary suitable/unsuitable layers using the threshold that maximizes true positive/negative rate (i.e., specificity + sensitivity). This is **0.29** for the BNLL maxent model.
+Calculated in `4_maxent_predictions_bnll.qmd`, reclassify continuous habitat suitability layers into binary suitable/unsuitable layers using the threshold that maximizes true positive/negative rate (i.e., specificity + sensitivity). This is **0.21** for the BNLL maxent model.
 
 ```{r}
 # define the reclass matrix
-reclass_matrix_future <- matrix(c(0, 0.29, 0,
-                                  0.29, 1, 1),
+reclass_matrix_future <- matrix(c(0, 0.21, 0,
+                                  0.21, 1, 1),
                                 ncol = 3, byrow = TRUE)
 
 # reclassify baseline
@@ -236,7 +236,7 @@ inset_map <- tm_shape(ca_vect, bbox = ca_bbox_expanded) +
 print(main_map)
 
 # add inset using viewport
-print(inset_map, vp = grid::viewport(x = 0.72, y = 0.5, width = 0.2, height = 0.25))
+print(inset_map, vp = grid::viewport(x = 0.75, y = 0.5, width = 0.2, height = 0.25))
 ```
 
 Continuous difference maps
@@ -264,7 +264,7 @@ main_map_cont <- tm_shape(cont_diff_stack, bbox = sjv_bbox_expanded) +
 print(main_map_cont)
 
 # add inset using viewport
-print(inset_map, vp = grid::viewport(x = 0.73, y = 0.3, width = 0.2, height = 0.25))
+print(inset_map, vp = grid::viewport(x = 0.78, y = 0.3, width = 0.2, height = 0.25))
 ```
 
 Raw future projections
@@ -303,7 +303,7 @@ bnll_fut_map <- tm_shape(future_stack, bbox = sjv_bbox_expanded) +
 print(bnll_fut_map)
 
 # add inset using viewport
-print(inset_map, vp = grid::viewport(x = 0.73, y = 0.4, width = 0.2, height = 0.25))
+print(inset_map, vp = grid::viewport(x = 0.77, y = 0.4, width = 0.2, height = 0.25))
 ```
 
 ## Plot the baseline predictions
@@ -328,7 +328,7 @@ bnll_baseline_map <- tm_shape(bnll_baseline_sjv, bbox = sjv_bbox_expanded) +
 print(bnll_baseline_map)
 
 # add inset using viewport
-print(inset_map, vp = grid::viewport(x = 0.75, y = 0.21, width = 0.2, height = 0.25))
+print(inset_map, vp = grid::viewport(x = 0.81, y = 0.20, width = 0.2, height = 0.25))
 ```
 
 
