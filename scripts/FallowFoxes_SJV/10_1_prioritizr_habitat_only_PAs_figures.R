@@ -75,6 +75,11 @@ cat("  Chosen BLM:", chosen_blm, "\n")
 sjv_basins <- st_transform(sjv_basins, st_crs(field_data))
 
 
+# load the TNC Pixley-Kern wildlife refuge corridor
+kern_pix_cor <- st_read(here("data/raw/tnc_corridor/ConceptualRestorationArea.shp"))
+# match the field data crs
+kern_pix_cor <- st_transform(kern_pix_cor, st_crs(field_data))
+
 # =============================================================================
 # COLOR PALETTE
 # =============================================================================
@@ -583,6 +588,7 @@ for (scen in names(solutions)) {
     geom_sf(data = pa_sf %>% mutate(status = "Existing protected area"),
             aes(fill = status), color = NA, alpha = 0.85) +
     geom_sf(data = sjv_basins, fill = NA, color = col_basin_line, linewidth = 0.3) +
+    geom_sf(data = kern_pix_cor, fill = NA, color = "black", linewidth = 0.2) + 
     coord_sf(xlim = zoom_bbox[c(1, 3)], ylim = zoom_bbox[c(2, 4)],
              expand = FALSE, datum = sf::st_crs(4326)) +
     scale_fill_manual(
