@@ -537,7 +537,7 @@ build_status_map <- function(scen, title_text) {
         "Retired"                                        = "Retired",
         "Existing protected area"                        = "Existing protected\narea (locked in)"
       ),
-      name = "Planning Unit\nStatus"
+      name = "Planning unit\nstatus"
     ) +
     labs(title = title_text) +
     theme_void(base_size = 10) +
@@ -612,7 +612,7 @@ map3b_freq <- ggplot() +
            ylim = plot_bbox_3b[c("ymin", "ymax")],
            expand = FALSE, datum = sf::st_crs(4326)) +
   scale_fill_manual(values = freq_colors_3b, labels = freq_labels_3b,
-                    name = "Selection frequency", drop = FALSE) +
+                    name = "Selection\nfrequency", drop = FALSE) +
   labs(title = "D: Selection frequency") +
   theme_void(base_size = 10) +
   theme(
@@ -646,7 +646,7 @@ status_legend <- get_legend(
                                override.aes = list(linewidth = 0.3, color = "gray40"))) +
     theme(legend.position = "bottom",
           legend.title = element_text(face = "bold", size = 10),
-          legend.text = element_text(size = 10),
+          legend.text = element_text(size = 9),
           legend.key.height = unit(0.6, "cm"))
 )
 
@@ -657,7 +657,7 @@ freq_legend <- get_legend(
                                override.aes = list(linewidth = 0.3, color = "gray40"))) +
     theme(legend.position = "bottom",
           legend.title = element_text(face = "bold", size = 10),
-          legend.text = element_text(size = 10),
+          legend.text = element_text(size = 9),
           legend.key.height = unit(0.6, "cm"))
 )
 
@@ -686,7 +686,7 @@ fig3b_titled <- ggdraw() +
 print(fig3b_titled)
 
 ggsave(file.path(fig_dir, "fig3b_spatial_maps_frequency.png"), fig3b_titled,
-       width = 10, height = 10, dpi = 600, bg = "white")
+       width = 10.5, height = 10, dpi = 600, bg = "white")
 cat("  Saved: fig3b_spatial_maps_frequency.png\n")
 
 
