@@ -53,10 +53,10 @@ library(kableExtra)
 # file paths ------------------------------------------------------
 
 # Prioritizr output directory
-prioritizr_dir <- here("data/intermediate/FallowFoxes_SJV_archive/9_2_prioritizr_water_only_AW/")
+prioritizr_dir <- here("data/intermediate/misc/aw_prioritizr_formulation/9_2_prioritizr_water_only_AW/")
 
 # Figure output directory
-fig_dir <- here("data/intermediate/FallowFoxes_SJV_archive/10_2_prioritizr_water_only_figures_AW/")
+fig_dir <- here("data/intermediate/misc/aw_prioritizr_formulation/10_2_prioritizr_water_only_figures_AW/")
 
 # Basin boundaries
 basins_path <- here("data/raw/i08_B118_CA_GroundwaterBasins/i08_B118_CA_GroundwaterBasins.shp")
@@ -865,11 +865,729 @@ if (all(file.exists(unlist(valley_gpkg_paths)))) {
 }
 
 
-cat("\n=== FIGURE AND TABLE GENERATION COMPLETE (AW analysis) ===\n")
+
+# ==============================================================================
+# WATER-ONLY (AW) FIGURES: VALLEY-WIDE vs. BASIN-SPECIFIC COMPARISON
+# ==============================================================================
+# This block builds three new figures and an updated version of Figure 1 to 
+# highlight the operational tension between valley-wide and basin-specific 
+# optimization (i.e., regional efficiency vs. local SGMA implementation, where 
+# each GSA is independently responsible for its basin's overdraft reduction).
+#
+# NEW / UPDATED:
+#   - Figure 1b: same basin-level bars as Fig 1, plus a "Total" row that sums
+#                across basins for each scenario. The Total row is directly
+#                comparable to Figure 2 (valley-wide).
+#   - Figure 4:  Spatial maps comparing valley-wide vs. basin-specific
+#                solutions side-by-side, across 3 climate scenarios (2x3 grid).
+#   - Figure 6:  Per-basin retirement totals comparing basin-specific runs
+#                vs. each basin's share of the valley-wide run. Reveals how
+#                valley-wide optimization redistributes effort (e.g. drops
+#                some Kern retirements onto cheaper basins elsewhere).
+#   - Figure 7:  Retirement efficiency (acres/TAF, $/TAF, fields/TAF) comparing
+#                valley-wide vs. basin-specific approaches across scenarios.
+#
+# Assumes the following objects already exist from the upstream script:
+#   - prioritizr_dir, fig_dir, basins_path
+#   - valley_summary, basin_summary, basin_ref, basin_results, valley_plot
+#   - valley_gpkg_paths, valley_solutions
+#   - sjv_basins, scenario_colors
+#   - valley_base_taf, valley_rcp45_taf, valley_rcp85_taf
+# ==============================================================================
+
+
+# ==============================================================================
+# SECTION A: Load all basin-specific solution GeoPackages
+# ==============================================================================
+# 15 basins x 3 scenarios = 45 files (or whatever the optimization produced).
+# Each file is a single-basin solution; we combine them into one sf object per
+# scenario, with a `basin` column attached for downstream grouping.
+
+cat("\n========================================\n")
+cat("LOADING BASIN-SPECIFIC SOLUTIONS\n")
+cat("========================================\n")
+
+# Discover all basin-specific GPKGs in the prioritizr output directory
+basin_gpkgs <- list.files(prioritizr_dir,
+                          pattern = "^Basin_.*\\.gpkg$",
+                          full.names = TRUE)
+
+cat("  Found", length(basin_gpkgs), "basin-specific GeoPackages\n")
+
+# Parse basin + scenario from filename, load, and tag
+parse_basin_scenario <- function(path) {
+  fname <- tools::file_path_sans_ext(basename(path))
+  # Format: Basin_{basin_with_underscores}_{Baseline|RCP45_2020_2049|RCP85_2020_2049}
+  scen <- case_when(
+    grepl("_Baseline$",        fname) ~ "Baseline",
+    grepl("_RCP45_2020_2049$", fname) ~ "RCP45_2020_2049",
+    grepl("_RCP85_2020_2049$", fname) ~ "RCP85_2020_2049"
+  )
+  basin <- fname %>%
+    str_remove("^Basin_") %>%
+    str_remove("_(Baseline|RCP45_2020_2049|RCP85_2020_2049)$") %>%
+    str_replace_all("_", " ")
+  list(basin = basin, scenario = scen)
+}
+
+# Load all and bind per scenario
+basin_sols_by_scenario <- list(
+  Baseline        = list(),
+  RCP45_2020_2049 = list(),
+  RCP85_2020_2049 = list()
+)
+
+for (gpath in basin_gpkgs) {
+  meta <- parse_basin_scenario(gpath)
+  if (is.na(meta$scenario)) next
+  
+  sol <- st_read(gpath, quiet = TRUE)
+  # Force the basin tag from the filename (in case the saved attribute lost it)
+  sol$basin <- meta$basin
+  basin_sols_by_scenario[[meta$scenario]][[meta$basin]] <- sol
+}
+
+# Combine each scenario's basin solutions into one sf object
+combine_basin_sols <- function(sol_list) {
+  if (length(sol_list) == 0) return(NULL)
+  # Different basins have slightly different schemas; keep the safe subset
+  keeper_cols <- c("id", "basin", "acres", "revenue", "comm",
+                   "AW_baseline_AF", "AW_RCP45_near_AF", "AW_RCP85_near_AF",
+                   "solution_1", "scenario", "aw_col_used", "target_taf")
+  sol_list %>%
+    map(~ select(.x, any_of(keeper_cols))) %>%
+    bind_rows()
+}
+
+basin_combined <- list(
+  Baseline        = combine_basin_sols(basin_sols_by_scenario$Baseline),
+  RCP45_2020_2049 = combine_basin_sols(basin_sols_by_scenario$RCP45_2020_2049),
+  RCP85_2020_2049 = combine_basin_sols(basin_sols_by_scenario$RCP85_2020_2049)
+)
+
+for (scen in names(basin_combined)) {
+  if (!is.null(basin_combined[[scen]])) {
+    n_sel <- sum(basin_combined[[scen]]$solution_1 == 1)
+    cat("  ", scen, ": ", nrow(basin_combined[[scen]]),
+        " planning units across ",
+        length(unique(basin_combined[[scen]]$basin)),
+        " basins (", n_sel, " selected)\n", sep = "")
+  }
+}
+
+
+# ==============================================================================
+# FIGURE 1b: Basin-level results across scenarios, WITH a "Total" row
+# ==============================================================================
+# Same as Fig 1 but adds a "Total" row (sum across basins, per scenario).
+# This makes the basin-specific summed total directly comparable to Figure 2
+# (valley-wide).
+
+cat("\nCreating Figure 1b: Basin-level results with Total row...\n")
+
+# Compute totals across basins, per scenario
+basin_totals <- basin_results %>%
+  filter(!is.na(basin)) %>%
+  group_by(scenario_label) %>%
+  summarise(
+    acres_selected   = sum(acres_selected,   na.rm = TRUE),
+    revenue_cost_usd = sum(revenue_cost_usd, na.rm = TRUE),
+    aw_achieved_af   = sum(aw_achieved_af,   na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(basin = "Total (basin-specific)")
+
+# Add the Total row to a copy of the basin results
+basin_results_with_total <- basin_results %>%
+  select(basin, scenario_label, acres_selected, revenue_cost_usd, aw_achieved_af) %>%
+  mutate(basin = as.character(basin)) %>%
+  bind_rows(basin_totals %>% select(basin, scenario_label, acres_selected,
+                                    revenue_cost_usd, aw_achieved_af))
+
+# Reorder factor: Total at the top (which becomes the bottom after coord_flip's
+# reversal, so we want it FIRST in the factor levels for it to appear at top
+# after the flip — actually the easiest way is to set it as the LAST level)
+fig1b_basin_order <- c(levels(basin_results$basin), "Total (basin-specific)")
+basin_results_with_total$basin <- factor(basin_results_with_total$basin,
+                                         levels = fig1b_basin_order)
+
+# Reshape for faceted plotting
+fig1b_data <- basin_results_with_total %>%
+  filter(!is.na(basin)) %>%
+  mutate(
+    revenue_cost_millions = revenue_cost_usd / 1e6,
+    aw_achieved_taf       = aw_achieved_af / 1000
+  ) %>%
+  pivot_longer(
+    cols = c(acres_selected, revenue_cost_millions, aw_achieved_taf),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric,
+                    levels = c("acres_selected", "revenue_cost_millions", "aw_achieved_taf"),
+                    labels = c("Acres retired", "Foregone revenue ($ millions)", "Applied water saved (TAF)"))
+  )
+
+# Build figure with a horizontal rule separating Total from individual basins
+fig1b <- ggplot(fig1b_data, aes(x = basin, y = value, fill = scenario_label)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7) +
+  geom_hline(yintercept = 0, color = "gray70", linewidth = 0.3) +
+  # Separator: dotted line between Total and the rest
+  geom_vline(xintercept = length(fig1b_basin_order) - 0.5,
+             linetype = "dashed", color = "gray40", linewidth = 0.5) +
+  coord_flip() +
+  facet_wrap(~ metric, scales = "free_x", ncol = 3) +
+  scale_fill_manual(values = scenario_colors, name = "Scenario") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.08)),
+                     labels = label_comma()) +
+  labs(
+    title = "Basin-level results across climate scenarios, with summed totals (applied water)",
+    subtitle = "Total row shows the sum of basin-specific retirements; compare directly to Figure 2 (valley-wide)",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(color = "gray40", size = 10),
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 11),
+    strip.background = element_rect(fill = "gray95", color = NA),
+    axis.text.y = element_text(
+      face = ifelse(levels(basin_results_with_total$basin) == "Total (basin-specific)",
+                    "bold", "plain")
+    )
+  )
+
+print(fig1b)
+
+ggsave(file.path(fig_dir, "fig1b_basin_results_with_total.png"), fig1b,
+       width = 13, height = 8.5, dpi = 600, bg = "white")
+cat("  Saved: fig1b_basin_results_with_total.png\n")
+
+
+# ==============================================================================
+# FIGURE 1c: Valley totals (from basin-specific runs) + basin-level breakdown
+# ==============================================================================
+# Top panel (A): valley totals computed by summing basin-specific results,
+#                analogous to Figure 2 but using the summed basin-specific runs.
+# Bottom panel (B): basin-level breakdown (same as Fig 1, no Total row).
+# Both panels use the same scenario color scheme.
+
+cat("\nCreating Figure 1c: Valley totals (basin sum) + basin breakdown...\n")
+
+# --- Top panel (A): valley totals from summed basin-specific runs ---
+# Same 3-metric grid as Fig 2, but bars colored by scenario for direct
+# visual comparison with the bottom panel.
+
+# Pretty scenario labels for the top panel (multi-line so x-axis text matches Fig 2 style)
+basin_totals_top <- basin_totals %>%
+  mutate(
+    scenario_label_multi = factor(case_when(
+      scenario_label == "Baseline"           ~ "Baseline",
+      scenario_label == "RCP4.5 (2020-2049)" ~ "RCP4.5\n(2020-2049)",
+      scenario_label == "RCP8.5 (2020-2049)" ~ "RCP8.5\n(2020-2049)"
+    ), levels = c("Baseline", "RCP4.5\n(2020-2049)", "RCP8.5\n(2020-2049)"))
+  )
+
+# Sub-panel 1A: acres
+fig1c_top_acres <- ggplot(basin_totals_top,
+                          aes(x = scenario_label_multi, y = acres_selected,
+                              fill = scenario_label)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = format(acres_selected, big.mark = ",")),
+            vjust = -0.5, size = 4.5, fontface = "bold") +
+  scale_fill_manual(values = scenario_colors, guide = "none") +
+  scale_y_continuous(labels = label_comma(), expand = expansion(mult = c(0, 0.15))) +
+  labs(x = NULL, y = "Acres") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size = 13)
+  )
+
+# Sub-panel 1B: revenue
+fig1c_top_rev <- ggplot(basin_totals_top,
+                        aes(x = scenario_label_multi, y = revenue_cost_usd / 1e6,
+                            fill = scenario_label)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = paste0("$", format(round(revenue_cost_usd / 1e6), big.mark = ","), "M")),
+            vjust = -0.5, size = 4.5, fontface = "bold") +
+  scale_fill_manual(values = scenario_colors, guide = "none") +
+  scale_y_continuous(labels = function(x) paste0("$", x, "M"),
+                     expand = expansion(mult = c(0, 0.15))) +
+  labs(x = NULL, y = "$ millions") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size = 13)
+  )
+
+# Sub-panel 1C: AW saved
+fig1c_top_aw <- ggplot(basin_totals_top,
+                       aes(x = scenario_label_multi, y = aw_achieved_af / 1000,
+                           fill = scenario_label)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = paste0(format(round(aw_achieved_af / 1000), big.mark = ","), " TAF")),
+            vjust = -0.5, size = 4.5, fontface = "bold") +
+  scale_fill_manual(values = scenario_colors, guide = "none") +
+  scale_y_continuous(labels = label_comma(), expand = expansion(mult = c(0, 0.15))) +
+  labs(x = NULL, y = "TAF/yr") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size = 13)
+  )
+
+# Assemble top panel A (3 sub-panels side by side)
+fig1c_top <- fig1c_top_acres + fig1c_top_rev + fig1c_top_aw +
+  plot_layout(ncol = 3) +
+  plot_annotation(
+    title = "A. Summed basin-specific totals across climate scenarios",
+    theme = theme(plot.title = element_text(face = "bold", size = 13))
+  )
+
+# --- Bottom panel (B): basin-level breakdown (Fig 1 without Total row) ---
+# Reshape basin_results (already excludes the Total row) for faceted plotting
+fig1c_bot_data <- basin_results %>%
+  filter(!is.na(basin)) %>%
+  select(basin, scenario_label, acres_selected, revenue_cost_usd, aw_achieved_af) %>%
+  mutate(
+    revenue_cost_millions = revenue_cost_usd / 1e6,
+    aw_achieved_taf       = aw_achieved_af / 1000
+  ) %>%
+  pivot_longer(
+    cols = c(acres_selected, revenue_cost_millions, aw_achieved_taf),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric,
+                    levels = c("acres_selected", "revenue_cost_millions", "aw_achieved_taf"),
+                    labels = c("Acres retired", "Foregone revenue ($ millions)", "Applied water saved (TAF)"))
+  )
+
+fig1c_bot <- ggplot(fig1c_bot_data, aes(x = basin, y = value, fill = scenario_label)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7) +
+  coord_flip() +
+  facet_wrap(~ metric, scales = "free_x", ncol = 3) +
+  scale_fill_manual(values = scenario_colors, name = "Scenario") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.08)),
+                     labels = label_comma()) +
+  labs(
+    title = "B. Basin-level results across climate scenarios",
+    x = NULL, y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 11),
+    strip.background = element_rect(fill = "gray95", color = NA)
+  )
+
+# --- Combine top + bottom with patchwork ---
+fig1c <- wrap_elements(fig1c_top) / fig1c_bot +
+  plot_layout(heights = c(1, 2.2)) +
+  plot_annotation(
+    title = "Basin-specific optimization results: valley totals (A) and basin-level breakdown (B), applied water",
+    theme = theme(plot.title = element_text(face = "bold", size = 14))
+  )
+
+print(fig1c)
+
+ggsave(file.path(fig_dir, "fig1c_basin_totals_and_breakdown.png"), fig1c,
+       width = 14, height = 14, dpi = 600, bg = "white")
+cat("  Saved: fig1c_basin_totals_and_breakdown.png\n")
 
 
 
+# ==============================================================================
+# FIGURE 4: Valley-wide vs. basin-specific spatial maps
+# ==============================================================================
+# 2x3 grid: rows = approach (Valley-wide, Basin-specific), columns = scenarios.
+# Same coloring as Fig 3a-c (selected = blue, not selected = gray).
 
+cat("\nCreating Figure 4: Valley-wide vs. basin-specific spatial maps...\n")
+
+# Reuse the bounding box from Fig 3 (valley_solutions[["Baseline"]])
+base_sol_for_bbox <- valley_solutions[["Baseline"]]
+map_bbox_4 <- st_bbox(base_sol_for_bbox)
+
+# Map helper (matches Fig 3 styling)
+make_compare_map <- function(plot_data, title_text) {
+  ggplot() +
+    # Basin boundaries (background)
+    geom_sf(data = sjv_basins, fill = NA, color = "gray60", linewidth = 0.4) +
+    # Non-selected fields
+    geom_sf(data = plot_data %>% filter(solution_1 == 0),
+            fill = "gray85", color = NA, linewidth = 0) +
+    # Selected fields
+    geom_sf(data = plot_data %>% filter(solution_1 == 1),
+            fill = "#2166AC", color = NA, linewidth = 0) +
+    # Basin boundaries on top
+    geom_sf(data = sjv_basins, fill = NA, color = "gray40", linewidth = 0.3) +
+    coord_sf(xlim = c(map_bbox_4["xmin"], map_bbox_4["xmax"]),
+             ylim = c(map_bbox_4["ymin"], map_bbox_4["ymax"])) +
+    labs(title = title_text) +
+    theme_void(base_size = 10) +
+    theme(
+      plot.title       = element_text(face = "bold", size = 11, hjust = 0),
+      plot.margin      = margin(5, 5, 5, 5),
+      panel.grid.major = element_line(color = "grey80", linewidth = 0.2),
+      panel.grid.minor = element_blank(),
+      axis.text        = element_text(size = 9, color = "grey30"),
+      axis.ticks       = element_line(color = "grey30")
+    ) +
+    scale_y_continuous(n.breaks = 7) +
+    scale_x_continuous(n.breaks = 4)
+}
+
+# Targets for titles
+target_lookup <- c(
+  Baseline        = valley_base_taf,
+  RCP45_2020_2049 = valley_rcp45_taf,
+  RCP85_2020_2049 = valley_rcp85_taf
+)
+
+scenario_pretty <- c(
+  Baseline        = "Baseline",
+  RCP45_2020_2049 = "RCP 4.5",
+  RCP85_2020_2049 = "RCP 8.5"
+)
+
+# Build the 6 panels
+fig4_panels <- list()
+
+for (scen in c("Baseline", "RCP45_2020_2049", "RCP85_2020_2049")) {
+  
+  # Valley-wide map
+  vw_title <- sprintf("Valley-wide  |  %s", scenario_pretty[scen])
+  fig4_panels[[paste0("vw_", scen)]] <- make_compare_map(
+    valley_solutions[[scen]], vw_title
+  )
+  
+  # Basin-specific map (assembled from per-basin solutions)
+  bs_data <- basin_combined[[scen]]
+  if (!is.null(bs_data)) {
+    bs_title <- sprintf("Basin-specific  |  %s", scenario_pretty[scen])
+    fig4_panels[[paste0("bs_", scen)]] <- make_compare_map(bs_data, bs_title)
+  } else {
+    fig4_panels[[paste0("bs_", scen)]] <- patchwork::plot_spacer()
+  }
+}
+
+# Assemble 2x3 grid: row 1 = valley-wide, row 2 = basin-specific
+fig4 <- (fig4_panels$vw_Baseline + fig4_panels$vw_RCP45_2020_2049 + fig4_panels$vw_RCP85_2020_2049) /
+  (fig4_panels$bs_Baseline + fig4_panels$bs_RCP45_2020_2049 + fig4_panels$bs_RCP85_2020_2049) +
+  plot_annotation(
+    title = "Spatial distribution of selected fields: valley-wide vs. basin-specific optimization (applied water)",
+    subtitle = "Top row: valley-wide target. Bottom row: each basin meets its own PPIC target. Selected fields shown in blue.",
+    theme = theme(
+      plot.title    = element_text(face = "bold", size = 14),
+      plot.subtitle = element_text(color = "gray40", size = 11)
+    )
+  )
+
+print(fig4)
+
+ggsave(file.path(fig_dir, "fig4_valley_vs_basin_maps.png"), fig4,
+       width = 14, height = 11, dpi = 600, bg = "white")
+cat("  Saved: fig4_valley_vs_basin_maps.png\n")
+
+
+# ==============================================================================
+# FIGURE 6: Per-basin comparison — basin-specific vs. valley-wide
+# ==============================================================================
+# For each basin, plot side-by-side bars showing what was retired in
+#   (a) the basin-specific run (selecting fields only from that basin to meet
+#       that basin's own target), vs.
+#   (b) the basin's share of the valley-wide run (selecting fields valley-wide
+#       to meet the summed target; how much fell into each basin?).
+# Three panels: acres, revenue, AW achieved.
+
+cat("\nCreating Figure 6: Per-basin comparison (basin-specific vs. valley-wide share)...\n")
+
+# --- (a) Basin-specific totals (already have these in basin_results) ---
+fig6_basin_specific <- basin_results %>%
+  filter(!is.na(basin)) %>%
+  select(basin, scenario_label, acres_selected, revenue_cost_usd, aw_achieved_af) %>%
+  mutate(
+    approach = "Basin-specific run",
+    revenue_millions = revenue_cost_usd / 1e6,
+    aw_taf           = aw_achieved_af / 1000
+  ) %>%
+  select(basin, scenario_label, approach, acres_selected, revenue_millions, aw_taf)
+
+# --- (b) Valley-wide solutions, broken down by basin ---
+# Need to know which AW column corresponds to each scenario
+scenario_aw_col_map <- c(
+  Baseline        = "AW_baseline_AF",
+  RCP45_2020_2049 = "AW_RCP45_near_AF",
+  RCP85_2020_2049 = "AW_RCP85_near_AF"
+)
+
+valley_by_basin_list <- list()
+
+for (scen_key in names(valley_solutions)) {
+  
+  sol <- valley_solutions[[scen_key]]
+  if (is.null(sol)) next
+  
+  aw_col <- scenario_aw_col_map[scen_key]
+  
+  scen_label_pretty <- case_when(
+    scen_key == "Baseline"        ~ "Baseline",
+    scen_key == "RCP45_2020_2049" ~ "RCP4.5 (2020-2049)",
+    scen_key == "RCP85_2020_2049" ~ "RCP8.5 (2020-2049)"
+  )
+  
+  vw_per_basin <- sol %>%
+    st_drop_geometry() %>%
+    filter(solution_1 == 1, !is.na(basin)) %>%
+    group_by(basin) %>%
+    summarise(
+      acres_selected   = sum(acres, na.rm = TRUE),
+      revenue_millions = sum(revenue, na.rm = TRUE) / 1e6,
+      aw_taf           = sum(.data[[aw_col]], na.rm = TRUE) / 1000,
+      .groups = "drop"
+    ) %>%
+    mutate(
+      scenario_label = scen_label_pretty,
+      approach = "Valley-wide run (basin share)"
+    )
+  
+  valley_by_basin_list[[scen_key]] <- vw_per_basin
+}
+
+fig6_valley_share <- bind_rows(valley_by_basin_list) %>%
+  select(basin, scenario_label, approach, acres_selected, revenue_millions, aw_taf)
+
+# --- Combine ---
+fig6_data <- bind_rows(fig6_basin_specific, fig6_valley_share) %>%
+  mutate(
+    scenario_label = factor(scenario_label,
+                            levels = c("Baseline", "RCP4.5 (2020-2049)", "RCP8.5 (2020-2049)")),
+    approach = factor(approach,
+                      levels = c("Basin-specific run", "Valley-wide run (basin share)"))
+  )
+
+# Use the same basin ordering as Fig 1 (by baseline target, descending)
+fig6_data$basin <- factor(fig6_data$basin, levels = basin_order)
+
+# Reshape for facets
+fig6_long <- fig6_data %>%
+  filter(!is.na(basin)) %>%
+  pivot_longer(
+    cols = c(acres_selected, revenue_millions, aw_taf),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric,
+                    levels = c("acres_selected", "revenue_millions", "aw_taf"),
+                    labels = c("Acres retired", "Foregone revenue ($ millions)", "Applied water saved (TAF)"))
+  )
+
+# Color: encode approach via fill, scenario via facet column
+# Use a 6-color palette: approach x scenario
+approach_scen_colors <- c(
+  "Basin-specific run | Baseline"             = "#3266ad",
+  "Basin-specific run | RCP4.5 (2020-2049)"   = "#E8A825",
+  "Basin-specific run | RCP8.5 (2020-2049)"   = "#C7432B",
+  "Valley-wide run (basin share) | Baseline"           = "#88B1D4",
+  "Valley-wide run (basin share) | RCP4.5 (2020-2049)" = "#F5D17F",
+  "Valley-wide run (basin share) | RCP8.5 (2020-2049)" = "#E89685"
+)
+
+fig6_long <- fig6_long %>%
+  mutate(approach_scen = paste(approach, scenario_label, sep = " | "))
+
+# Faceted plot — facets by scenario (columns) x metric (rows), basin on y-axis
+fig6 <- ggplot(fig6_long, aes(x = basin, y = value, fill = approach)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7) +
+  coord_flip() +
+  facet_grid(scenario_label ~ metric, scales = "free_x", switch = "y") +
+  scale_fill_manual(
+    values = c("Basin-specific run" = "#1f4e79",
+               "Valley-wide run (basin share)" = "#a8c8e8"),
+    name = "Optimization approach"
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.10)),
+                     labels = label_comma()) +
+  labs(
+    title = "Per-basin retirement: basin-specific run vs. share from valley-wide run (applied water)",
+    subtitle = "Reveals how valley-wide optimization redistributes retirement effort across basins relative to local SGMA targets",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(color = "gray40", size = 10),
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 10),
+    strip.background = element_rect(fill = "gray95", color = NA),
+    strip.placement = "outside",
+    panel.spacing.x = unit(1, "lines"),
+    panel.spacing.y = unit(0.5, "lines")
+  )
+
+print(fig6)
+
+ggsave(file.path(fig_dir, "fig6_basin_specific_vs_valley_share.png"), fig6,
+       width = 14, height = 11, dpi = 600, bg = "white")
+cat("  Saved: fig6_basin_specific_vs_valley_share.png\n")
+
+
+# Also export the comparison data as CSV for the manuscript supplement
+fig6_export <- fig6_data %>%
+  select(scenario_label, basin, approach, acres_selected, revenue_millions, aw_taf) %>%
+  arrange(scenario_label, basin, approach)
+
+write_csv(fig6_export, file.path(fig_dir, "fig6_basin_comparison_data.csv"))
+cat("  Saved: fig6_basin_comparison_data.csv\n")
+
+
+# ==============================================================================
+# FIGURE 7: Retirement efficiency — valley-wide vs. basin-specific
+# ==============================================================================
+# Efficiency = output per unit input. Lower = better.
+# Three metrics: acres / TAF saved, $ / TAF saved, fields / TAF saved.
+# Computed at the valley aggregate level (summed across all basins for the
+# basin-specific approach).
+
+cat("\nCreating Figure 7: Retirement efficiency comparison...\n")
+
+# --- Valley-wide aggregate efficiency (one row per scenario) ---
+valley_efficiency <- valley_summary %>%
+  mutate(
+    scenario_label = case_when(
+      grepl("Baseline", scenario) ~ "Baseline",
+      grepl("RCP45", scenario)    ~ "RCP4.5 (2020-2049)",
+      grepl("RCP85", scenario)    ~ "RCP8.5 (2020-2049)"
+    ),
+    approach = "Valley-wide",
+    aw_taf = aw_achieved_af / 1000,
+    acres_per_taf  = acres_selected / aw_taf,
+    dollars_per_af = revenue_cost_usd / aw_achieved_af,
+    fields_per_taf = n_fields_selected / aw_taf
+  ) %>%
+  select(scenario_label, approach, acres_per_taf, dollars_per_af, fields_per_taf)
+
+# --- Basin-specific aggregate efficiency (sum across basins, per scenario) ---
+basin_specific_efficiency <- basin_results %>%
+  filter(!is.na(basin)) %>%
+  group_by(scenario_label) %>%
+  summarise(
+    acres_selected   = sum(acres_selected,   na.rm = TRUE),
+    revenue_cost_usd = sum(revenue_cost_usd, na.rm = TRUE),
+    aw_achieved_af   = sum(aw_achieved_af,   na.rm = TRUE),
+    n_fields         = sum(n_fields_selected, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    approach = "Basin-specific (summed)",
+    aw_taf = aw_achieved_af / 1000,
+    acres_per_taf  = acres_selected / aw_taf,
+    dollars_per_af = revenue_cost_usd / aw_achieved_af,
+    fields_per_taf = n_fields / aw_taf,
+    scenario_label = as.character(scenario_label)
+  ) %>%
+  select(scenario_label, approach, acres_per_taf, dollars_per_af, fields_per_taf)
+
+efficiency_combined <- bind_rows(valley_efficiency, basin_specific_efficiency) %>%
+  mutate(
+    scenario_label = factor(scenario_label,
+                            levels = c("Baseline", "RCP4.5 (2020-2049)", "RCP8.5 (2020-2049)")),
+    approach = factor(approach, levels = c("Valley-wide", "Basin-specific (summed)"))
+  )
+
+# Reshape for facets — drop fields_per_taf, keep only acres and dollars
+fig7_long <- efficiency_combined %>%
+  pivot_longer(
+    cols = c(acres_per_taf, dollars_per_af),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric,
+                    levels = c("acres_per_taf", "dollars_per_af"),
+                    labels = c("A: ac/TAF", "B: $/AF"))
+  )
+
+# Build figure
+fig7 <- ggplot(fig7_long, aes(x = scenario_label, y = value, fill = approach)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7,
+           color = "black", linewidth = 0.3) +
+  geom_text(aes(label = ifelse(metric == "B: $/AF",
+                               paste0("$", round(value)),
+                               round(value, 1))),
+            position = position_dodge(width = 0.75),
+            vjust = -0.5, size = 3.5, fontface = "bold") +
+  facet_wrap(~ metric, scales = "free_y", ncol = 2) +
+  scale_fill_manual(
+    values = c("Valley-wide" = "#1f4e79",
+               "Basin-specific (summed)" = "#a8c8e8"),
+    name = "Optimization approach"
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.18)),
+                     labels = label_comma()) +
+  labs(
+    title = "Retirement efficiency: valley-wide vs. basin-specific optimization (applied water)",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold", size = 12),
+    strip.background = element_rect(fill = "gray95", color = NA),
+    panel.spacing.x = unit(1.5, "lines")
+  )
+
+print(fig7)
+
+ggsave(file.path(fig_dir, "fig7_efficiency_comparison.png"), fig7,
+       width = 9, height = 6, dpi = 600, bg = "white")
+cat("  Saved: fig7_efficiency_comparison.png\n")
+
+
+# Export underlying numbers
+write_csv(efficiency_combined %>%
+            mutate(across(where(is.numeric), ~ round(., 2))),
+          file.path(fig_dir, "fig7_efficiency_data.csv"))
+cat("  Saved: fig7_efficiency_data.csv\n")
+
+
+cat("\n=== VALLEY vs. BASIN COMPARISON FIGURES COMPLETE ===\n")
+
+
+cat("\n=== ALL FIGURE AND TABLE GENERATION COMPLETE (AW analysis) ===\n")
 
 
 
