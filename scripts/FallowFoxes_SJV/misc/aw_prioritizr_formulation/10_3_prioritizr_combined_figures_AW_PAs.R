@@ -87,7 +87,7 @@ habitat_results <- tryCatch({
 # consistent. Water-only does NOT use PAs (per manuscript), so we use the
 # original AW water-only output.
 water_summary <- tryCatch({
-  read_csv(here("data/intermediate/FallowFoxes_SJV_archive/9_2_prioritizr_water_only_AW/valley_wide_summary.csv"),
+  read_csv(here("data/intermediate/misc/aw_prioritizr_formulation/9_2_prioritizr_water_only_AW/valley_wide_summary.csv"),
            show_col_types = FALSE)
 }, error = function(e) {
   cat("  NOTE: AW water-only summary not found — Figure 5 will skip water comparison.\n")

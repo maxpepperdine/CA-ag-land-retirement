@@ -1219,6 +1219,55 @@ cat("  Saved: fig1c_basin_totals_and_breakdown.png\n")
 
 
 # ==============================================================================
+# FIGURE 1d: Revenue efficiency by basin and scenario ($/AF saved)
+# ==============================================================================
+
+cat("Creating Figure 1d: Revenue efficiency by basin...\n")
+
+fig1d_data <- basin_results %>%
+  filter(!is.na(basin), aw_achieved_af > 0) %>%
+  mutate(
+    efficiency = revenue_cost_usd / aw_achieved_af
+  )
+
+fig1d <- ggplot(fig1d_data, aes(x = basin, y = efficiency, fill = scenario_label)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.75) +
+  coord_flip() +
+  scale_fill_manual(values = scenario_colors, name = "Scenario") +
+  scale_y_continuous(labels = label_dollar(), expand = expansion(mult = c(0, 0.08))) +
+  labs(
+    title = "Revenue efficiency of land retirement by basin",
+    subtitle = "Cost per acre-foot of AW savings ($/AF) — lower values indicate more efficient retirement",
+    x = NULL,
+    y = "Revenue cost per AF saved ($/AF)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(color = "gray40", size = 10),
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(), 
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14), 
+    axis.title.x = element_text(size = 16), 
+    legend.title = element_text(face = "bold", size = 14),
+    legend.text = element_text(size = 12),
+    # legend.margin removes space around the legend items
+    legend.margin = margin(b = -3), 
+    # legend.box.margin adjusts the space between the legend box and the plot area
+    legend.box.margin = margin(t = 0, b = -5),
+  )
+fig1d
+
+ggsave(file.path(fig_dir, "fig1d_revenue_efficiency.png"), fig1d,
+       width = 10, height = 9, dpi = 600, bg = "white")
+cat("  Saved: fig1d_revenue_efficiency.png\n")
+
+
+
+# ==============================================================================
 # FIGURE 4: Valley-wide vs. basin-specific spatial maps
 # ==============================================================================
 # 2x3 grid: rows = approach (Valley-wide, Basin-specific), columns = scenarios.
