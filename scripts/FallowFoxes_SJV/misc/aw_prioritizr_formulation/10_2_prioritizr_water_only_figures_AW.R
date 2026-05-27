@@ -1279,6 +1279,38 @@ cat("\nCreating Figure 4: Valley-wide vs. basin-specific spatial maps...\n")
 base_sol_for_bbox <- valley_solutions[["Baseline"]]
 map_bbox_4 <- st_bbox(base_sol_for_bbox)
 
+
+# --- Derive bounding boxes for the basins we want to highlight ---
+# Northern cluster: Eastern San Joaquin + Tracy
+north_basins <- sjv_basins %>%
+  filter(grepl("EASTERN SAN JOAQUIN|TRACY", Basin_Su_1))
+north_bbox <- st_bbox(north_basins)
+
+# Southern cluster: Kern
+kern_basin <- sjv_basins %>%
+  filter(grepl("KERN COUNTY", Basin_Su_1))
+kern_bbox <- st_bbox(kern_basin)
+
+# Small buffer (in CRS units) so the boxes don't sit flush against the basin edges
+bbox_buffer <- 5000  # adjust if too tight/loose — units are meters in CA Albers
+
+box_north <- data.frame(
+  xmin = unname(north_bbox["xmin"]) - bbox_buffer,
+  xmax = unname(north_bbox["xmax"]) + bbox_buffer,
+  ymin = unname(north_bbox["ymin"]) - bbox_buffer,
+  ymax = unname(north_bbox["ymax"]) + bbox_buffer
+)
+
+box_kern <- data.frame(
+  xmin = unname(kern_bbox["xmin"]) - bbox_buffer,
+  xmax = unname(kern_bbox["xmax"]) - 17500,
+  ymin = unname(kern_bbox["ymin"]) + 15000,
+  ymax = unname(kern_bbox["ymax"]) + bbox_buffer
+)
+
+highlight_boxes <- rbind(box_north, box_kern)
+
+
 # Map helper (matches Fig 3 styling)
 make_compare_map <- function(plot_data, title_text) {
   ggplot() +
@@ -1292,6 +1324,11 @@ make_compare_map <- function(plot_data, title_text) {
             fill = "#2166AC", color = NA, linewidth = 0) +
     # Basin boundaries on top
     geom_sf(data = sjv_basins, fill = NA, color = "gray40", linewidth = 0.3) +
+    # Highlight boxes for basins of interest
+    geom_rect(data = highlight_boxes,
+              aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+              fill = NA, color = "red", linewidth = 0.3,
+              inherit.aes = FALSE) +
     coord_sf(xlim = c(map_bbox_4["xmin"], map_bbox_4["xmax"]),
              ylim = c(map_bbox_4["ymin"], map_bbox_4["ymax"])) +
     labs(title = title_text) +
@@ -1354,7 +1391,7 @@ fig4 <- (fig4_panels$vw_Baseline + fig4_panels$vw_RCP45_2020_2049 + fig4_panels$
     )
   )
 
-print(fig4)
+#print(fig4)
 
 ggsave(file.path(fig_dir, "fig4_valley_vs_basin_maps.png"), fig4,
        width = 14, height = 11, dpi = 600, bg = "white")
@@ -1486,25 +1523,29 @@ fig6 <- ggplot(fig6_long, aes(x = basin, y = value, fill = approach)) +
     x = NULL,
     y = NULL
   ) +
-  theme_minimal(base_size = 10) +
+  theme_minimal(base_size = 12) +
   theme(
     plot.title = element_text(face = "bold", size = 13),
     plot.subtitle = element_text(color = "gray40", size = 10),
     legend.position = "top",
     legend.justification = "left",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 12),
     panel.grid.major.y = element_blank(),
     panel.grid.minor = element_blank(),
-    strip.text = element_text(face = "bold", size = 10),
+    strip.text = element_text(face = "bold", size = 12),
     strip.background = element_rect(fill = "gray95", color = NA),
     strip.placement = "outside",
     panel.spacing.x = unit(1, "lines"),
-    panel.spacing.y = unit(0.5, "lines")
+    panel.spacing.y = unit(0.5, "lines"),
+    axis.text.y = element_text(size = 11.5, margin = margin(r = 8)),
+    axis.text.x = element_text(size = 12)
   )
 
 print(fig6)
 
 ggsave(file.path(fig_dir, "fig6_basin_specific_vs_valley_share.png"), fig6,
-       width = 14, height = 11, dpi = 600, bg = "white")
+       width = 14, height = 12, dpi = 600, bg = "white")
 cat("  Saved: fig6_basin_specific_vs_valley_share.png\n")
 
 

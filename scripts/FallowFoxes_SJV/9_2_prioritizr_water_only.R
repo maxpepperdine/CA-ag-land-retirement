@@ -300,6 +300,7 @@ planning_units <- fields %>%
 cat("  Total PUs:", nrow(planning_units), "\n")
 cat("  Total PU revenue: $", format(sum(planning_units$revenue, na.rm = TRUE),
                                     big.mark = ","), "\n")
+cat("  Total PU area:", sum(planning_units$acres),  "\n")
 
 # Scale values to avoid numerical issues with solver
 # Revenue: USD -> ten-thousands of USD (/ 10,000)
