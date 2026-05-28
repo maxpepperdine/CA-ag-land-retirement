@@ -96,7 +96,7 @@ fields_path <- here("data/intermediate/8_Snet_estimation/prioritizr_water_only/f
 basins_path <- here("data/raw/i08_B118_CA_GroundwaterBasins/i08_B118_CA_GroundwaterBasins.shp")
 
 # Output directory
-output_dir <- here("data/intermediate/FallowFoxes_SJV_archive/9_2_prioritizr_water_only_AW/")
+output_dir <- here("data/intermediate/9_2_prioritizr_water_only_AW/")
 
 
 # Load data ------------------------------------------------------------

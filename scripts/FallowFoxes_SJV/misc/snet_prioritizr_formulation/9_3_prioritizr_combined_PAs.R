@@ -835,8 +835,7 @@ print(target_detail, n = Inf)
 # SECTION 9: Export Results
 # =============================================================================
 
-output_dir <- here("data/intermediate/9_3_prioritizr_combined_PAs/")
-if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+output_dir <- here("data/intermediate/misc/snet_prioritizr_formulation/9_3_prioritizr_combined_PAs/")
 
 # --- Save all objects for figures ---
 save(
@@ -921,7 +920,7 @@ write_csv(target_methodology, file.path(output_dir, "combined_PAs_target_methodo
 cat("\n========== COMBINED OPTIMIZATION (w/ PAs) COMPLETE — RESULTS SAVED ==========\n")
 cat("Output directory:", output_dir, "\n")
 cat("Load results for figures with:\n")
-cat('  load(here("data/intermediate/9_3_prioritizr_combined_PAs/prioritizr_combined_PAs_results.RData"))\n')
+cat('  load(here("data/intermediate/misc/snet_prioritizr_formulation/9_3_prioritizr_combined_PAs/prioritizr_combined_PAs_results.RData"))\n')
 
 
 
