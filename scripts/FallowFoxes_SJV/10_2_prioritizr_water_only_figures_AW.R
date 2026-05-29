@@ -230,7 +230,7 @@ fig2a <- ggplot(valley_plot, aes(x = scenario_label, y = acres_selected)) +
   theme(
     plot.title = element_text(face = "bold", size = 22),
     panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank(), 
+    panel.grid.minor = element_blank(),
     axis.text.x = element_text(size = 16, angle = 45, hjust = 1),
     axis.text.y = element_text(size = 16),
     axis.title.y = element_text(size = 18)
@@ -248,7 +248,7 @@ fig2b <- ggplot(valley_plot, aes(x = scenario_label, y = revenue_cost_usd / 1e9)
   theme(
     plot.title = element_text(face = "bold", size = 22),
     panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank(), 
+    panel.grid.minor = element_blank(),
     axis.text.x = element_text(size = 16, angle = 45, hjust = 1),
     axis.text.y = element_text(size = 16),
     axis.title.y = element_text(size = 18)
@@ -268,7 +268,7 @@ fig2c <- ggplot(valley_plot, aes(x = scenario_label)) +
     plot.title = element_text(face = "bold", size = 22),
     plot.caption = element_text(size = 9, color = "gray50"),
     panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank(), 
+    panel.grid.minor = element_blank(),
     axis.text.x = element_text(size = 16, angle = 45, hjust = 1),
     axis.text.y = element_text(size = 16),
     axis.title.y = element_text(size = 18)
@@ -296,6 +296,7 @@ fig2
 ggsave(file.path(fig_dir, "fig2_valley_scenario_comparison.png"), fig2,
        width = 15, height = 8, dpi = 600, bg = "white")
 cat("  Saved: fig2_valley_scenario_comparison.png\n")
+
 
 
 # ==============================================================================
