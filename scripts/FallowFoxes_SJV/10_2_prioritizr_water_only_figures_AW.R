@@ -4,10 +4,6 @@
 # Creating figures from the AW-based prioritizr optimization results
 # (9_2_prioritizr_water_only_AW.R).
 #
-# This is the AW-feature counterpart to 10_2_prioritizr_water_only_figures.R,
-# providing a parallel visual analysis using applied water (AW) reductions 
-# rather than S_net consumption reductions as the water feature.
-#
 # FIGURES:
 #   1. Basin-level results: acres retired, revenue cost, and AW achieved
 #      across climate scenarios (grouped bar chart, faceted by metric)
@@ -437,7 +433,7 @@ if (!is.null(base_sol)) {
         plot.subtitle = element_text(color = "gray40", size = 11)
       )
     )
-  fig3
+  #fig3
   
   ggsave(file.path(fig_dir, "fig3_spatial_maps_frequency.png"), fig3,
          width = 10, height = 10, dpi = 600, bg = "white")
@@ -1400,6 +1396,83 @@ cat("  Saved: fig4_valley_vs_basin_maps.png\n")
 
 
 # ==============================================================================
+# FIGURE 4b: Simplified Baseline comparison (main text)
+# ==============================================================================
+# Main-text version of Figure 4: just the two Baseline maps side by side
+# (valley-wide vs. basin-specific), with a Selected/Not selected field legend
+# on the right panel. The full 6-scenario Figure 4 moves to the SI.
+# Reuses objects from the Figure 4 block: map_bbox_4, sjv_basins,
+# highlight_boxes, valley_solutions, basin_combined.
+cat("\nCreating Figure 4b: Baseline valley-wide vs. basin-specific maps...\n")
+
+# Map helper with a Selected / Not selected fill legend (mirrors make_compare_map)
+make_compare_map_legend <- function(plot_data, title_text, show_legend = FALSE) {
+  plot_data <- plot_data %>%
+    mutate(status = factor(ifelse(solution_1 == 1, "Selected", "Not selected"),
+                           levels = c("Not selected", "Selected"))) %>%
+    arrange(status)  # draw selected fields last (on top)
+  
+  ggplot() +
+    geom_sf(data = sjv_basins, fill = NA, color = "gray60", linewidth = 0.4) +
+    geom_sf(data = plot_data, aes(fill = status), color = NA, linewidth = 0,
+            show.legend = show_legend) +
+    geom_sf(data = sjv_basins, fill = NA, color = "gray40", linewidth = 0.3) +
+    geom_rect(data = highlight_boxes,
+              aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+              fill = NA, color = "red", linewidth = 0.3, inherit.aes = FALSE) +
+    coord_sf(xlim = c(map_bbox_4["xmin"], map_bbox_4["xmax"]),
+             ylim = c(map_bbox_4["ymin"], map_bbox_4["ymax"])) +
+    scale_fill_manual(
+      values = c("Selected" = "#2166AC", "Not selected" = "gray85"),
+      breaks = c("Selected", "Not selected"),
+      name   = "Planning unit"
+    ) +
+    labs(title = title_text) +
+    theme_void(base_size = 10) +
+    theme(
+      plot.title       = element_text(face = "bold", size = 11, hjust = 0),
+      plot.margin      = margin(5, 5, 5, 5),
+      panel.grid.major = element_line(color = "grey80", linewidth = 0.2),
+      panel.grid.minor = element_blank(),
+      axis.text        = element_text(size = 9, color = "grey30"),
+      axis.ticks       = element_line(color = "grey30"),
+      legend.title     = element_text(face = "bold", size = 9),
+      legend.text      = element_text(size = 9),
+      legend.position       = "inside",
+      legend.position.inside = c(0.97, 0.97),
+      legend.justification   = c(1, 1),
+      legend.background = element_rect(fill = scales::alpha("white", 0.7), color = NA),
+      legend.key        = element_rect(fill = NA, color = NA),
+      legend.margin     = margin(3, 5, 3, 5)
+    ) +
+    scale_y_continuous(n.breaks = 7) +
+    scale_x_continuous(n.breaks = 4)
+}
+
+# Left: valley-wide Baseline (no legend). Right: basin-specific Baseline (legend).
+fig4b_vw <- make_compare_map_legend(valley_solutions[["Baseline"]],
+                                    "A. valley-wide", show_legend = FALSE)
+fig4b_bs <- make_compare_map_legend(basin_combined[["Baseline"]],
+                                    "B. basin-specific", show_legend = TRUE)
+
+fig4b <- fig4b_vw + fig4b_bs +
+  plot_layout(ncol = 2) +
+  plot_annotation(
+    title = "Spatial distribution of selected fields under the Baseline target (applied water)",
+    subtitle = "Valley-wide optimization (single valley target) vs. basin-specific optimization (each basin meets its own PPIC target).",
+    theme = theme(
+      plot.title    = element_text(face = "bold", size = 13),
+      plot.subtitle = element_text(color = "gray40", size = 10)
+    )
+  )
+
+ggsave(file.path(fig_dir, "fig4b_baseline_valley_vs_basin_maps.png"), fig4b,
+       width = 11, height = 6, dpi = 600, bg = "white")
+cat("  Saved: fig4b_baseline_valley_vs_basin_maps.png\n")
+
+
+
+# ==============================================================================
 # FIGURE 6: Per-basin comparison — basin-specific vs. valley-wide
 # ==============================================================================
 # For each basin, plot side-by-side bars showing what was retired in
@@ -1688,6 +1761,830 @@ cat("\n=== VALLEY vs. BASIN COMPARISON FIGURES COMPLETE ===\n")
 
 
 cat("\n=== ALL FIGURE AND TABLE GENERATION COMPLETE (AW analysis) ===\n")
+
+
+
+
+
+
+
+
+
+
+# ==============================================================================
+# ==============================================================================
+# METRIC VERSIONS (SI UNITS) OF ALL FIGURES AND TABLES
+# ==============================================================================
+# ==============================================================================
+# This section regenerates every figure and table above in metric units and
+# saves a parallel copy to a "metric/" subfolder, with "_metric" appended to the
+# original filename. The imperial outputs above are left untouched.
+#
+# Conversions:
+#   - Area retired:        acres   -> hectares (ha)
+#   - Water savings/target: TAF/yr / AF -> km^3/yr
+#   - Efficiency ratios:   ac/TAF -> ha/Mm^3 ; $/AF -> $/m^3
+#                          (finer volume base used for ratios so the per-unit
+#                           numbers stay readable; headline volumes use km^3)
+#
+# All source data objects persist from the script body above, so each metric
+# figure is rebuilt from the same data with units converted.
+# ==============================================================================
+
+cat("\n========================================\n")
+cat("GENERATING METRIC (SI UNIT) VERSIONS\n")
+cat("========================================\n")
+
+# --- Unit conversion constants -------------------------------------------------
+ACRE_TO_HA <- 0.40468564224           # 1 acre  = 0.40468564224 hectares
+AF_TO_M3   <- 1233.48183754752        # 1 acre-foot = 1233.48 cubic metres
+AF_TO_KM3  <- AF_TO_M3 / 1e9          # 1 acre-foot in km^3
+TAF_TO_KM3 <- (AF_TO_M3 * 1000) / 1e9 # 1 TAF (1000 AF) in km^3  (~1.2335e-3)
+AF_TO_MM3  <- AF_TO_M3 / 1e6          # 1 acre-foot in million m^3 (Mm^3)
+TAF_TO_MM3 <- (AF_TO_M3 * 1000) / 1e6 # 1 TAF in Mm^3  (~1.2335)
+
+# --- Vectorised converters -----------------------------------------------------
+ac_to_ha  <- function(acres) acres * ACRE_TO_HA   # acres -> hectares
+af_to_km3 <- function(af)    af    * AF_TO_KM3     # acre-feet -> km^3
+
+# km^3 value formatter (km^3 totals are small, so keep decimals)
+fmt_km3 <- function(x, digits = 2) formatC(x, format = "f", digits = digits, big.mark = ",")
+
+# --- Metric output directory + filename helper --------------------------------
+metric_dir <- file.path(fig_dir, "metric")
+
+# Build a metric output path: same base name + "_metric" before the extension,
+# placed in the metric/ subfolder.
+metric_path <- function(filename) {
+  stem <- tools::file_path_sans_ext(filename)
+  ext  <- tools::file_ext(filename)
+  file.path(metric_dir, paste0(stem, "_metric.", ext))
+}
+
+cat("  Metric output directory:", metric_dir, "\n")
+
+
+# ==============================================================================
+# FIGURE 1 (metric): Basin-level results across scenarios
+# ==============================================================================
+cat("Creating Figure 1 (metric)...\n")
+
+fig1_data_m <- basin_results %>%
+  filter(!is.na(basin)) %>%
+  select(basin, scenario_label, acres_selected, revenue_cost_usd, aw_achieved_af) %>%
+  mutate(
+    hectares_retired      = ac_to_ha(acres_selected),
+    revenue_cost_millions = revenue_cost_usd / 1e6,
+    aw_achieved_km3       = af_to_km3(aw_achieved_af)
+  ) %>%
+  pivot_longer(
+    cols = c(hectares_retired, revenue_cost_millions, aw_achieved_km3),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric,
+                    levels = c("hectares_retired", "revenue_cost_millions", "aw_achieved_km3"),
+                    labels = c("Hectares retired", "Foregone revenue ($ millions)", "Applied water saved (km³)"))
+  )
+
+fig1_m <- ggplot(fig1_data_m, aes(x = basin, y = value, fill = scenario_label)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7) +
+  coord_flip() +
+  facet_wrap(~ metric, scales = "free_x", ncol = 3) +
+  scale_fill_manual(values = scenario_colors, name = "Scenario") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.08)),
+                     labels = label_comma()) +
+  labs(
+    title = "Basin-level optimization results across climate scenarios (applied water target only)",
+    subtitle = "Hectares retired, foregone revenue, and applied water saved by groundwater basin",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(color = "gray40", size = 10),
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 11),
+    strip.background = element_rect(fill = "gray95", color = NA)
+  )
+
+ggsave(metric_path("fig1_basin_results_by_scenario.png"), fig1_m,
+       width = 13, height = 8, dpi = 600, bg = "white")
+cat("  Saved: fig1_basin_results_by_scenario_metric.png\n")
+
+
+# ==============================================================================
+# FIGURE 2 (metric): Valley-wide scenario comparison
+# ==============================================================================
+cat("Creating Figure 2 (metric)...\n")
+
+# Panel A: hectares
+fig2a_m <- ggplot(valley_plot, aes(x = scenario_label, y = ac_to_ha(acres_selected))) +
+  geom_col(fill = "#854F0B", width = 0.6) +
+  geom_text(aes(label = format(round(ac_to_ha(acres_selected)), big.mark = ",")),
+            vjust = -0.5, size = 5.5, fontface = "bold") +
+  scale_y_continuous(labels = label_comma(), expand = expansion(mult = c(0, 0.12))) +
+  labs(title = "A", x = NULL, y = "Hectares") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 22),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(size = 16, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 16),
+    axis.title.y = element_text(size = 18)
+  )
+
+# Panel B: revenue (unchanged — reuse imperial object)
+fig2b_m <- fig2b
+
+# Panel C: applied water saved (km^3/yr)
+fig2c_m <- ggplot(valley_plot, aes(x = scenario_label)) +
+  geom_col(aes(y = af_to_km3(aw_achieved_af)), fill = "#3266ad", width = 0.6) +
+  geom_text(aes(y = af_to_km3(aw_achieved_af),
+                label = paste0(fmt_km3(af_to_km3(aw_achieved_af), 2), " km³")),
+            vjust = -0.5, size = 5.5, fontface = "bold") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.12)),
+                     labels = label_comma()) +
+  labs(title = "C", x = NULL, y = "km³/yr") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 22),
+    plot.caption = element_text(size = 9, color = "gray50"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(size = 16, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 16),
+    axis.title.y = element_text(size = 18)
+  )
+
+fig2_subtitle_m <- sprintf(
+  "Each RCP scenario uses a climate-adjusted applied water reduction target (Baseline: %s km³; RCP4.5: %s km³; RCP8.5: %s km³)",
+  fmt_km3(valley_base_taf  * TAF_TO_KM3, 2),
+  fmt_km3(valley_rcp45_taf * TAF_TO_KM3, 2),
+  fmt_km3(valley_rcp85_taf * TAF_TO_KM3, 2)
+)
+
+fig2_m <- fig2a_m + fig2b_m + fig2c_m +
+  plot_annotation(
+    title = "Valley-wide optimization results across climate scenarios (applied water)",
+    subtitle = fig2_subtitle_m,
+    theme = theme(
+      plot.title = element_text(face = "bold", size = 14),
+      plot.subtitle = element_text(color = "gray40", size = 11)
+    )
+  )
+
+ggsave(metric_path("fig2_valley_scenario_comparison.png"), fig2_m,
+       width = 15, height = 8, dpi = 600, bg = "white")
+cat("  Saved: fig2_valley_scenario_comparison_metric.png\n")
+
+
+# ==============================================================================
+# FIGURE 3 (metric): Spatial maps — only the scenario-target titles change
+# ==============================================================================
+# The maps themselves are identical (field selections are unit-independent);
+# only the TAF targets in the panel titles convert to km^3. Reuses the
+# persisted make_scenario_map() helper, selection_data, and map_frequency.
+if (exists("make_scenario_map") && exists("selection_data") && exists("map_frequency")) {
+  
+  cat("Creating Figure 3 (metric)...\n")
+  
+  scenario_map_labels_m <- c(
+    "selected_baseline" = sprintf("A: Baseline (target: %s km³)",
+                                  fmt_km3(valley_base_taf  * TAF_TO_KM3, 2)),
+    "selected_rcp45"    = sprintf("B: RCP 4.5 (target: %s km³)",
+                                  fmt_km3(valley_rcp45_taf * TAF_TO_KM3, 2)),
+    "selected_rcp85"    = sprintf("C: RCP 8.5 (target: %s km³)",
+                                  fmt_km3(valley_rcp85_taf * TAF_TO_KM3, 2))
+  )
+  
+  map_baseline_m <- make_scenario_map(selection_data, "selected_baseline",
+                                      scenario_map_labels_m["selected_baseline"])
+  map_rcp45_m    <- make_scenario_map(selection_data, "selected_rcp45",
+                                      scenario_map_labels_m["selected_rcp45"])
+  map_rcp85_m    <- make_scenario_map(selection_data, "selected_rcp85",
+                                      scenario_map_labels_m["selected_rcp85"])
+  
+  fig3_m <- (map_baseline_m + map_rcp45_m) / (map_rcp85_m + map_frequency) +
+    plot_annotation(
+      title = "Spatial distribution of fields selected for retirement (applied water target only)",
+      subtitle = "Valley-wide optimization under three climate scenarios with scenario-specific targets",
+      theme = theme(
+        plot.title = element_text(face = "bold", size = 14),
+        plot.subtitle = element_text(color = "gray40", size = 11)
+      )
+    )
+  
+  ggsave(metric_path("fig3_spatial_maps_frequency.png"), fig3_m,
+         width = 10, height = 10, dpi = 600, bg = "white")
+  cat("  Saved: fig3_spatial_maps_frequency_metric.png\n")
+}
+
+
+# ==============================================================================
+# FIGURE 5 (metric): Retirement totals by crop type
+# ==============================================================================
+cat("Creating Figure 5 (metric)...\n")
+
+fig5_data_m <- crop_summary %>%
+  mutate(
+    hectares_retired = ac_to_ha(acres_retired),
+    aw_km3           = aw_taf * TAF_TO_KM3
+  ) %>%
+  pivot_longer(
+    cols = c(hectares_retired, revenue_millions, aw_km3),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric,
+                    levels = c("hectares_retired", "revenue_millions", "aw_km3"),
+                    labels = c("Hectares retired", "Foregone revenue ($ millions)", "Applied water saved (km³)"))
+  )
+
+fig5_m <- ggplot(fig5_data_m, aes(x = crop_group, y = value, fill = scenario)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7) +
+  coord_flip() +
+  facet_wrap(~ metric, scales = "free_x", ncol = 3) +
+  scale_fill_manual(values = scenario_colors, name = "Scenario") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.08)),
+                     labels = label_comma()) +
+  labs(
+    title = "Retirement totals by crop type across climate scenarios (applied water target)",
+    subtitle = "Top 10 crop types by baseline hectares retired, with remaining types grouped",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(color = "gray40", size = 10),
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 13),
+    strip.background = element_rect(fill = "gray95", color = NA),
+    axis.text.y = element_text(
+      face = ifelse(levels(crop_summary$crop_group) == "All other crops", "italic", "plain"),
+      size = 12
+    ),
+    axis.text.x = element_text(size = 12),
+    legend.title = element_text(face = "bold", size = 12),
+    legend.text = element_text(size = 11),
+    panel.spacing.x = unit(1.5, "lines")
+  )
+
+ggsave(metric_path("fig5_retirement_by_crop_type.png"), fig5_m,
+       width = 12, height = 7, dpi = 600, bg = "white")
+cat("  Saved: fig5_retirement_by_crop_type_metric.png\n")
+
+
+# ==============================================================================
+# TABLE 1 (metric): Basin-level results by scenario
+# ==============================================================================
+cat("Creating Table 1 (metric)...\n")
+
+# Convert numeric source table: *_taf columns -> km^3, *_acres_selected -> ha.
+taf_cols_t1 <- grep("_taf$",            names(table1_final), value = TRUE)
+ac_cols_t1  <- grep("_acres_selected$", names(table1_final), value = TRUE)
+
+table1_final_m <- table1_final %>%
+  mutate(across(all_of(taf_cols_t1), ~ round(.x * TAF_TO_KM3, 4)),
+         across(all_of(ac_cols_t1),  ~ round(ac_to_ha(.x))))
+
+# Rename acres columns to hectares for clarity in the exported CSV
+names(table1_final_m) <- gsub("_acres_selected$", "_hectares", names(table1_final_m))
+
+table1_display_m <- table1_final_m %>%
+  rename(Basin = basin) %>%
+  mutate(across(contains("hectares") | contains("fields"), ~ format(., big.mark = ",")))
+
+kbl_table1_m <- table1_display_m %>%
+  kbl(
+    col.names = c("Basin",
+                  "Target", "AW", "Hectares", "Fields", "Rev ($M)",
+                  "Target", "AW", "Hectares", "Fields", "Rev ($M)",
+                  "Target", "AW", "Hectares", "Fields", "Rev ($M)"),
+    align = c("l", rep("r", 15)),
+    caption = "Table 1. Basin-level optimization results by climate scenario (applied water target). Targets and AW in km³/yr; revenue in millions USD."
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    font_size = 12
+  ) %>%
+  add_header_above(c(" " = 1,
+                     "Baseline" = 5,
+                     "RCP 4.5 (2020-2049)" = 5,
+                     "RCP 8.5 (2020-2049)" = 5)) %>%
+  row_spec(nrow(table1_display_m), bold = TRUE,
+           extra_css = "border-top: 2px solid #333;") %>%
+  kableExtra::footnote(
+    general = "Baseline targets derived from PPIC San Joaquin Valley dataset (Escriva-Bou et al. 2023; 'Corrected reduction in groundwater supplies no negative' field, aggregated to basin level). RCP 4.5 targets are baseline targets scaled by 6.3% following PPIC's published climate-change adjustment (2.68 -> 2.85 MAF). RCP 8.5 targets apply an additional multiplier derived from the ratio of ensemble mean PET change between RCP scenarios in the BCMv8 projections. Valley-wide totals reflect the valley-wide optimization, not the sum of basin-specific runs.",
+    general_title = "Note: "
+  )
+
+save_kable(kbl_table1_m, metric_path("table1_basin_results.html"))
+cat("  Saved: table1_basin_results_metric.html\n")
+
+write_csv(table1_final_m, metric_path("table1_basin_results.csv"))
+cat("  Saved: table1_basin_results_metric.csv\n")
+
+
+# ==============================================================================
+# TABLE 2 (metric): Valley-wide scenario summary
+# ==============================================================================
+cat("Creating Table 2 (metric)...\n")
+
+table2_m <- valley_summary %>%
+  mutate(
+    Scenario = case_when(
+      grepl("Baseline", scenario) ~ "Baseline",
+      grepl("RCP45", scenario)    ~ "RCP 4.5 (2020-2049)",
+      grepl("RCP85", scenario)    ~ "RCP 8.5 (2020-2049)"
+    ),
+    `Target multiplier` = case_when(
+      grepl("Baseline", scenario) ~ "1.000",
+      grepl("RCP45", scenario)    ~ as.character(round(rcp45_mult, 4)),
+      grepl("RCP85", scenario)    ~ as.character(round(rcp85_mult, 4))
+    ),
+    `Target (km³)`   = round(target_af       * AF_TO_KM3, 4),
+    `AW saved (km³)` = round(aw_achieved_af  * AF_TO_KM3, 4),
+    `Hectares retired` = format(round(ac_to_ha(acres_selected)), big.mark = ","),
+    `Fields selected`  = format(n_fields_selected, big.mark = ","),
+    `Revenue cost ($M)` = round(revenue_cost_usd / 1e6, 1)
+  ) %>%
+  select(Scenario, `Target multiplier`, `Target (km³)`, `AW saved (km³)`,
+         `Hectares retired`, `Fields selected`, `Revenue cost ($M)`)
+
+kbl_table2_m <- table2_m %>%
+  kbl(
+    align = c("l", rep("r", 7)),
+    caption = "Table 2. Valley-wide optimization results across climate scenarios (applied water target)."
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    font_size = 13
+  ) %>%
+  column_spec(1, bold = TRUE) %>%
+  footnote(
+    general = sprintf(
+      paste0("Target multiplier reflects the proportional scaling of the baseline PPIC SGMA applied water reduction target: ",
+             "%.3f for RCP 4.5 (Escriva-Bou et al., 2023; reflecting the 6.3%% increase from 2.68 to 2.85 MAF under median RCP 4.5 conditions) ",
+             "and %.3f for RCP 8.5 (the RCP 4.5 increment scaled by the ratio of ensemble mean PET change between RCP scenarios ",
+             "in the BCMv8 projections)."),
+      rcp45_mult, rcp85_mult
+    ),
+    general_title = "Note: "
+  )
+
+save_kable(kbl_table2_m, metric_path("table2_valley_summary.html"))
+cat("  Saved: table2_valley_summary_metric.html\n")
+
+write_csv(table2_m, metric_path("table2_valley_summary.csv"))
+cat("  Saved: table2_valley_summary_metric.csv\n")
+
+
+# ==============================================================================
+# TABLE 3 (metric): Selection consistency across scenarios
+# ==============================================================================
+if (exists("table3_data")) {
+  
+  cat("Creating Table 3 (metric)...\n")
+  
+  table3_display_m <- table3_data %>%
+    mutate(
+      Category = case_when(
+        n_selected == 0 ~ "Not selected in any scenario",
+        n_selected == 1 ~ "Selected in 1 scenario",
+        n_selected == 2 ~ "Selected in 2 scenarios",
+        n_selected == 3 ~ "Selected in all 3 scenarios"
+      ),
+      Fields = format(n_fields, big.mark = ","),
+      `% Fields` = paste0(pct_fields, "%"),
+      Hectares = format(round(ac_to_ha(total_acres)), big.mark = ","),
+      `% Hectares` = paste0(pct_acres, "%"),
+      `Revenue ($M)` = total_revenue_m
+    ) %>%
+    select(Category, Fields, `% Fields`, Hectares, `% Hectares`, `Revenue ($M)`)
+  
+  kbl_table3_m <- table3_display_m %>%
+    kbl(
+      align = c("l", "r", "r", "r", "r", "r"),
+      caption = "Table 3. Selection consistency of fields across three climate scenarios (valley-wide optimization, applied water target)."
+    ) %>%
+    kable_styling(
+      bootstrap_options = c("striped", "hover", "condensed"),
+      full_width = FALSE,
+      font_size = 13
+    ) %>%
+    row_spec(nrow(table3_display_m), bold = TRUE,
+             extra_css = "background-color: #E8F0FE;") %>%
+    footnote(
+      general = "Fields selected in all 3 scenarios represent a 'core portfolio' of no-regret retirements that are optimal regardless of climate trajectory. Fields selected in only 1 scenario are climate-sensitive selections whose inclusion depends on the severity of future conditions.",
+      general_title = "Note: "
+    )
+  
+  save_kable(kbl_table3_m, metric_path("table3_selection_consistency.html"))
+  cat("  Saved: table3_selection_consistency_metric.html\n")
+  
+  # CSV: convert total_acres -> hectares
+  table3_data_m <- table3_data %>%
+    mutate(total_hectares = ac_to_ha(total_acres)) %>%
+    select(-total_acres)
+  write_csv(table3_data_m, metric_path("table3_selection_consistency.csv"))
+  cat("  Saved: table3_selection_consistency_metric.csv\n")
+}
+
+
+# ==============================================================================
+# FIGURE 1b (metric): Basin-level results with Total row
+# ==============================================================================
+cat("Creating Figure 1b (metric)...\n")
+
+fig1b_data_m <- basin_results_with_total %>%
+  filter(!is.na(basin)) %>%
+  mutate(
+    hectares_retired = ac_to_ha(acres_selected),
+    revenue_cost_millions = revenue_cost_usd / 1e6,
+    aw_achieved_km3  = af_to_km3(aw_achieved_af)
+  ) %>%
+  pivot_longer(
+    cols = c(hectares_retired, revenue_cost_millions, aw_achieved_km3),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric,
+                    levels = c("hectares_retired", "revenue_cost_millions", "aw_achieved_km3"),
+                    labels = c("Hectares retired", "Foregone revenue ($ millions)", "Applied water saved (km³)"))
+  )
+
+fig1b_m <- ggplot(fig1b_data_m, aes(x = basin, y = value, fill = scenario_label)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7) +
+  geom_hline(yintercept = 0, color = "gray70", linewidth = 0.3) +
+  geom_vline(xintercept = length(fig1b_basin_order) - 0.5,
+             linetype = "dashed", color = "gray40", linewidth = 0.5) +
+  coord_flip() +
+  facet_wrap(~ metric, scales = "free_x", ncol = 3) +
+  scale_fill_manual(values = scenario_colors, name = "Scenario") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.08)),
+                     labels = label_comma()) +
+  labs(
+    title = "Basin-level results across climate scenarios, with summed totals (applied water)",
+    subtitle = "Total row shows the sum of basin-specific retirements; compare directly to Figure 2 (valley-wide)",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(color = "gray40", size = 10),
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 11),
+    strip.background = element_rect(fill = "gray95", color = NA),
+    axis.text.y = element_text(
+      face = ifelse(levels(basin_results_with_total$basin) == "Total (basin-specific)",
+                    "bold", "plain")
+    )
+  )
+
+ggsave(metric_path("fig1b_basin_results_with_total.png"), fig1b_m,
+       width = 13, height = 8.5, dpi = 600, bg = "white")
+cat("  Saved: fig1b_basin_results_with_total_metric.png\n")
+
+
+# ==============================================================================
+# FIGURE 1c (metric): Valley totals (basin sum) + basin breakdown
+# ==============================================================================
+cat("Creating Figure 1c (metric)...\n")
+
+# --- Top panel sub-plots ---
+fig1c_top_acres_m <- ggplot(basin_totals_top,
+                            aes(x = scenario_label_multi, y = ac_to_ha(acres_selected),
+                                fill = scenario_label)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = format(round(ac_to_ha(acres_selected)), big.mark = ",")),
+            vjust = -0.5, size = 4.5, fontface = "bold") +
+  scale_fill_manual(values = scenario_colors, guide = "none") +
+  scale_y_continuous(labels = label_comma(), expand = expansion(mult = c(0, 0.15))) +
+  labs(x = NULL, y = "Hectares") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size = 13)
+  )
+
+# revenue sub-panel unchanged — reuse imperial object
+fig1c_top_rev_m <- fig1c_top_rev
+
+fig1c_top_aw_m <- ggplot(basin_totals_top,
+                         aes(x = scenario_label_multi, y = af_to_km3(aw_achieved_af),
+                             fill = scenario_label)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = paste0(fmt_km3(af_to_km3(aw_achieved_af), 2), " km³")),
+            vjust = -0.5, size = 4.5, fontface = "bold") +
+  scale_fill_manual(values = scenario_colors, guide = "none") +
+  scale_y_continuous(labels = label_comma(), expand = expansion(mult = c(0, 0.15))) +
+  labs(x = NULL, y = "km³/yr") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size = 13)
+  )
+
+fig1c_top_m <- fig1c_top_acres_m + fig1c_top_rev_m + fig1c_top_aw_m +
+  plot_layout(ncol = 3) +
+  plot_annotation(
+    title = "A. Summed basin-specific totals across climate scenarios",
+    theme = theme(plot.title = element_text(face = "bold", size = 13))
+  )
+
+# --- Bottom panel: basin-level breakdown ---
+fig1c_bot_data_m <- basin_results %>%
+  filter(!is.na(basin)) %>%
+  select(basin, scenario_label, acres_selected, revenue_cost_usd, aw_achieved_af) %>%
+  mutate(
+    hectares_retired = ac_to_ha(acres_selected),
+    revenue_cost_millions = revenue_cost_usd / 1e6,
+    aw_achieved_km3  = af_to_km3(aw_achieved_af)
+  ) %>%
+  pivot_longer(
+    cols = c(hectares_retired, revenue_cost_millions, aw_achieved_km3),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric,
+                    levels = c("hectares_retired", "revenue_cost_millions", "aw_achieved_km3"),
+                    labels = c("Hectares retired", "Foregone revenue ($ millions)", "Applied water saved (km³)"))
+  )
+
+fig1c_bot_m <- ggplot(fig1c_bot_data_m, aes(x = basin, y = value, fill = scenario_label)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7) +
+  coord_flip() +
+  facet_wrap(~ metric, scales = "free_x", ncol = 3) +
+  scale_fill_manual(values = scenario_colors, name = "Scenario") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.08)),
+                     labels = label_comma()) +
+  labs(
+    title = "B. Basin-level results across climate scenarios",
+    x = NULL, y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 11),
+    strip.background = element_rect(fill = "gray95", color = NA)
+  )
+
+fig1c_m <- wrap_elements(fig1c_top_m) / fig1c_bot_m +
+  plot_layout(heights = c(1, 2.2)) +
+  plot_annotation(
+    title = "Basin-specific optimization results: valley totals (A) and basin-level breakdown (B), applied water",
+    theme = theme(plot.title = element_text(face = "bold", size = 14))
+  )
+
+ggsave(metric_path("fig1c_basin_totals_and_breakdown.png"), fig1c_m,
+       width = 14, height = 14, dpi = 600, bg = "white")
+cat("  Saved: fig1c_basin_totals_and_breakdown_metric.png\n")
+
+
+# ==============================================================================
+# FIGURE 1d (metric): Revenue efficiency by basin ($/m^3 saved)
+# ==============================================================================
+cat("Creating Figure 1d (metric)...\n")
+
+fig1d_data_m <- basin_results %>%
+  filter(!is.na(basin), aw_achieved_af > 0) %>%
+  mutate(
+    efficiency = revenue_cost_usd / (aw_achieved_af * AF_TO_M3)  # $ per m^3
+  )
+
+fig1d_m <- ggplot(fig1d_data_m, aes(x = basin, y = efficiency, fill = scenario_label)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.75) +
+  coord_flip() +
+  scale_fill_manual(values = scenario_colors, name = "Scenario") +
+  scale_y_continuous(labels = label_dollar(accuracy = 0.01), expand = expansion(mult = c(0, 0.08))) +
+  labs(
+    title = "Revenue efficiency of land retirement by basin",
+    subtitle = "Cost per cubic metre of AW savings ($/m³) \u2014 lower values indicate more efficient retirement",
+    x = NULL,
+    y = "Revenue cost per m³ saved ($/m³)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(color = "gray40", size = 10),
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14),
+    axis.title.x = element_text(size = 16),
+    legend.title = element_text(face = "bold", size = 14),
+    legend.text = element_text(size = 12),
+    legend.margin = margin(b = -3),
+    legend.box.margin = margin(t = 0, b = -5),
+  )
+
+ggsave(metric_path("fig1d_revenue_efficiency.png"), fig1d_m,
+       width = 10, height = 9, dpi = 600, bg = "white")
+cat("  Saved: fig1d_revenue_efficiency_metric.png\n")
+
+
+# ==============================================================================
+# FIGURE 4 (metric): Valley-wide vs. basin-specific spatial maps
+# ==============================================================================
+# Field-selection maps are unit-independent and the titles carry no units, so
+# the metric copy is identical; saved under the metric filename for a complete set.
+if (exists("fig4")) {
+  cat("Creating Figure 4 (metric)...\n")
+  ggsave(metric_path("fig4_valley_vs_basin_maps.png"), fig4,
+         width = 14, height = 11, dpi = 600, bg = "white")
+  cat("  Saved: fig4_valley_vs_basin_maps_metric.png\n")
+}
+
+
+# ==============================================================================
+# FIGURE 6 (metric): Per-basin comparison (basin-specific vs. valley-wide share)
+# ==============================================================================
+cat("Creating Figure 6 (metric)...\n")
+
+fig6_long_m <- fig6_data %>%
+  filter(!is.na(basin)) %>%
+  mutate(
+    hectares_retired = ac_to_ha(acres_selected),
+    aw_km3           = aw_taf * TAF_TO_KM3
+  ) %>%
+  pivot_longer(
+    cols = c(hectares_retired, revenue_millions, aw_km3),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric,
+                    levels = c("hectares_retired", "revenue_millions", "aw_km3"),
+                    labels = c("Hectares retired", "Foregone revenue ($ millions)", "Applied water saved (km³)"))
+  )
+
+fig6_m <- ggplot(fig6_long_m, aes(x = basin, y = value, fill = approach)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7) +
+  coord_flip() +
+  facet_grid(scenario_label ~ metric, scales = "free_x", switch = "y") +
+  scale_fill_manual(
+    values = c("Basin-specific run" = "#1f4e79",
+               "Valley-wide run (basin share)" = "#a8c8e8"),
+    name = "Optimization approach"
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.10)),
+                     labels = label_comma()) +
+  labs(
+    title = "Per-basin retirement: basin-specific run vs. share from valley-wide run (applied water)",
+    subtitle = "Reveals how valley-wide optimization redistributes retirement effort across basins relative to local SGMA targets",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(color = "gray40", size = 10),
+    legend.position = "top",
+    legend.justification = "left",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 12),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 12),
+    strip.background = element_rect(fill = "gray95", color = NA),
+    strip.placement = "outside",
+    panel.spacing.x = unit(1, "lines"),
+    panel.spacing.y = unit(0.5, "lines"),
+    axis.text.y = element_text(size = 11.5, margin = margin(r = 8)),
+    axis.text.x = element_text(size = 12)
+  )
+
+ggsave(metric_path("fig6_basin_specific_vs_valley_share.png"), fig6_m,
+       width = 14, height = 12, dpi = 600, bg = "white")
+cat("  Saved: fig6_basin_specific_vs_valley_share_metric.png\n")
+
+# Comparison data CSV (metric)
+fig6_export_m <- fig6_data %>%
+  mutate(hectares = ac_to_ha(acres_selected),
+         aw_km3   = aw_taf * TAF_TO_KM3) %>%
+  select(scenario_label, basin, approach, hectares, revenue_millions, aw_km3) %>%
+  arrange(scenario_label, basin, approach)
+write_csv(fig6_export_m, metric_path("fig6_basin_comparison_data.csv"))
+cat("  Saved: fig6_basin_comparison_data_metric.csv\n")
+
+
+# ==============================================================================
+# FIGURE 7 (metric): Retirement efficiency (ha/Mm^3 and $/m^3)
+# ==============================================================================
+cat("Creating Figure 7 (metric)...\n")
+
+# Convert efficiency ratios:
+#   acres_per_taf  -> ha per Mm^3
+#   dollars_per_af -> $ per m^3
+#   fields_per_taf -> fields per Mm^3
+efficiency_combined_m <- efficiency_combined %>%
+  mutate(
+    ha_per_mm3     = acres_per_taf  * ACRE_TO_HA / TAF_TO_MM3,
+    dollars_per_m3 = dollars_per_af / AF_TO_M3,
+    fields_per_mm3 = fields_per_taf / TAF_TO_MM3
+  )
+
+fig7_long_m <- efficiency_combined_m %>%
+  pivot_longer(
+    cols = c(ha_per_mm3, dollars_per_m3),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric,
+                    levels = c("ha_per_mm3", "dollars_per_m3"),
+                    labels = c("A: ha/Mm³", "B: $/m³"))
+  )
+
+fig7_m <- ggplot(fig7_long_m, aes(x = scenario_label, y = value, fill = approach)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7,
+           color = "black", linewidth = 0.3) +
+  geom_text(aes(label = ifelse(metric == "B: $/m³",
+                               paste0("$", formatC(value, format = "f", digits = 3)),
+                               formatC(value, format = "f", digits = 1))),
+            position = position_dodge(width = 0.75),
+            vjust = -0.5, size = 3.5, fontface = "bold") +
+  facet_wrap(~ metric, scales = "free_y", ncol = 2) +
+  scale_fill_manual(
+    values = c("Valley-wide" = "#1f4e79",
+               "Basin-specific (summed)" = "#a8c8e8"),
+    name = "Optimization approach"
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.18)),
+                     labels = label_comma(accuracy = 0.01)) +
+  labs(
+    title = "Retirement efficiency: valley-wide vs. basin-specific optimization (applied water)",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13),
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold", size = 12),
+    strip.background = element_rect(fill = "gray95", color = NA),
+    panel.spacing.x = unit(1.5, "lines")
+  )
+
+ggsave(metric_path("fig7_efficiency_comparison.png"), fig7_m,
+       width = 9, height = 6, dpi = 600, bg = "white")
+cat("  Saved: fig7_efficiency_comparison_metric.png\n")
+
+write_csv(efficiency_combined_m %>%
+            select(scenario_label, approach, ha_per_mm3, dollars_per_m3, fields_per_mm3) %>%
+            mutate(across(where(is.numeric), ~ round(., 4))),
+          metric_path("fig7_efficiency_data.csv"))
+cat("  Saved: fig7_efficiency_data_metric.csv\n")
+
+
+cat("\n=== METRIC (SI UNIT) VERSIONS COMPLETE (AW water-only analysis) ===\n")
+
+
+
+
+
+
+
+
+
+
+
 
 
 
