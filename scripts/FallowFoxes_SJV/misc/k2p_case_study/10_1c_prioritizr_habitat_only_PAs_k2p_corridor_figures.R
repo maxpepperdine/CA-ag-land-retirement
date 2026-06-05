@@ -1217,7 +1217,7 @@ crop_tbl <- crop_table_disp %>%
 
 crop_tbl
 
-write_csv(crop_table_df, file.path(metric_dir, "crop_composition.csv"))
+save_kable(crop_tbl, metric_path("crop_composition.html"))
 
 
 # =============================================================================
