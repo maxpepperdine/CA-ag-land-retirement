@@ -49,14 +49,14 @@ source(here("scripts/FallowFoxes_SJV/0_startup/0_2_functions.R"))
 options(scipen = 999)
 
 # Figure output directory
-fig_dir <- here("data/intermediate/misc/k2p_case_study/10_1c_prioritizr_habitat_only_PAs_k2p_corridor_figures/blm_0.01_neigh_5/")
+fig_dir <- here("data/intermediate/misc/k2p_case_study/10_1c_prioritizr_habitat_only_PAs_k2p_corridor_figures/blm_0.0075/")
 
 
 # =============================================================================
 # LOAD RESULTS
 # =============================================================================
 
-load(here("data/intermediate/misc/k2p_case_study/9_1c_prioritizr_habitat_only_PAs_k2p_corridor/blm_0.01_neigh_5/prioritizr_corridor_cross_temporal_PAs_results.RData"))
+load(here("data/intermediate/misc/k2p_case_study/9_1c_prioritizr_habitat_only_PAs_k2p_corridor/blm_0.0075/prioritizr_corridor_cross_temporal_PAs_results.RData"))
 
 # Extract the cleaned PA layer from the combined planning unit object
 pa_sf <- pu %>% filter(is_pa) %>% st_make_valid()
@@ -520,6 +520,7 @@ ggsave(file.path(fig_dir, "fig4_spatial_map.png"), fig4_corridor_map,
 
 
 
+
 # =============================================================================
 # ADDING AN INSET TO THE PLOT ABOVE
 # =============================================================================
@@ -620,12 +621,12 @@ for (scen in names(solutions)) {
         "Existing protected area"
       ),
       labels = c(
-        "Cultivated or short-term fallow (selected)"     = "Cultivated or short-term\nfallow (selected)",
-        "Cultivated or short-term fallow (not selected)" = "Cultivated or short-term\nfallow (not selected)",
+        "Cultivated or short-term fallow (selected)"     = "Planning unit\n(selected)",
+        "Cultivated or short-term fallow (not selected)" = "Planning unit\n(not selected)",
         "Retired"                                        = "Retired",
-        "Existing protected area"                        = "Existing protected\narea (locked in)"
+        "Existing protected area"                        = "Protected area\n(locked in)"
       ),
-      name = "Planning unit status"
+      name = "Field status"
     ) +
     labs(title = quality_label) +
     theme_minimal(base_size = 10) +
@@ -749,6 +750,103 @@ ggsave(file.path(fig_dir, "fig5_blm_calibration.png"), fig5_blm_plot,
        width = 8, height = 5.5, dpi = 600, bg = "white")
 
 
+
+# =============================================================================
+# FIGURE 6: CROP COMPOSITION OF SELECTED FIELDS — KERN-PIXLEY CORRIDOR
+# Same side-by-side layout as fig4 (Suitable | High Quality), but selected
+# planning units are filled by crop class (`comm`) instead of field status.
+# =============================================================================
+
+# ---- 0. Set to match your objects -------------------------------------------
+id_col   <- "id"            # field ID column (PAs are negative)
+comm_col <- "comm"          # crop class column on field_data
+sol_col  <- "solution_1"    # selected flag in the solved prioritizr objects
+n_top    <- 8               # # of crops to color individually; rest -> "Other"
+# sol_suit, sol_hq : your two solved problems (sf or df with `sol_col`)
+# field_data       : corridor planning units (sf) carrying `comm` + geometry
+# corridor_union   : TNC corridor polygon (for the black outline)
+
+sol_suit <- solutions[["cross_temporal_suit"]]
+sol_hq   <- solutions[["cross_temporal_hq"]]
+
+# ---- 1. Selected field IDs per solution (drop locked-in PAs via id > 0) ------
+sel_ids <- function(sol) sol %>% st_drop_geometry() %>%
+  filter(.data[[sol_col]] == 1, .data[[id_col]] > 0) %>% pull(all_of(id_col))
+
+selected_all <- bind_rows(
+  field_data %>% filter(.data[[id_col]] %in% sel_ids(sol_suit)) %>% mutate(quality = "Suitable"),
+  field_data %>% filter(.data[[id_col]] %in% sel_ids(sol_hq))   %>% mutate(quality = "High Quality")
+) %>%
+  mutate(area_ha = as.numeric(st_area(geom)) / 1e4)
+
+# ---- 2. Collapse to top crops (consistent colors across both panels) --------
+top_crops <- selected_all %>% st_drop_geometry() %>%
+  group_by(crop = .data[[comm_col]]) %>% summarise(ha = sum(area_ha), .groups = "drop") %>%
+  slice_max(ha, n = n_top) %>% pull(crop)
+
+# ---- 2b. Factor levels + green-free crop palette + PA layer -----------------
+crop_levels <- c(top_crops, "Other", "Protected area (locked in)")
+
+selected_all <- selected_all %>%
+  mutate(crop    = factor(if_else(.data[[comm_col]] %in% top_crops, .data[[comm_col]], "Other"),
+                          levels = crop_levels),
+         quality = factor(quality, levels = c("Suitable", "High Quality")))
+
+# Locked-in PAs (negative IDs) — identical across both solutions, so pull once.
+# No `quality` column => facet draws them in both panels.
+pa_sf <- sol_suit %>%
+  filter(.data[[sol_col]] == 1, .data[[id_col]] < 0) %>%
+  mutate(crop = factor("Protected area (locked in)", levels = crop_levels))
+
+# Green-free qualitative palette (Okabe-Ito + Tol, greens/teals removed)
+crop_colors <- c("cyan", "#F0E442", "#0072B2", "#E69F00", "#CC79A7",
+                 "bisque3", "#882255", "#332288", "#AA4499", "#661100")
+crop_pal <- c(setNames(head(crop_colors, length(top_crops)), top_crops),
+              "Other"                       = "grey75",
+              "Protected area (locked in)"  = "forestgreen")
+
+# ---- 3. Framing: corridor bbox w/ asymmetric left buffer (matches fig4) ------
+corridor_union <- st_transform(corridor_union, st_crs(field_data))
+bb <- st_bbox(field_data); xr <- bb["xmax"] - bb["xmin"]; yr <- bb["ymax"] - bb["ymin"]
+xlim <- c(bb["xmin"] - 0.20 * xr, bb["xmax"] + 0.05 * xr)
+ylim <- c(bb["ymin"] - 0.05 * yr, bb["ymax"] + 0.05 * yr)
+
+# ---- 4. Single faceted plot => one shared legend ----------------------------
+fig6_crop <- ggplot() +
+  geom_sf(data = field_data, fill = "grey95", color = "grey85", linewidth = 0.05) +
+  geom_sf(data = pa_sf,        aes(fill = crop), color = "grey30", linewidth = 0.05) +
+  geom_sf(data = selected_all, aes(fill = crop), color = "grey30", linewidth = 0.05) +
+  geom_sf(data = corridor_union, fill = NA, color = "black", linewidth = 0.6) +
+  facet_wrap(~ quality) +
+  coord_sf(xlim = xlim, ylim = ylim, expand = FALSE) +
+  scale_fill_manual(values = crop_pal, drop = FALSE, name = "Selected field crop class / status") +
+  scale_y_continuous(n.breaks = 7) + scale_x_continuous(n.breaks = 4) +
+  labs(title    = "Crop composition of selected fields (Kern–Pixley case study)",
+       subtitle = "Selected planning units colored by crop class; locked-in protected areas in green") +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title       = element_text(face = "bold", size = 14),
+    plot.subtitle    = element_text(size = 10),
+    strip.text       = element_text(face = "bold", size = 12),
+    panel.grid.major = element_line(color = "grey80", linewidth = 0.2),
+    panel.grid.minor = element_blank(),
+    axis.text        = element_text(size = 9, color = "grey30"),
+    axis.ticks       = element_line(color = "grey30"),
+    panel.background = element_rect(fill = "white", color = NA),
+    axis.title       = element_blank(),
+    legend.title     = element_text(face = "bold"),
+    legend.position  = "right"
+  )
+
+print(fig6_crop)
+ggsave(file.path(fig_dir, "fig6_crop_composition.png"), fig6_crop,
+       width = 11, height = 6, dpi = 600, bg = "white")
+
+
+
+
+
+
 # =============================================================================
 # EXPORT SUMMARY TABLES
 # =============================================================================
@@ -763,6 +861,398 @@ write_csv(overall_summary,
 
 cat("\n========== ALL CORRIDOR FIGURES GENERATED ==========\n")
 cat("Outputs written to:\n  ", fig_dir, "\n")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# =============================================================================
+# =============================================================================
+# METRIC VERSIONS (SI UNITS) OF ALL FIGURES AND TABLES
+# =============================================================================
+# =============================================================================
+# Regenerates every figure/table above in metric units and saves a parallel
+# copy to a "metric/" subfolder, with "_metric" appended to the filename. The
+# imperial outputs above are left untouched.
+#
+# Conversions:
+#   - Area retired / habitat targets / species targets: acres -> hectares (ha)
+#   - Incidental water reported in the summary:          AF -> km^3
+#   - Cost ($), boundary length, BLM, and field-status maps are unit-free.
+#
+# All source data objects persist from the script body above.
+# =============================================================================
+
+cat("\n========== GENERATING METRIC (SI UNIT) VERSIONS ==========\n")
+
+# --- Unit conversion constants -------------------------------------------------
+ACRE_TO_HA <- 0.40468564224           # 1 acre = 0.40468564224 hectares
+AF_TO_M3   <- 1233.48183754752        # 1 acre-foot = 1233.48 cubic metres
+AF_TO_KM3  <- AF_TO_M3 / 1e9          # 1 acre-foot in km^3
+
+# --- Converters ----------------------------------------------------------------
+ac_to_ha  <- function(acres) acres * ACRE_TO_HA
+af_to_km3 <- function(af)    af    * AF_TO_KM3
+
+# --- Metric output directory + filename helper --------------------------------
+metric_dir <- file.path(fig_dir, "metric")
+
+metric_path <- function(filename) {
+  stem <- tools::file_path_sans_ext(filename)
+  ext  <- tools::file_ext(filename)
+  file.path(metric_dir, paste0(stem, "_metric.", ext))
+}
+
+cat("  Metric output directory:", metric_dir, "\n")
+
+# Habitat target expressed in hectares (for subtitles/captions)
+hab_ha_lbl <- format(round(ac_to_ha(habitat_target)), big.mark = ",")
+
+
+# =============================================================================
+# FIGURE 1 (metric): Overall summary + target achievement tables
+# =============================================================================
+# The imperial script prints these tables to the console; here we build metric
+# versions and additionally save them to the metric/ folder as HTML.
+cat("Creating Figure 1 tables (metric)...\n")
+
+overall_summary_m <- summary_all %>%
+  mutate(
+    Quality                 = quality,
+    `PAs Locked In`         = format(n_pa_locked_in, big.mark = ","),
+    `PA Hectares Locked In` = format(round(ac_to_ha(total_pa_acres)), big.mark = ","),
+    `Fields Selected`       = format(n_selected, big.mark = ","),
+    `Hectares Retired`      = format(round(ac_to_ha(total_acres)), big.mark = ","),
+    `Revenue Cost ($)`      = paste0("$", format(round(total_cost), big.mark = ",")),
+    `Water Saved (km³)`     = ifelse(is.na(total_water_AW), "—",
+                                     format(round(af_to_km3(total_water_AW), 4), big.mark = ",")),
+    `Boundary Length`       = format(round(boundary), big.mark = ",")
+  ) %>%
+  dplyr::select(Quality, `PAs Locked In`, `PA Hectares Locked In`,
+                `Fields Selected`, `Hectares Retired`,
+                `Revenue Cost ($)`, `Water Saved (km³)`, `Boundary Length`)
+
+kbl_overall_m <- overall_summary_m %>%
+  kbl(caption = "Corridor Cross-Temporal Optimization Summary (with locked-in PAs)",
+      align = c("l", rep("r", 7))) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE, position = "center") %>%
+  row_spec(0, bold = TRUE)
+
+print(kbl_overall_m)
+save_kable(kbl_overall_m, metric_path("fig1_overall_summary.html"))
+cat("  Saved: fig1_overall_summary_metric.html\n")
+
+# Detailed target achievement by species and climate period (areas -> ha)
+target_summary_m <- target_summary %>%
+  mutate(
+    target_ha   = ac_to_ha(target),
+    achieved_ha = ac_to_ha(achieved),
+    surplus_ha  = ac_to_ha(surplus)
+  )
+
+kbl_target_m <- target_summary_m %>%
+  dplyr::select(Quality = quality, Species = species, `Climate Scenario` = climate,
+                `Target (ha)` = target_ha, `Achieved (ha)` = achieved_ha,
+                `Surplus (ha)` = surplus_ha, `% of Target` = pct_of_target) %>%
+  mutate(
+    `Target (ha)`   = format(round(`Target (ha)`),   big.mark = ","),
+    `Achieved (ha)` = format(round(`Achieved (ha)`), big.mark = ","),
+    `Surplus (ha)`  = format(round(`Surplus (ha)`),  big.mark = ",")
+  ) %>%
+  kbl(caption = "Corridor Target Achievement by Species and Climate Scenario",
+      align = c("l", "l", "l", "r", "r", "r", "r")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE, position = "center") %>%
+  row_spec(0, bold = TRUE) %>%
+  pack_rows("Suitable Habitat", 1, 15) %>%
+  pack_rows("High Quality Habitat", 16, 30)
+
+print(kbl_target_m)
+save_kable(kbl_target_m, metric_path("fig1_target_achievement.html"))
+cat("  Saved: fig1_target_achievement_metric.html\n")
+
+
+# =============================================================================
+# FIGURE 2 (metric): Retirement by Basin
+# =============================================================================
+cat("Creating Figure 2 (metric)...\n")
+
+basin_long_m <- basin_summary_all %>%
+  mutate(total_hectares = ac_to_ha(total_acres)) %>%
+  pivot_longer(
+    cols      = c(total_hectares, total_rev, n_fields),
+    names_to  = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = case_when(
+      metric == "total_hectares" ~ "Hectares Retired",
+      metric == "total_rev"      ~ "Foregone Revenue ($)",
+      metric == "n_fields"       ~ "Fields Retired"
+    ),
+    metric = factor(metric, levels = c("Hectares Retired", "Foregone Revenue ($)", "Fields Retired"))
+  )
+
+fig2_basin_plot_m <- ggplot(basin_long_m,
+                            aes(x = basin, y = value, fill = quality)) +
+  geom_col(position = "dodge", col = "black", linewidth = 0.3) +
+  facet_wrap(~ metric, scales = "free_x") +
+  coord_flip() +
+  scale_y_continuous(labels = function(x) {
+    ifelse(x >= 1e6, paste0("$", round(x / 1e6, 1), "M"),
+           format(round(x), big.mark = ","))
+  }) +
+  scale_fill_manual(values = col_quality) +
+  labs(
+    title    = "Corridor retirement by groundwater basin (habitat only, with locked-in PAs)",
+    subtitle = paste0("Fields must meet ", hab_ha_lbl, "-ha targets for BNLL, GKR & SJKF across all climate scenarios"),
+    x = NULL, y = NULL, fill = "Habitat Quality"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0),
+    plot.subtitle = element_text(hjust = 0, size = 9),
+    strip.text    = element_text(face = "bold", size = 10, hjust = 0),
+    axis.text.y   = element_text(size = 10),
+    axis.text.x   = element_text(size = 9),
+    legend.title  = element_text(face = "bold", size = 11),
+    legend.text   = element_text(size = 10),
+    legend.position = "bottom"
+  )
+
+ggsave(metric_path("fig2_retirement_by_basin.png"), fig2_basin_plot_m,
+       width = 10, height = 6, dpi = 600, bg = "white")
+cat("  Saved: fig2_retirement_by_basin_metric.png\n")
+
+
+# =============================================================================
+# FIGURE 3 (metric): Cost and Hectares Comparison — Suitable vs. High Quality
+# =============================================================================
+cat("Creating Figure 3 (metric)...\n")
+
+# Panel A: revenue cost (unchanged — reuse imperial object)
+fig3a_cost_plot_m <- fig3a_cost_plot
+
+# Panel B: hectares retired
+fig3b_acres_plot_m <- ggplot(comparison_data, aes(x = quality, y = ac_to_ha(total_acres), fill = quality)) +
+  geom_col(width = 0.6, col = "black", linewidth = 0.3) +
+  geom_text(aes(label = format(round(ac_to_ha(total_acres)), big.mark = ",")),
+            vjust = -0.5, size = 4, fontface = "bold") +
+  scale_y_continuous(labels = scales::comma_format(),
+                     expand = expansion(mult = c(0, 0.15))) +
+  scale_fill_manual(values = col_quality, guide = "none") +
+  labs(title = "B", x = NULL, y = "Hectares retired") +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0),
+    axis.title.y  = element_text(margin = margin(r = 10))
+  )
+
+fig3_cost_acres_m <- fig3a_cost_plot_m + fig3b_acres_plot_m +
+  plot_annotation(
+    title    = "Corridor retirement: suitable vs. high quality habitat",
+    subtitle = paste0("Meeting ", hab_ha_lbl, "-ha targets for BNLL, GKR & SJKF across all 5 climate scenarios"),
+    theme    = theme(
+      plot.title    = element_text(face = "bold", hjust = 0, size = 14),
+      plot.subtitle = element_text(hjust = 0, size = 11)
+    )
+  )
+
+ggsave(metric_path("fig3_total_revenue_acreage.png"), fig3_cost_acres_m,
+       width = 7, height = 5, dpi = 600, bg = "white")
+cat("  Saved: fig3_total_revenue_acreage_metric.png\n")
+
+
+# =============================================================================
+# FIGURE 4 (metric): Corridor spatial maps (plain + inset)
+# =============================================================================
+# The field-status maps are unit-independent; only the habitat-target acreage
+# in the subtitle converts to hectares. Reuses the persisted corridor map
+# panels (map_list), the inset overview (inset_map), and the inset layout.
+if (exists("map_list")) {
+  
+  cat("Creating Figure 4 (metric, plain side-by-side)...\n")
+  fig4_corridor_map_m <- map_list[["Suitable"]] + map_list[["High Quality"]] +
+    plot_layout(guides = "collect") +
+    plot_annotation(
+      title    = "Optimal corridor retirement configuration (Kern-Pixley case study)",
+      subtitle = paste0("minimizing foregone revenue | ", hab_ha_lbl,
+                        " ha target per species × 5 climate periods | BLM = ", chosen_blm,
+                        " | corridor outlined in black"),
+      theme    = theme(
+        plot.title    = element_text(face = "bold", hjust = 0, size = 14),
+        plot.subtitle = element_text(hjust = 0, size = 10)
+      )
+    )
+  ggsave(metric_path("fig4_spatial_map.png"), fig4_corridor_map_m,
+         width = 11, height = 6, dpi = 600, bg = "white")
+  cat("  Saved: fig4_spatial_map_metric.png\n")
+  
+  if (exists("inset_map") && exists("layout")) {
+    cat("Creating Figure 4 (metric, with inset)...\n")
+    fig4_corridor_map_inset_m <- map_list[["Suitable"]] + map_list[["High Quality"]] +
+      inset_map + guide_area() +
+      plot_layout(design = layout, guides = "collect") +
+      plot_annotation(
+        title    = "Optimal corridor retirement configuration (Kern-Pixley case study)",
+        subtitle = paste0("minimizing foregone revenue | ", hab_ha_lbl,
+                          " ha target per species × 5 climate periods | BLM = ", chosen_blm),
+        theme    = theme(
+          plot.title    = element_text(face = "bold", hjust = 0, size = 14),
+          plot.subtitle = element_text(hjust = 0, size = 10)
+        )
+      )
+    ggsave(metric_path("fig4_spatial_map_inset.png"), fig4_corridor_map_inset_m,
+           width = 13, height = 7, dpi = 600, bg = "white")
+    cat("  Saved: fig4_spatial_map_inset_metric.png\n")
+  }
+}
+
+
+# =============================================================================
+# FIGURE 5 (metric): BLM calibration (unit-free copy; cost in $M vs. boundary)
+# =============================================================================
+if (exists("fig5_blm_plot")) {
+  cat("Creating Figure 5 (metric)...\n")
+  ggsave(metric_path("fig5_blm_calibration.png"), fig5_blm_plot,
+         width = 8, height = 5.5, dpi = 600, bg = "white")
+  cat("  Saved: fig5_blm_calibration_metric.png\n")
+}
+
+
+
+# =============================================================================
+# CROP-LEVEL SELECTION SUMMARY — suitable vs. high quality (corridor)
+# Exact hectares & foregone revenue by crop class, to quantify the cost driver.
+# =============================================================================
+rev_col <- "revenue"   # per-field annual revenue ($) on field_data — adjust if named differently
+
+crop_summary <- selected_all %>%
+  st_drop_geometry() %>%
+  mutate(q = if_else(quality == "Suitable", "suit", "hq")) %>%
+  group_by(q, comm = .data[[comm_col]]) %>%
+  summarise(n_fields  = n(),
+            hectares  = sum(area_ha, na.rm = TRUE),
+            revenue_M = sum(.data[[rev_col]], na.rm = TRUE) / 1e6,
+            .groups = "drop")
+
+# Wide comparison: deltas (High Quality − Suitable), sorted by revenue delta
+crop_compare <- crop_summary %>%
+  pivot_wider(id_cols = comm,
+              names_from = q,
+              values_from = c(n_fields, hectares, revenue_M),
+              values_fill = 0) %>%
+  mutate(ha_delta  = hectares_hq  - hectares_suit,
+         rev_delta = revenue_M_hq - revenue_M_suit) %>%
+  arrange(desc(rev_delta)) %>%
+  mutate(across(where(is.numeric), ~ round(.x, 1)))
+
+print(crop_compare, n = Inf, width = Inf)
+
+# Pistachios line, ready to cite
+crop_compare %>% filter(comm == "Pistachios")
+
+# QA: totals should reconcile with the overall summary (suit ~10,524 ha / $22.6M;
+# hq ~11,860 ha / $88.1M)
+crop_summary %>% group_by(q) %>%
+  summarise(ha = sum(hectares), rev_M = sum(revenue_M), .groups = "drop")
+
+
+# =============================================================================
+# TABLE S[X]: CROP COMPOSITION OF SELECTED FIELDS — KERN-PIXLEY CORRIDOR
+# Companion to the crop-composition maps (Figure S[X]).
+# =============================================================================
+library(kableExtra)
+
+# Reorder to Suitable | High Quality | Difference, then append a totals row
+crop_table_df <- crop_compare %>%
+  transmute(`Crop class` = comm,
+            suit_fields = n_fields_suit, suit_ha = hectares_suit, suit_rev = revenue_M_suit,
+            hq_fields   = n_fields_hq,   hq_ha   = hectares_hq,   hq_rev   = revenue_M_hq,
+            d_ha = ha_delta, d_rev = rev_delta)
+
+crop_table_df <- crop_table_df %>%
+  bind_rows(crop_table_df %>%
+              summarise(across(where(is.numeric), sum)) %>%
+              mutate(`Crop class` = "Total"))
+
+# Display formatting: integers w/ commas, $M to 1 dp, signed deltas
+crop_table_disp <- crop_table_df %>%
+  mutate(suit_fields = formatC(suit_fields, format = "d", big.mark = ","),
+         hq_fields   = formatC(hq_fields,   format = "d", big.mark = ","),
+         suit_ha     = formatC(round(suit_ha), format = "d", big.mark = ","),
+         hq_ha       = formatC(round(hq_ha),   format = "d", big.mark = ","),
+         suit_rev    = formatC(suit_rev, format = "f", digits = 1),
+         hq_rev      = formatC(hq_rev,   format = "f", digits = 1),
+         d_ha        = formatC(round(d_ha), format = "d", big.mark = ",", flag = "+"),
+         d_rev       = formatC(d_rev, format = "f", digits = 1, flag = "+"))
+
+crop_tbl <- crop_table_disp %>%
+  kbl(col.names = c("Crop class", "Fields", "Hectares", "Revenue ($M)",
+                    "Fields", "Hectares", "Revenue ($M)",
+                    "\u0394 Hectares", "\u0394 Revenue ($M)"),
+      align = c("l", rep("r", 8)), booktabs = TRUE,
+      caption = paste("Crop composition of fields selected in the Kern\u2013Pixley corridor",
+                      "habitat-only optimization, under the suitable and high-quality habitat",
+                      "thresholds. Differences are high-quality minus suitable; rows are sorted",
+                      "by foregone-revenue difference. Locked-in protected areas are excluded.")) %>%
+  add_header_above(c(" " = 1, "Suitable" = 3, "High Quality" = 3,
+                     "Difference (HQ \u2212 Suitable)" = 2)) %>%
+  kable_styling(full_width = FALSE, position = "center",
+                bootstrap_options = c("striped", "condensed")) %>%
+  row_spec(nrow(crop_table_disp), bold = TRUE) %>%   # totals row
+  column_spec(1, width = "16em")
+
+crop_tbl
+
+write_csv(crop_table_df, file.path(metric_dir, "crop_composition.csv"))
+
+
+# =============================================================================
+# EXPORT SUMMARY TABLES (metric): acres -> ha, incidental AF -> km^3
+# =============================================================================
+cat("Exporting metric summary CSVs...\n")
+
+basin_summary_all_m <- basin_summary_all %>%
+  mutate(
+    total_hectares  = ac_to_ha(total_acres),
+    total_water_km3 = af_to_km3(total_water_AW)
+  ) %>%
+  dplyr::select(-total_acres, -total_water_AW)
+write_csv(basin_summary_all_m, metric_path("corridor_basin_summaries.csv"))
+cat("  Saved: corridor_basin_summaries_metric.csv\n")
+
+target_achievement_m <- target_summary %>%
+  mutate(
+    target   = ac_to_ha(target),
+    achieved = ac_to_ha(achieved),
+    surplus  = ac_to_ha(surplus)
+  )
+write_csv(target_achievement_m, metric_path("corridor_target_achievement.csv"))
+cat("  Saved: corridor_target_achievement_metric.csv\n")
+
+write_csv(overall_summary_m, metric_path("corridor_overall_summary.csv"))
+cat("  Saved: corridor_overall_summary_metric.csv\n")
+
+
+cat("\n========== METRIC (SI UNIT) VERSIONS COMPLETE (corridor habitat-only) ==========\n")
+cat("Metric output directory:", metric_dir, "\n")
+
+
+
+
 
 
 

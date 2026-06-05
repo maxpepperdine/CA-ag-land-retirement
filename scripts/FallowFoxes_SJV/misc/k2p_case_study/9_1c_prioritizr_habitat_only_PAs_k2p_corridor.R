@@ -227,6 +227,8 @@ pa_data <- cpad_in_corridor %>%
   select(-acres_pa)
 
 # Add field-only attributes as NA so rbind() preserves them
+# We'll use the comm variables for plotting/exploring crop classes on selected
+# fields.
 pa_data <- pa_data %>%
   mutate(
     county    = NA_character_,
@@ -467,7 +469,7 @@ print(blm_plot)
 
 # --- SELECT THE BEST BLM ---
 # Look for the "elbow" of the curve
-chosen_blm <- 0.01
+chosen_blm <- 0.0075
 
 cat("\nChosen BLM:", chosen_blm, "\n")
 
@@ -514,7 +516,7 @@ for (i in 1:nrow(scenarios)) {
     add_absolute_targets(targets = targs) %>%
     add_binary_decisions() %>%
     add_locked_in_constraints(locked_in = "is_pa") %>%
-    add_neighbor_constraints(k = k_neighbors) %>%
+    # add_neighbor_constraints(k = k_neighbors) %>%
     add_boundary_penalties(penalty = chosen_blm, data = bm) %>%
     add_gurobi_solver(verbose = FALSE, numeric_focus = TRUE)
   
@@ -629,7 +631,7 @@ print(target_detail, n = Inf)
 # =============================================================================
 
 # Output directory (separate from the basin-wide PA results)
-out_dir <- here("data/intermediate/misc/k2p_case_study/9_1c_prioritizr_habitat_only_PAs_k2p_corridor/blm_0.01_neigh_5")
+out_dir <- here("data/intermediate/misc/k2p_case_study/9_1c_prioritizr_habitat_only_PAs_k2p_corridor/blm_0.0075")
 
 
 # --- Save objects needed for figures ---
@@ -648,7 +650,7 @@ save(
   corridor_union,
   habitat_target,
   chosen_blm,
-  k_neighbors,
+  #k_neighbors,
   blm_results,
   bm,
   cost_scale_factor,
@@ -683,7 +685,7 @@ write_csv(blm_results,    file.path(out_dir, "corridor_cross_temporal_PAs_blm_ca
 
 cat("\n========== CORRIDOR CROSS-TEMPORAL OPTIMIZATION (w/ PAs) COMPLETE — RESULTS SAVED ==========\n")
 cat("Load results for figures with:\n")
-cat('  load(here("data/intermediate/misc/k2p_case_study/9_1c_prioritizr_habitat_only_PAs_k2p_corridor/blm_0.01/prioritizr_corridor_cross_temporal_PAs_results.RData"))\n')
+cat('  load(here("data/intermediate/misc/k2p_case_study/9_1c_prioritizr_habitat_only_PAs_k2p_corridor/blm_0.0075/prioritizr_corridor_cross_temporal_PAs_results.RData"))\n')
 
 
 
