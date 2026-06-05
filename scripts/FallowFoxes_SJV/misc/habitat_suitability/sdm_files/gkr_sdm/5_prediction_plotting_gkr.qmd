@@ -39,6 +39,18 @@ sjv_boundary <- read_sf(here("data/raw/sjv_counties/sjv_counties.shp"))
 ca_boundary <- read_sf(here("data/raw/ca_state/ca_state_boundary_wgs84.shp"))
 ```
 
+```{r}
+# DWR basins
+basins_raw <- st_read(here("data/raw/i08_B118_CA_GroundwaterBasins/i08_B118_CA_GroundwaterBasins.shp"))
+
+sjv_basins <- basins_raw %>%
+  filter(grepl("^SAN JOAQUIN VALLEY", Basin_Su_1)) %>%
+  filter(!Basin_Su_1 %in% c("SAN JOAQUIN VALLEY - EAST CONTRA COSTA",
+                            "SAN JOAQUIN VALLEY - KETTLEMAN PLAIN",
+                            "SAN JOAQUIN VALLEY - COSUMNES",
+                            "SAN JOAQUIN VALLEY - PLEASANT VALLEY"))
+```
+
 #### Make sure all are in `EPSG:3310`
 
 ```{r}
@@ -53,6 +65,15 @@ ca_boundary <- st_transform(ca_boundary, crs = crs(gkr_baseline))
 crs(ca_boundary)
 # convert to terra vector
 ca_vect <- vect(ca_boundary)
+
+# transform basins
+sjv_basins <- st_transform(sjv_basins, crs = crs(gkr_baseline))
+crs(sjv_basins)
+# convert to terra vector
+basins_vect <- vect(sjv_basins)
+# merge to one polygon for clipping
+basins_union <- st_union(sjv_basins)
+basins_union_vect <- vect(basins_union)
 ```
 
 ## Comparing future predictions under different emissions scenarios
@@ -83,18 +104,18 @@ cont_diff_rcp85_2049 <- gkr_rcp85_2049 - gkr_baseline
 cont_diff_rcp85_2069 <- gkr_rcp85_2069 - gkr_baseline
 
 # clip to SJV boundary
-cont_diff_rcp45_2049_sjv <- cont_diff_rcp45_2049 %>% 
-  mask(sjv_vect) %>% 
-  crop(sjv_vect)
-cont_diff_rcp45_2069_sjv <- cont_diff_rcp45_2069 %>% 
-  mask(sjv_vect) %>% 
-  crop(sjv_vect)
-cont_diff_rcp85_2049_sjv <- cont_diff_rcp85_2049 %>% 
-  mask(sjv_vect) %>% 
-  crop(sjv_vect)
-cont_diff_rcp85_2069_sjv <- cont_diff_rcp85_2069 %>% 
-  mask(sjv_vect) %>% 
-  crop(sjv_vect)
+cont_diff_rcp45_2049_basin <- cont_diff_rcp45_2049 %>% 
+  mask(basins_union_vect) %>% 
+  crop(basins_union_vect)
+cont_diff_rcp45_2069_basin <- cont_diff_rcp45_2069 %>% 
+  mask(basins_union_vect) %>% 
+  crop(basins_union_vect)
+cont_diff_rcp85_2049_basin <- cont_diff_rcp85_2049 %>% 
+  mask(basins_union_vect) %>% 
+  crop(basins_union_vect)
+cont_diff_rcp85_2069_basin <- cont_diff_rcp85_2069 %>% 
+  mask(basins_union_vect) %>% 
+  crop(basins_union_vect)
 ```
 
 #### Reclassify the future predictions & calculate binary difference rasters
@@ -146,18 +167,18 @@ bin_diff_rcp85_2049 <- classify(combined_rcp85_2049, reclass_change)
 bin_diff_rcp85_2069 <- classify(combined_rcp85_2069, reclass_change)
 
 # clip difference rasters to SJV boundary
-bin_diff_rcp45_2049_sjv <- bin_diff_rcp45_2049 %>% 
-  mask(sjv_vect) %>% 
-  crop(sjv_vect)
-bin_diff_rcp45_2069_sjv <- bin_diff_rcp45_2069 %>% 
-  mask(sjv_vect) %>% 
-  crop(sjv_vect)
-bin_diff_rcp85_2049_sjv <- bin_diff_rcp85_2049 %>% 
-  mask(sjv_vect) %>% 
-  crop(sjv_vect)
-bin_diff_rcp85_2069_sjv <- bin_diff_rcp85_2069 %>% 
-  mask(sjv_vect) %>% 
-  crop(sjv_vect)
+bin_diff_rcp45_2049_basin <- bin_diff_rcp45_2049 %>% 
+  mask(basins_union_vect) %>% 
+  crop(basins_union_vect)
+bin_diff_rcp45_2069_basin <- bin_diff_rcp45_2069 %>% 
+  mask(basins_union_vect) %>% 
+  crop(basins_union_vect)
+bin_diff_rcp85_2049_basin <- bin_diff_rcp85_2049 %>% 
+  mask(basins_union_vect) %>% 
+  crop(basins_union_vect)
+bin_diff_rcp85_2069_basin <- bin_diff_rcp85_2069 %>% 
+  mask(basins_union_vect) %>% 
+  crop(basins_union_vect)
 ```
 
 #### Plot the future predictions and difference maps
@@ -166,21 +187,21 @@ Make buffered bbox for plotting
 
 ```{r}
 # convert terra vectors to sf for easier handling
-sjv_sf <- st_as_sf(sjv_vect)
+basin_sf <- st_as_sf(basins_union_vect)
 ca_sf <- st_as_sf(ca_vect)
 
-## Create expanded bounding box for SJV
-sjv_bbox <- st_bbox(sjv_sf)
-sjv_buffer <- 0.1
-x_expand <- sjv_buffer * (unname(sjv_bbox["xmax"]) - unname(sjv_bbox["xmin"]))
-y_expand <- sjv_buffer * (unname(sjv_bbox["ymax"]) - unname(sjv_bbox["ymin"]))
+## Create expanded bounding box for basins
+basin_bbox <- st_bbox(basin_sf)
+basin_buffer <- 0.05
+x_expand <- basin_buffer * (unname(basin_bbox["xmax"]) - unname(basin_bbox["xmin"]))
+y_expand <- basin_buffer * (unname(basin_bbox["ymax"]) - unname(basin_bbox["ymin"]))
 
-sjv_bbox_expanded <- st_bbox(c(
-  xmin = unname(sjv_bbox["xmin"]) - x_expand,
-  xmax = unname(sjv_bbox["xmax"]) + x_expand,
-  ymin = unname(sjv_bbox["ymin"]) - y_expand,
-  ymax = unname(sjv_bbox["ymax"]) + y_expand
-), crs = st_crs(sjv_sf))
+basin_bbox_expanded <- st_bbox(c(
+  xmin = unname(basin_bbox["xmin"]) - x_expand,
+  xmax = unname(basin_bbox["xmax"]) + x_expand,
+  ymin = unname(basin_bbox["ymin"]) - y_expand,
+  ymax = unname(basin_bbox["ymax"]) + y_expand
+), crs = st_crs(basin_sf))
 
 # Create expanded bounding box for CA
 ca_bbox <- st_bbox(ca_sf)
@@ -200,13 +221,13 @@ Binary difference maps
 
 ```{r}
 # stack the difference rasters and name them
-bin_diff_stack <- c(bin_diff_rcp45_2049_sjv, bin_diff_rcp45_2069_sjv, 
-                    bin_diff_rcp85_2049_sjv, bin_diff_rcp85_2069_sjv)
+bin_diff_stack <- c(bin_diff_rcp45_2049_basin, bin_diff_rcp45_2069_basin, 
+                    bin_diff_rcp85_2049_basin, bin_diff_rcp85_2069_basin)
 names(bin_diff_stack) <- c("RCP 4.5 (2020-2049)", "RCP 4.5 (2040-2069)", 
                            "RCP 8.5 (2020-2049)", "RCP 8.5 (2040-2069)")
 
 # create the binary difference map with 4 categories
-main_map <- tm_shape(bin_diff_stack, bbox = sjv_bbox_expanded) +
+main_map <- tm_shape(bin_diff_stack, bbox = basin_bbox_expanded) +
   
   tm_raster(
     col.scale = tm_scale_categorical(
@@ -221,13 +242,13 @@ main_map <- tm_shape(bin_diff_stack, bbox = sjv_bbox_expanded) +
   tm_layout(
     panel.labels = names(bin_diff_stack)
   ) + 
-  tm_shape(sjv_vect) +
-  tm_borders(col = "black", lwd = 0.5)
+  tm_shape(basins_union_vect) +
+  tm_borders(col = "grey25", lwd = 0.1)
 
 # create the inset map
 inset_map <- tm_shape(ca_vect, bbox = ca_bbox_expanded) +
-  tm_borders(col = "black", lwd=1) +
-  tm_shape(sjv_vect) +
+  tm_borders(col = "grey25", lwd=1) +
+  tm_shape(basins_union_vect) +
   tm_fill(fill = "red", fill_alpha = 0.5) +
   tm_borders(col = "red") +
   tm_layout(frame = TRUE, bg.color = "white")
@@ -236,7 +257,7 @@ inset_map <- tm_shape(ca_vect, bbox = ca_bbox_expanded) +
 print(main_map)
 
 # add inset using viewport
-print(inset_map, vp = grid::viewport(x = 0.75, y = 0.5, width = 0.2, height = 0.25))
+print(inset_map, vp = grid::viewport(x = 0.63, y = 0.5, width = 0.2, height = 0.25))
 ```
 
 Continuous difference maps
@@ -271,27 +292,27 @@ Raw future projections
 
 ```{r}
 # clip the cont future predictions to SJV boundary
-gkr_rcp45_2049_sjv <- gkr_rcp45_2049 %>% 
-  mask(sjv_vect) %>% 
-  crop(sjv_vect)
-gkr_rcp45_2069_sjv <- gkr_rcp45_2069 %>% 
-  mask(sjv_vect) %>% 
-  crop(sjv_vect)
-gkr_rcp85_2049_sjv <- gkr_rcp85_2049 %>% 
-  mask(sjv_vect) %>% 
-  crop(sjv_vect)
-gkr_rcp85_2069_sjv <- gkr_rcp85_2069 %>% 
-  mask(sjv_vect) %>% 
-  crop(sjv_vect)
+gkr_rcp45_2049_basin <- gkr_rcp45_2049 %>% 
+  mask(basins_union_vect) %>% 
+  crop(basins_union_vect)
+gkr_rcp45_2069_basin <- gkr_rcp45_2069 %>% 
+  mask(basins_union_vect) %>% 
+  crop(basins_union_vect)
+gkr_rcp85_2049_basin <- gkr_rcp85_2049 %>% 
+  mask(basins_union_vect) %>% 
+  crop(basins_union_vect)
+gkr_rcp85_2069_basin <- gkr_rcp85_2069 %>% 
+  mask(basins_union_vect) %>% 
+  crop(basins_union_vect)
 
 # stack the future predictions and name them
-future_stack <- c(gkr_rcp45_2049_sjv, gkr_rcp45_2069_sjv, 
-                  gkr_rcp85_2049_sjv, gkr_rcp85_2069_sjv)
+future_stack <- c(gkr_rcp45_2049_basin, gkr_rcp45_2069_basin, 
+                  gkr_rcp85_2049_basin, gkr_rcp85_2069_basin)
 names(future_stack) <- c("RCP 4.5 (2020-2049)", "RCP 4.5 (2040-2069)", 
                          "RCP 8.5 (2020-2049)", "RCP 8.5 (2040-2069)")
 
 # plot the future predictions
-gkr_fut_map <- tm_shape(future_stack, bbox = sjv_bbox_expanded) +
+gkr_fut_map <- tm_shape(future_stack, bbox = basin_bbox_expanded) +
   tm_raster(col.scale = tm_scale_continuous(values = "viridis",
                                              ticks = seq(0, 1, by = 0.25)),
             col.legend = tm_legend(title = "Habitat suitability"), 
@@ -303,32 +324,35 @@ gkr_fut_map <- tm_shape(future_stack, bbox = sjv_bbox_expanded) +
 print(gkr_fut_map)
 
 # add inset using viewport
-print(inset_map, vp = grid::viewport(x = 0.77, y = 0.4, width = 0.2, height = 0.25))
+print(inset_map, vp = grid::viewport(x = 0.65, y = 0.3, width = 0.2, height = 0.25))
 ```
 
 ## Plot the baseline predictions
 
 ```{r}
 # clip baseline to SJV boundary
-gkr_baseline_sjv <- gkr_baseline %>% 
-  mask(sjv_vect) %>% 
-  crop(sjv_vect)
+gkr_baseline_basin <- gkr_baseline %>% 
+  mask(basins_union_vect) %>% 
+  crop(basins_union_vect)
 
 # plot baseline predictions
-gkr_baseline_map <- tm_shape(gkr_baseline_sjv, bbox = sjv_bbox_expanded) +
-  tm_graticules(col = "grey80", lwd = 0.5) +
+gkr_baseline_map <- tm_shape(gkr_baseline_basin, bbox = basin_bbox_expanded) +
+  tm_graticules(col = "grey80", 
+                lwd = 0.5, 
+                n.x = 4, 
+                n.y = 5) +
   tm_raster(col.scale = tm_scale_continuous(values = "viridis",
                                              ticks = seq(0, 1, by = 0.25)),
             col.legend = tm_legend(title = "Habitat suitability"), 
             col.free = FALSE) +
-  tm_shape(sjv_vect) +
-  tm_borders(col = "black", lwd = 0.5)
+  tm_shape(basins_vect) +
+  tm_borders(col = "red4", lwd = 0.1)
 
 # plot main map
 print(gkr_baseline_map)
 
 # add inset using viewport
-print(inset_map, vp = grid::viewport(x = 0.81, y = 0.2, width = 0.2, height = 0.25))
+print(inset_map, vp = grid::viewport(x = 0.68, y = 0.20, width = 0.2, height = 0.25))
 ```
 
 
