@@ -5,12 +5,6 @@
 #       PPIC-estimated applied water (AW) reduction targets for SGMA
 #       implementation, while minimizing foregone agricultural revenue.
 #
-# PURPOSE (vs. 9_2_prioritizr_water_only.R):
-#   Parallel analysis to the S_net version, using per-field annual applied 
-#   water (AW) estimates as the water feature instead of derived S_net
-#   consumption estimates. Intended as a secondary/SI-friendly formulation 
-#   that relies only on widely understood AW accounting.
-#
 # SCENARIOS:
 #   - 3 climate scenarios: Baseline, RCP4.5 (2020-2049), RCP8.5 (2020-2049)
 #   - 2 spatial scales per scenario:
@@ -47,10 +41,6 @@
 #     RCP4.5 target = Baseline target × 1.063
 #     RCP8.5 target = Baseline target × (1 + 0.063 × BCM scaling factor)
 #
-#   This approach maintains methodological consistency with the S_net 
-#   version of this analysis (9_2_prioritizr_water_only.R), enabling 
-#   direct comparison between AW-based and S_net-based results.
-#
 # OPTIMIZATION:
 #   - Objective: minimize total revenue of selected fields (min-set)
 #   - Planning units: non-retired fields only (retired = 0)
@@ -65,6 +55,7 @@
 #
 # INPUTS:
 #   - fields_Snet_estimation.gpkg (fields with AW, S_net, revenue, fallow status)
+#     from 8_Snet_estimation.R
 #   - DWR groundwater basin boundaries shapefile
 #
 # OUTPUTS:
@@ -84,12 +75,12 @@ library(here)
 
 
 # ==============================================================================
-# SECTION 1: Load data 
+# STEP 1: Load data 
 # ==============================================================================
 
 # File paths -----------------------------------------------------------
 
-# Fields from Path A workflow (contains AW_* and Snet_* columns + revenue)
+# Fields from S_net workflow (contains AW_* and Snet_* columns + revenue)
 fields_path <- here("data/intermediate/8_Snet_estimation/prioritizr_water_only/fields_Snet_estimation.gpkg")
 
 # DWR groundwater basin boundaries
@@ -109,13 +100,14 @@ basins_raw <- st_read(basins_path)
 
 
 # ==============================================================================
-# SECTION 2: Assign fields to groundwater basins
+# STEP 2: Assign fields to groundwater basins
 # ==============================================================================
 
 cat("Assigning fields to groundwater basins...\n")
 
 # Filter basins to SJV only (Basin_Su_1 starts with "SAN JOAQUIN VALLEY")
-# Also remove basins we don't have PPIC targets for
+# Also remove basins we don't have PPIC targets for (East CC, Kettleman, 
+# Consumnes, Pleasant Valley)
 sjv_basins <- basins_raw %>%
   filter(grepl("^SAN JOAQUIN VALLEY", Basin_Su_1)) %>% 
   filter(!Basin_Su_1 %in% c("SAN JOAQUIN VALLEY - EAST CONTRA COSTA", 
@@ -127,15 +119,15 @@ cat("  SJV basins found:", nrow(sjv_basins), "\n")
 cat("  Basin names:\n")
 print(sort(unique(sjv_basins$Basin_Su_1)))
 
-# Reproject basins to match fields CRS
+# reproject basins to match fields CRS
 sjv_basins <- st_transform(sjv_basins, st_crs(fields))
 
-# Spatial join: assign each field to the basin it falls within
-# Use centroid of field for clean 1:1 matching
+# spatial join: assign each field to the basin it falls within
+# use centroid of field for clean 1:1 matching
 fields_centroids <- st_centroid(fields)
 basin_join <- st_join(fields_centroids, sjv_basins %>% select(Basin_Su_1), left = TRUE)
 
-# Extract basin name and add to fields
+# extract basin name and add to fields
 fields$basin_raw <- basin_join$Basin_Su_1
 
 # Clean basin names: extract the short name from "SAN JOAQUIN VALLEY - [NAME]"
@@ -175,7 +167,7 @@ cat("  Fields without basin assignment:", sum(is.na(fields$basin)), "\n")
 
 
 # ==============================================================================
-# SECTION 3: Define baseline AW reduction targets (in TAF)
+# STEP 3: Define baseline AW reduction targets (in TAF)
 # ==============================================================================
 # These are the PPIC-estimated SGMA AW reduction targets for each of the 15 
 # SJV groundwater basins, derived from the PPIC technical appendix dataset 
@@ -191,7 +183,7 @@ cat("  Fields without basin assignment:", sum(is.na(fields$basin)), "\n")
 # Valley-wide baseline target = sum of basin targets = 2,675 TAF. This 
 # approximates PPIC's headline 2.68 MAF figure (difference due to rounding) 
 # and ensures valley-wide and basin-specific targets are internally 
-# consistent. Future scenario targets are computed in Section 3b below.
+# consistent. Future scenario targets are computed in STEP 3b below.
 
 # Basin-specific AW reduction targets (TAF/yr) from the PPIC dataset
 basin_aw_reduction <- data.frame(
@@ -215,7 +207,7 @@ cat("PPIC reported valley-wide target: 2,680 TAF (2.68 MAF)\n")
 
 
 # ==============================================================================
-# SECTION 3b: Compute climate-adjusted targets
+# STEP 3b: Compute climate-adjusted targets
 # ==============================================================================
 # Baseline AW reduction targets are scaled upward under future climate to 
 # account for the combined effects of increased crop water demand and reduced 
@@ -234,8 +226,7 @@ cat("PPIC reported valley-wide target: 2,680 TAF (2.68 MAF)\n")
 #
 # This provides an empirically grounded multiplier that captures the 
 # stronger radiative forcing under RCP8.5 without requiring an independent 
-# water operations model, and maintains methodological consistency with 
-# the S_net version of this analysis (9_2_prioritizr_water_only.R).
+# water operations model.
 #
 #   RCP4.5 target = Baseline target × 1.063
 #   RCP8.5 target = Baseline target × (1 + 0.063 × BCM scaling factor)
@@ -320,7 +311,7 @@ retirement_by_basin <- retired_fields %>%
 
 
 # ==============================================================================
-# SECTION 4: Define AW scenario columns & map to targets (scaled to TAF)
+# STEP 4: Define AW scenario columns & map to targets (scaled to TAF)
 # ==============================================================================
 
 # Scenario definitions: name, AW column, and corresponding valley/basin targets
@@ -338,7 +329,7 @@ print(scenarios)
 
 
 # ==============================================================================
-# SECTION 5: Prepare planning units (non-retired fields only) & scale values
+# STEP 5: Prepare planning units (non-retired fields only) & scale values
 # ==============================================================================
 
 cat("\nPreparing planning units (non-retired fields only)...\n")
@@ -361,7 +352,7 @@ planning_units <- planning_units %>%
 
 
 # ==============================================================================
-# SECTION 5b: Export basin reference table
+# STEP 5b: Export basin reference table
 # ==============================================================================
 
 cat("\nBuilding basin reference table...\n")
@@ -397,7 +388,6 @@ cat("\nBasin reference table:\n")
 print(as.data.frame(basin_ref_table))
 
 write_csv(basin_ref_table, file.path(output_dir, "basin_reference_table.csv"))
-cat("  Saved: basin_reference_table.csv\n")
 
 # Export target methodology details for documentation
 target_methodology <- data.frame(
@@ -418,12 +408,13 @@ target_methodology <- data.frame(
 )
 
 write_csv(target_methodology, file.path(output_dir, "target_methodology.csv"))
-cat("  Saved: target_methodology.csv\n")
 
 
 # ==============================================================================
-# SECTION 6: Helper function — build and solve prioritizr problems
+# STEP 6: Helper function — build and solve prioritizr problems
 # ==============================================================================
+
+# create the helper function to build and solve prioritizr problems
 
 solve_water_savings <- function(pu,               # planning units (sf, non-retired fields)
                                 aw_col,           # name of SCALED AW column (TAF)
@@ -484,7 +475,7 @@ solve_water_savings <- function(pu,               # planning units (sf, non-reti
 
 
 # ==============================================================================
-# SECTION 7: Run valley-wide optimizations
+# STEP 7: Run valley-wide optimizations
 # ==============================================================================
 
 cat("\n========================================\n")
@@ -513,7 +504,7 @@ for (i in 1:nrow(scenarios)) {
 
 
 # ==============================================================================
-# SECTION 8: Run basin-specific optimizations
+# STEP 8: Run basin-specific optimizations
 # ==============================================================================
 
 cat("\n========================================\n")
@@ -565,7 +556,7 @@ for (i in 1:nrow(scenarios)) {
 
 
 # ==============================================================================
-# SECTION 9: COMPILE AND EXPORT RESULTS
+# STEP 9: COMPILE AND EXPORT RESULTS
 # ==============================================================================
 
 cat("\n========================================\n")
@@ -632,7 +623,7 @@ for (label in names(basin_results)) {
 write_csv(valley_summary, file.path(output_dir, "valley_wide_summary.csv"))
 write_csv(basin_summary,  file.path(output_dir, "basin_specific_summary.csv"))
 
-cat("\n=== PRIORITIZR AW WATER SAVINGS ANALYSIS COMPLETE ===\n")
+
 
 
 

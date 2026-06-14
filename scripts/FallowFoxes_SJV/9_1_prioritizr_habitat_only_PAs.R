@@ -1,13 +1,18 @@
 # =============================================================================
-# PRIORITIZR HABITAT CREATION (CROSS-TEMPORAL) OPTIMIZATION — WITH PROTECTED AREAS
+# PRIORITIZR HABITAT CREATION (CROSS-TEMPORAL) OPTIMIZATION — W/ PROTECTED AREAS
 # =============================================================================
 # Purpose: Use prioritizr to find optimal retirement configurations that meet
 #          habitat targets for BNLL, GKR, and SJKF across ALL climate scenarios
 #          / time periods simultaneously, with existing protected areas (PAs)
 #          incorporated as locked-in planning units.
 #
-# Approach: Mirrors the original 9_1_prioritizr_habitat_only.R workflow, with
-#           three changes:
+# Approach: 
+#           Build problems where every climate projection is a separate feature 
+#           with a 25,000-acre target. This forces the solver to select fields that 
+#           provide adequate habitat for all three species under ALL futures —
+#           ensuring that land retired today remains suitable as climate shifts.
+#
+#           Incorporate PAs as planning units:
 #
 #           1. Planning units are restricted to non-retired fields within the
 #              same 15 SJV groundwater basins used in the water-only analysis,
@@ -30,12 +35,10 @@
 #              encouraging new habitat to cluster around existing protected
 #              landscapes — a foundational principle in conservation planning.
 #
-#           A new `is_pa` logical column distinguishes PA planning units (TRUE)
-#           from field planning units (FALSE) for downstream reporting.
-#
 # Two optimization problems:
 #   1. Suitable habitat: 15 features (BNLL + GKR + SJKF × 5 time periods)
 #   2. High quality habitat: 15 features (BNLL + GKR + SJKF × 5 time periods)
+#
 #   Each feature has a 25,000-acre target.
 #
 # Cost layer: annual revenue per field (`revenue`); PAs assigned cost = 0.0001
@@ -45,9 +48,7 @@
 #      applied to both problems.
 # =============================================================================
 
-
-
-# Clear environment
+# clear environment
 rm(list = ls())
 
 
@@ -69,11 +70,11 @@ options(scipen = 999)
 
 
 # =============================================================================
-# SECTION 1: Load Data
+# STEP 1: Load Data
 # =============================================================================
 
 # --- Planning units: SJV fields with habitat extractions ---
-field_data_all <- read_sf(here("data/intermediate/7_habitatExtraction/sjvHabitatExtractions/sjvHabitatExtractions.gpkg"))
+field_data_all <- read_sf(here("data/intermediate/7_habitat_extraction/sjvHabitatExtractions/sjvHabitatExtractions.gpkg"))
 
 # --- DWR groundwater basin boundaries ---
 basins_raw <- st_read(here("data/raw/i08_B118_CA_GroundwaterBasins/i08_B118_CA_GroundwaterBasins.shp"))
@@ -83,7 +84,7 @@ cpad_raw <- st_read(here("data/raw/protected_areas/cpad_release_2025b/CPAD_Relea
 
 
 # =============================================================================
-# SECTION 1b: Filter Basins to the 15 SJV Groundwater Basins
+# STEP 1b: Filter Basins to the 15 SJV Groundwater Basins
 # =============================================================================
 # Same filter applied in 9_2_prioritizr_water_only.R: SJV basins only,
 # excluding the 4 basins without PPIC overdraft estimates (East Contra Costa,
@@ -101,27 +102,27 @@ sjv_basins <- basins_raw %>%
 cat("  SJV basins retained:", nrow(sjv_basins), "\n")
 print(sort(unique(sjv_basins$Basin_Su_1)))
 
-# Reproject basins to match fields CRS
+# reproject basins to match fields CRS
 sjv_basins <- st_transform(sjv_basins, st_crs(field_data_all))
 
 
 # =============================================================================
-# SECTION 1c: Restrict Field Planning Units to the 15 SJV Basins
+# STEP 1c: Restrict Field Planning Units to the 15 SJV Basins
 # =============================================================================
-# Mirror the water-only spatial filter: assign each field to a basin via
-# centroid spatial join, then keep only fields that fall within one of the
-# 15 SJV basins.
+# Assign each field to a basin via centroid spatial join, then keep only fields 
+# that fall within one of the 15 SJV basins.
 
 cat("\nAssigning fields to groundwater basins...\n")
 
-# Spatial join via centroid for clean 1:1 matching
+# spatial join via centroid for clean 1:1 matching
 field_centroids <- st_centroid(field_data_all)
-basin_join <- st_join(field_centroids, sjv_basins %>% select(Basin_Su_1), left = TRUE)
+basin_join <- st_join(field_centroids, sjv_basins %>% 
+                        select(Basin_Su_1), left = TRUE)
 
-# Attach basin name
+# attach basin name
 field_data_all$basin_raw <- basin_join$Basin_Su_1
 
-# Clean basin names (same crosswalk as water-only script)
+# clean basin names (same crosswalk as water-only script)
 field_data_all <- field_data_all %>%
   mutate(
     basin = case_when(
@@ -165,11 +166,10 @@ cat("  - Cultivated:", sum(field_data$fallow == 0), "\n")
 
 
 # =============================================================================
-# SECTION 1d: Filter Protected Areas to the 15 SJV Basins
+# STEP 1d: Filter Protected Areas to the 15 SJV Basins
 # =============================================================================
 # Step 1: Keep PAs that are within, intersecting, OR touching the boundary of
-#         the 15 SJV basins. `st_intersects()` returns TRUE for any of these
-#         spatial relationships, so a single intersects predicate covers all.
+#         the 15 SJV basins.
 #
 # Step 2: Resolve geometric overlap. CPAD Holdings frequently overlap each
 #         other (multiple agencies covering the same land) and overlap
@@ -193,14 +193,14 @@ cat("  - Cultivated:", sum(field_data$fallow == 0), "\n")
 
 cat("\nFiltering CPAD Holdings to the 15 SJV basins...\n")
 
-# Match CPAD to fields CRS
+# match CPAD to fields CRS
 cpad <- st_transform(cpad_raw, st_crs(field_data))
 cat("  CPAD Holdings (statewide):", nrow(cpad), "\n")
 
-# Union of 15 SJV basins (single multipolygon for the intersects test)
+# union of 15 SJV basins (single multipolygon for the intersects test)
 sjv_basins_union <- st_union(sjv_basins)
 
-# Keep PAs that intersect (covers within / overlapping / touching)
+# keep PAs that intersect (covers within / overlapping / touching)
 cpad_in_sjv <- cpad %>%
   filter(lengths(st_intersects(., sjv_basins_union)) > 0)
 
@@ -236,12 +236,12 @@ cpad_in_sjv <- pa_patches_sf
 
 
 # =============================================================================
-# SECTION 1e: Build the Combined Planning Unit Layer (Fields + PAs)
+# STEP 1e: Build the Combined Planning Unit Layer (Fields + PAs)
 # =============================================================================
 # Append PAs to the field planning units. PAs are assigned:
 #   - habitat = 0 for every habitat feature column (no contribution to targets)
 #   - water  = 0 (no contribution to water savings, for downstream consistency)
-#   - revenue = 0, cost = nominal (so the solver isn't selecting them "for free"
+#   - revenue = 0, (cost = nominal; so the solver isn't selecting them "for free"
 #     in a way that messes with cost reporting; the locked-in constraint
 #     forces selection regardless)
 #   - is_pa = TRUE for PAs, FALSE for fields (logical, required by
@@ -252,23 +252,22 @@ cat("\nBuilding combined planning unit layer (fields + PAs)...\n")
 
 # --- Identify habitat & water columns we'll need to zero out for PAs ---
 habitat_cols_all <- names(field_data)[grepl("^(bnll|gkr|sjkf)_", names(field_data))]
-# Optional: water column(s) for downstream consistency. Adjust if your habitat
-# extraction layer carries water columns under different names.
+# water columns for downstream consistency
 water_cols <- intersect(c("water", "waterUs", "waterAW"), names(field_data))
 
 # --- Add is_pa = FALSE to fields ---
-# `add_locked_in_constraints()` requires a logical column, not integer.
+# `add_locked_in_constraints()` requires a logical column, not integer
 field_data <- field_data %>%
   mutate(is_pa = FALSE)
 
 # --- Build PA planning units, matching the field schema ---
 # Start with a skeleton that has only the geometry and pre-computed acres
-# from the topology cleanup, then add all the columns the field layer
-# carries (zeroed).
+# from the topology cleanup
 n_pa <- nrow(cpad_in_sjv)
 
+# then add all the columns the field layer carries (zeroed)
 pa_data <- cpad_in_sjv %>%
-  # acres_pa is already computed in Section 1d topology cleanup; just keep it
+  # acres_pa is already computed in Section 1d topology cleanup, so keep it
   # Drop everything else we don't need
   select(acres_pa) %>%
   # Assign matching schema
@@ -282,10 +281,12 @@ pa_data <- cpad_in_sjv %>%
     basin     = NA_character_,        # PAs are not assigned to a single basin
     basin_raw = NA_character_
   ) %>%
+  # rename for joining
   rename(geom = geometry) %>% 
   select(-acres_pa)
 
 # Add field-only attributes as NA so rbind() preserves them
+# We'll also use these for plotting/post-prioritizr analyses
 pa_data <- pa_data %>%
   mutate(
     county    = NA_character_,
@@ -322,7 +323,7 @@ cat("  Total planning units:", nrow(pu), "\n")
 
 
 # =============================================================================
-# SECTION 2: Cost & Habitat Column Prep
+# STEP 2: Cost & Habitat Column Prep
 # =============================================================================
 
 # Replace NAs in habitat columns with 0 (PAs already 0 by construction)
@@ -330,7 +331,7 @@ pu <- pu %>%
   mutate(across(all_of(habitat_cols_all), ~ replace_na(.x, 0)))
 
 # Cost: revenue for fields, nominal $1 for PAs (locked in anyway, but a
-# strictly positive cost avoids degenerate solver behavior)
+# strictly positive cost avoids weird solver behavior)
 pu <- pu %>%
   mutate(
     cost_raw = case_when(
@@ -341,6 +342,7 @@ pu <- pu %>%
   )
 
 # Scale costs by a factor of 10,000
+# prioritizr can act weird when costs are too high, and we have high costs
 cost_scale_factor <- 1e4
 pu <- pu %>%
   mutate(cost = cost_raw / cost_scale_factor)
@@ -351,9 +353,10 @@ cat("Cost range (scaled): [", round(min(pu$cost), 4), ",",
 
 
 # =============================================================================
-# SECTION 2b: Boundary Matrix (Fields + PAs)
+# STEP 2b: Boundary Matrix (Fields + PAs)
 # =============================================================================
 # Build the boundary matrix on the FULL planning unit set (fields + PAs).
+
 # This is what allows the BLM penalty to reward retiring fields adjacent to
 # locked-in PAs.
 
@@ -363,9 +366,10 @@ cat("  Boundary matrix dimensions:", dim(bm), "\n")
 
 
 # =============================================================================
-# SECTION 3: Define the 2 Cross-Temporal Optimization Problems
+# STEP 3: Define the 2 Cross-Temporal Optimization Problems
 # =============================================================================
 
+# 25,000 ac habitat target for each feature
 habitat_target <- 25000
 
 # Suitable habitat features (15 total)
@@ -406,8 +410,11 @@ stopifnot(all(hq_features %in% names(pu)))
 
 
 # =============================================================================
-# SECTION 4: Diagnostic — Available Habitat & PA Locked-In Summary
+# STEP 4: Quick Diagnostic — Available Habitat & PA Locked-In Summary
 # =============================================================================
+
+# This just makes sure we have enough habitat available on PUs to meet the 
+# defined habitat targets
 
 cat("\n--- Available habitat on field PUs (PAs contribute 0) (acres) ---\n")
 cat("--- Field PUs:", sum(!pu$is_pa),
@@ -439,7 +446,7 @@ cat("Total PA acres (locked in):",
 
 
 # =============================================================================
-# SECTION 5: BLM Calibration (Suitable Habitat Problem, with locked-in PAs)
+# STEP 5: BLM Calibration (Suitable Habitat Problem, with locked-in PAs)
 # =============================================================================
 # Calibrate BLM on the suitable habitat problem with PAs locked in. The
 # locked-in constraint is part of the calibration so the chosen BLM reflects
@@ -461,6 +468,7 @@ for (blm_val in blm_values) {
   
   cat("  Solving BLM =", blm_val, "... ")
   
+  # define the calibration problem
   p_cal <- problem(
     x            = pu,
     features     = suit_features,
@@ -473,6 +481,7 @@ for (blm_val in blm_values) {
     add_boundary_penalties(penalty = blm_val, data = bm) %>%
     add_gurobi_solver(verbose = FALSE, numeric_focus = TRUE)
   
+  # solve the calibration problem
   sol_cal <- tryCatch(
     solve(p_cal, run_checks = FALSE),
     error = function(e) {
@@ -518,14 +527,14 @@ blm_plot <- ggplot(blm_results, aes(x = total_cost, y = boundary)) +
 print(blm_plot)
 
 # --- SELECT THE BEST BLM ---
-# Inspect the curve and update the chosen value at the elbow.
+# this is the "inflection" point (elbow) on the curve
 chosen_blm <- 0.005
 
 cat("\nChosen BLM:", chosen_blm, "\n")
 
 
 # =============================================================================
-# SECTION 6: Run Both Cross-Temporal Optimizations
+# STEP 6: Run Both Cross-Temporal Optimizations
 # =============================================================================
 
 cat("\n========== RUNNING 2 CROSS-TEMPORAL OPTIMIZATIONS (w/ locked-in PAs) ==========\n\n")
@@ -556,7 +565,7 @@ for (i in 1:nrow(scenarios)) {
   cat(sprintf("    Target: %s acres per feature\n", format(habitat_target, big.mark = ",")))
   cat(sprintf("    Locked-in PAs: %d\n", sum(pu$is_pa)))
   
-  # Build problem
+  # build problem
   p <- problem(
     x            = pu,
     features     = feats,
@@ -569,7 +578,7 @@ for (i in 1:nrow(scenarios)) {
     add_boundary_penalties(penalty = chosen_blm, data = bm) %>%
     add_gurobi_solver(verbose = FALSE, numeric_focus = TRUE)
   
-  # Solve
+  # solve problem
   sol <- tryCatch(
     solve(p, run_checks = FALSE),
     error = function(e) {
@@ -580,16 +589,17 @@ for (i in 1:nrow(scenarios)) {
   
   if (is.null(sol)) next
   
-  # Selected NEW retirements (exclude PAs)
-  sel <- sol %>% filter(solution_1 == 1, !is_pa)
+  # selected NEW retirements (exclude PAs)
+  sel <- sol %>% 
+    filter(solution_1 == 1, !is_pa)
   
-  # Boundary length on the full solution
+  # boundary length on the full solution
   boundary_length <- eval_boundary_summary(p, sol[, "solution_1"])$boundary
   
-  # Store solution
+  # store solution
   solutions[[scen]] <- sol
   
-  # Append summary
+  # append summary
   summary_all <- summary_all %>%
     add_row(
       scenario_name   = scen,
@@ -608,7 +618,7 @@ for (i in 1:nrow(scenarios)) {
               format(round(sum(sel$revenue, na.rm = TRUE)), big.mark = ","),
               format(round(sum(sel$acres, na.rm = TRUE)), big.mark = ",")))
   
-  # Per-feature target achievement (PAs contribute 0 by construction)
+  # per-feature target achievement (PAs contribute 0 by construction)
   cat("\n    --- Target Achievement ---\n")
   for (feat in feats) {
     achieved <- sum(sel[[feat]], na.rm = TRUE)
@@ -621,7 +631,7 @@ for (i in 1:nrow(scenarios)) {
 
 
 # =============================================================================
-# SECTION 7: Compare the Two Solutions
+# STEP 7: Compare the Two Solutions
 # =============================================================================
 
 cat("\n========== CROSS-TEMPORAL SOLUTION COMPARISON ==========\n\n")
@@ -681,7 +691,6 @@ print(target_detail, n = Inf)
 
 # Output directory
 out_dir <- here("data/intermediate/9_1_prioritizr_habitat_only_PAs")
-if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 # --- Save objects needed for figures ---
 save(
@@ -711,7 +720,7 @@ save(
 for (scen in names(solutions)) {
   sol <- solutions[[scen]]
   
-  # Try to attach crop/comm classification to fields, leave PAs as-is
+  # attach crop/comm classification to fields, leave PAs as-is
   if (exists("convertCommRetired")) {
     sol_classified <- tryCatch(
       convertCommRetired(sol) %>% dplyr::select(-any_of("crop")),
@@ -731,9 +740,6 @@ write_csv(target_detail,  file.path(out_dir, "cross_temporal_PAs_target_detail.c
 write_csv(blm_results,    file.path(out_dir, "cross_temporal_PAs_blm_calibration.csv"))
 
 
-cat("\n========== CROSS-TEMPORAL OPTIMIZATION (w/ PAs) COMPLETE — RESULTS SAVED ==========\n")
-cat("Load results for figures with:\n")
-cat('  load(here("data/intermediate/9_1_prioritizr_habitat_only_PAs/prioritizr_cross_temporal_PAs_results.RData"))\n')
 
 
 

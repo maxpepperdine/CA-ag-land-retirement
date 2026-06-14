@@ -3,6 +3,9 @@
 # ==============================================================================
 # GOAL: Identify optimal sets agricultural fields to retire to meet groundwater
 #       overdraft reduction targets while minimizing foregone agricultural revenue.
+#       Parallel analysis to the AW version, using per-field S_net consumption 
+#       estimates as the water feature instead of AW estimates. Intended as a 
+#       secondary/SI-friendly formulation.
 #
 # SCENARIOS:
 #   - 3 climate scenarios: Baseline, RCP4.5 (2020-2049), RCP8.5 (2020-2049)

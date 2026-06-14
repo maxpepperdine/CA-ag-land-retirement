@@ -9,51 +9,20 @@
 #          existing protected areas (PAs) incorporated as locked-in planning
 #          units.
 #
-# PURPOSE OF THIS SCRIPT (vs. 9_3_prioritizr_combined_PAs.R):
-#   Parallel analysis to the S_net + PAs combined version, using per-field
-#   annual applied water (AW) estimates as the water feature instead of
-#   derived S_net consumption estimates. Intended as a secondary/SI-friendly
-#   formulation that relies only on widely understood AW accounting, while
-#   incorporating the same locked-in PA design.
-#
-# Approach: Mirrors 9_3_prioritizr_combined_PAs.R, with the same PA design
-#           pattern from 9_1_prioritizr_habitat_only_PAs.R:
-#
-#           1. Planning units include the same non-retired fields within the
-#              15 SJV groundwater basins as the original combined workflow.
-#
-#           2. Protected areas (PAs) from the CPAD 2025b Holdings dataset are
-#              added to the planning unit pool. Only PAs that intersect or
-#              touch the union of the 15 SJV basins are retained, then
-#              topologically cleaned (PA-PA overlap dissolved, field footprint
-#              erased from PAs) so the resulting PA layer does not spatially
-#              overlap fields or other PAs. Field geometry is never altered.
-#
-#           3. PAs are assigned habitat = 0, AW = 0, and revenue = 0 so they
-#              do not contribute toward habitat creation or water savings
-#              targets. They are LOCKED IN to every solution via
-#              `add_locked_in_constraints()`. PAs influence the optimization
-#              solely through the boundary penalty: by appearing in the
-#              boundary matrix, they pull retired fields toward existing
-#              protected landscapes.
-#
-#           A new `is_pa` logical column distinguishes PA planning units (TRUE)
-#           from field planning units (FALSE) for downstream reporting.
-#
 # Scenarios: 6 problems (3 water scenarios × 2 habitat quality levels)
-#   Water: Baseline, RCP4.5 (2020-2049), RCP8.5 (2020-2049)
-#   Habitat quality: Suitable, High Quality
+#   - Water: Baseline, RCP4.5 (2020-2049), RCP8.5 (2020-2049)
+#   - Habitat quality: Suitable, High Quality
 #
 # Water savings targets (parallel to 9_2_prioritizr_water_only_AW.R):
 #   Valley-wide AW reduction targets from PPIC with climate adjustment:
-#     Baseline: 2,675 TAF (PPIC-derived, sum of 15 basin-specific targets
+#     - Baseline: 2,675 TAF (PPIC-derived, sum of 15 basin-specific targets
 #                          from the "Corrected reduction in groundwater
 #                          supplies no negative" field, Escriva-Bou et al. 2023)
-#     RCP4.5:   Baseline × 1.063 (PPIC 6.3% increase from 2.68 to 2.85 MAF)
-#     RCP8.5:   Baseline × (1 + 0.063 × BCM PET scaling factor)
+#     - RCP4.5:   Baseline × 1.063 (PPIC 6.3% increase from 2.68 to 2.85 MAF)
+#     - RCP8.5:   Baseline × (1 + 0.063 × BCM PET scaling factor)
 #
 # Habitat targets:
-#   25,000 acres per habitat feature (15 features, cross-temporal)
+#   - 25,000 acres per habitat feature (15 features, cross-temporal)
 #
 # Cost layer: revenue per field (annual foregone revenue); PAs assigned cost
 #             of 1 (scaled), nominal value since PAs are locked in.
@@ -85,7 +54,7 @@ options(scipen = 999)
 
 
 # =============================================================================
-# SECTION 1: Load Data
+# STEP 1: Load Data
 # =============================================================================
 
 # --- Combined planning unit data (water + habitat columns) ---
@@ -99,7 +68,7 @@ cpad_raw <- st_read(here("data/raw/protected_areas/cpad_release_2025b/CPAD_Relea
 
 
 # =============================================================================
-# SECTION 1b: Assign Fields to Groundwater Basins
+# STEP 1b: Assign Fields to Groundwater Basins
 # =============================================================================
 # Limit planning units to the same 15 SJV basins used in the water savings
 # analysis to ensure water targets are applied to the correct spatial extent.
@@ -118,11 +87,11 @@ cat("  SJV basins found:", nrow(sjv_basins), "\n")
 cat("  Basin names:\n")
 print(sort(unique(sjv_basins$Basin_Su_1)))
 
-# Reproject basins to match fields CRS
+# reproject basins to match fields CRS
 sjv_basins <- st_transform(sjv_basins, st_crs(field_data_all))
 
-# Spatial join: assign each field to the basin it falls within
-# Use centroid of field for clean 1:1 matching
+# spatial join: assign each field to the basin it falls within
+# use centroid of field for clean 1:1 matching
 fields_centroids <- st_centroid(field_data_all)
 basin_join <- st_join(fields_centroids, sjv_basins %>% select(Basin_Su_1), left = TRUE)
 
@@ -165,7 +134,7 @@ cat("  Fields without basin assignment:", sum(is.na(field_data_all$basin)), "\n"
 
 
 # =============================================================================
-# SECTION 1c: Define Field Planning Units
+# STEP 1c: Define Field Planning Units
 # =============================================================================
 # Planning units: non-retired fields within the 15 SJV groundwater basins.
 
@@ -182,11 +151,10 @@ cat("  - Cultivated:", sum(field_data$fallow == 0), "\n")
 
 
 # =============================================================================
-# SECTION 1d: Filter Protected Areas to the 15 SJV Basins, then Resolve
-#             Overlap with Fields and Other PAs
+# STEP 1d: Filter Protected Areas to the 15 SJV Basins, then Resolve
+#          Overlap with Fields and Other PAs
 # =============================================================================
-# Same topology cleanup approach as 9_1_prioritizr_habitat_only_PAs.R and
-# 9_3_prioritizr_combined_PAs.R:
+# Same topology cleanup approach as 9_1_prioritizr_habitat_only_PAs.R
 #
 #   Step 1: Keep CPAD Holdings that intersect the union of the 15 SJV basins
 #           (single `st_intersects` predicate covers within / overlapping /
@@ -210,14 +178,14 @@ cat("  - Cultivated:", sum(field_data$fallow == 0), "\n")
 
 cat("\nFiltering CPAD Holdings to the 15 SJV basins...\n")
 
-# Match CPAD to fields CRS
+# match CPAD to fields CRS
 cpad <- st_transform(cpad_raw, st_crs(field_data))
 cat("  CPAD Holdings (statewide):", nrow(cpad), "\n")
 
-# Union of 15 SJV basins (single multipolygon for the intersects test)
+# union of 15 SJV basins (single multipolygon for the intersects test)
 sjv_basins_union <- st_union(sjv_basins)
 
-# Keep PAs that intersect (covers within / overlapping / touching)
+# keep PAs that intersect (covers within / overlapping / touching)
 cpad_in_sjv <- cpad %>%
   filter(lengths(st_intersects(., sjv_basins_union)) > 0)
 
@@ -246,12 +214,12 @@ cat("  PA patches after topology cleanup:", nrow(pa_patches_sf), "\n")
 cat("  Total PA acres (after cleanup):",
     format(round(sum(pa_patches_sf$acres_pa)), big.mark = ","), "\n")
 
-# Replace cpad_in_sjv with the cleaned patch layer for downstream use
+# replace cpad_in_sjv with the cleaned patch layer for downstream use
 cpad_in_sjv <- pa_patches_sf
 
 
 # =============================================================================
-# SECTION 1e: Build the Combined Planning Unit Layer (Fields + PAs)
+# STEP 1e: Build the Combined Planning Unit Layer (Fields + PAs)
 # =============================================================================
 # Append PAs to the field planning units. PAs are assigned:
 #   - habitat = 0 for every habitat feature column (no contribution to targets)
@@ -278,7 +246,7 @@ water_cols_AF <- intersect(
   names(field_data)
 )
 
-# PET ratio columns are needed for the RCP8.5 scaling derivation in Section 3.
+# PET ratio columns are needed for the RCP8.5 scaling derivation in STEP 3.
 # Setting these to NA on PAs ensures they are excluded from the weighted mean
 # (we also filter !is_pa explicitly in Section 3 for clarity).
 pet_ratio_cols <- intersect(
@@ -312,8 +280,7 @@ pa_data <- cpad_in_sjv %>%
 
 # Add NA-filled versions of any other field-only attributes so rbind() doesn't
 # drop them (e.g., county, last_comm). Only add columns that exist on fields
-# but not yet on PAs. We'll handle the type-matching for important columns
-# explicitly below.
+# but not yet on PAs.
 pa_data <- pa_data %>%
   mutate(
     county    = NA_character_,
@@ -332,7 +299,7 @@ for (col in water_cols_AF) {
   pa_data[[col]] <- 0
 }
 
-# Add NA PET ratio columns (these are excluded from the Section 3 calculation
+# Add NA PET ratio columns (these are excluded from the STEP 3 calculation
 # anyway — explicitly NA so they don't sneak into any future weighted means).
 for (col in pet_ratio_cols) {
   pa_data[[col]] <- NA_real_
@@ -355,7 +322,7 @@ cat("  Total planning units:", nrow(pu), "\n")
 
 
 # =============================================================================
-# SECTION 2: Prepare Cost, Habitat, and Water Columns
+# STEP 2: Prepare Cost, Habitat, and Water Columns
 # =============================================================================
 
 # --- Cost: revenue scaled to ten-thousands of USD; PAs get nominal cost ---
@@ -402,7 +369,7 @@ cat("Fields outside 15 basins (excluded):",
 
 
 # =============================================================================
-# SECTION 2b: Boundary Matrix (Fields + PAs)
+# STEP 2b: Boundary Matrix (Fields + PAs)
 # =============================================================================
 # Build the boundary matrix on the FULL planning unit set (fields + PAs).
 # This is what allows the BLM penalty to reward retiring fields adjacent to
@@ -414,7 +381,7 @@ cat("  Boundary matrix dimensions:", dim(bm), "\n")
 
 
 # =============================================================================
-# SECTION 3: Define Water Savings Targets
+# STEP 3: Define Water Savings Targets
 # =============================================================================
 # Climate-adjusted AW reduction targets following the PPIC/BCM methodology
 # established in the AW water-only analysis (9_2_prioritizr_water_only_AW.R).
@@ -473,7 +440,7 @@ cat("  RCP8.5 (2020-2049):", round(water_target_rcp85_taf, 1),
 
 
 # =============================================================================
-# SECTION 4: Define Scenario Matrix (6 Problems)
+# STEP 4: Define Scenario Matrix (6 Problems)
 # =============================================================================
 # Each problem combines 15 cross-temporal habitat features + 1 water feature.
 
@@ -535,7 +502,7 @@ cat("\nAll feature columns verified.\n")
 
 
 # =============================================================================
-# SECTION 5: Diagnostic — Check Feature Availability
+# STEP 5: Diagnostic — Check Feature Availability
 # =============================================================================
 # Available habitat and water on FIELD planning units only (PAs contribute 0).
 
@@ -570,16 +537,11 @@ cat("Total PA acres (locked in):",
 
 
 # =============================================================================
-# SECTION 6: BLM Calibration (Baseline + Suitable Problem, with locked-in PAs)
+# STEP 6: BLM Calibration (Baseline + Suitable Problem, with locked-in PAs)
 # =============================================================================
 # Recalibrate BLM for the AW-based combined problem WITH locked-in PAs.
 # Calibrated on the Baseline + Suitable problem (16 features). The chosen
 # BLM will be applied to all 6 problems.
-#
-# Note: The S_net + PAs combined script uses BLM = 0.005, but because the
-# water feature and target here are different (AW vs S_net), the
-# cost-boundary trade-off curve may differ. Inspect the printed calibration
-# plot and resulting table, then set `chosen_blm` below.
 
 cat("\n========== BLM CALIBRATION (Baseline + Suitable, 16 features, w/ PAs, AW) ==========\n\n")
 
@@ -659,15 +621,14 @@ blm_plot <- ggplot(blm_results, aes(x = total_cost, y = boundary)) +
 print(blm_plot)
 
 # --- SELECT THE BEST BLM ---
-# Inspect the plot above and set the "elbow" value.
-# Starting value matches the S_net + PAs version; revise after inspecting the plot.
+# Inspect the plot above and set the "elbow" value
 chosen_blm <- 0.005
 
 cat("\nChosen BLM:", chosen_blm, "\n")
 
 
 # =============================================================================
-# SECTION 7: Run All 6 Combined Optimizations (with locked-in PAs)
+# STEP 7: Run All 6 Combined Optimizations (with locked-in PAs)
 # =============================================================================
 
 cat("\n========== RUNNING 6 COMBINED AW OPTIMIZATIONS (w/ locked-in PAs) ==========\n\n")
@@ -784,7 +745,7 @@ for (i in 1:nrow(scenarios)) {
 
 
 # =============================================================================
-# SECTION 8: Compare Solutions
+# STEP 8: Compare Solutions
 # =============================================================================
 
 cat("\n========== COMBINED SOLUTION COMPARISON ==========\n\n")
@@ -865,7 +826,7 @@ print(target_detail, n = Inf)
 
 
 # =============================================================================
-# SECTION 9: Export Results
+# STEP 9: Export Results
 # =============================================================================
 
 output_dir <- here("data/intermediate/9_3_prioritizr_combined_AW_PAs/")
@@ -957,10 +918,6 @@ target_methodology <- data.frame(
 write_csv(target_methodology, file.path(output_dir, "combined_AW_PAs_target_methodology.csv"))
 
 
-cat("\n========== COMBINED AW OPTIMIZATION (w/ PAs) COMPLETE — RESULTS SAVED ==========\n")
-cat("Output directory:", output_dir, "\n")
-cat("Load results for figures with:\n")
-cat('  load(here("data/intermediate/9_3_prioritizr_combined_AW_PAs/prioritizr_combined_AW_PAs_results.RData"))\n')
 
 
 
