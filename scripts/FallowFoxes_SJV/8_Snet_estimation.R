@@ -20,7 +20,7 @@
 #
 # OUTPUTS:
 #   - GeoPackage with S_net values per field per scenario, combined with habitat
-#     extraction acreages per field from 7_habitatExtraction.R, for use in 
+#     extraction acreages per field from 7_habitat_extraction.R, for use in 
 #     prioritizr
 # ==============================================================================
 
@@ -37,11 +37,11 @@ library(nngeo)
 
 
 # ==============================================================================
-# SECTION 1: File paths
+# STEP 1: File paths
 # ==============================================================================
 
-# LandIQ fields (main dataset with geometry from 6_estimateFallowing_median.R)
-landiq_path <- "data/intermediate/6_estimateFallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.gpkg"
+# LandIQ fields (main dataset with geometry from 6_estimate_fallowing_median.R)
+landiq_path <- "data/intermediate/6_estimate_fallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.gpkg"
 
 # BCM PET rasters (annual, mm)
 # baseline: 30-yr average 1990-2020
@@ -63,31 +63,29 @@ output_dir <- "data/intermediate/8_Snet_estimation"
 
 
 # ==============================================================================
-# SECTION 2: Load data
+# STEP 2: Load data
 # ==============================================================================
 
-cat("Loading LandIQ fields...\n")
+# land IQ fields
 fields <- st_read(landiq_path)
 
-cat("Loading PET rasters...\n")
+# PET rasters
 pet_base <- rast(pet_baseline_path)
 pet_futures <- lapply(pet_future_paths, rast)
 
-cat("Loading SAGBI...\n")
+# modified SAGBI
 sagbi <- st_read(sagbi_path)
 
 
 # ==============================================================================
-# SECTION 3: Prepare SAGBI
+# STEP 3: Prepare SAGBI
 # ==============================================================================
 
 # reproject SAGBI to match LandIQ CRS
-cat("Reprojecting SAGBI to LandIQ CRS...\n")
 sagbi <- st_transform(sagbi, st_crs(fields))
 
 # compute area-weighted average SAGBI score per LandIQ field
 # this handles the case where a field overlaps multiple SAGBI polygons
-cat("Computing area-weighted SAGBI scores per field...\n")
 
 # intersect fields with SAGBI
 fields_sagbi <- st_intersection(fields, sagbi %>% 
@@ -162,6 +160,7 @@ if (nrow(fields_missing_sagbi) > 0) {
 fields <- fields %>%
   left_join(sagbi_by_field, by = "id")
 
+# summary outputs
 cat("  Final SAGBI summary:\n")
 cat("    Fields with SAGBI:", sum(!is.na(fields$sagbi_score)), "\n")
 cat("    Fields missing SAGBI:", sum(is.na(fields$sagbi_score)), "\n")
@@ -170,17 +169,17 @@ cat("    SAGBI range:", round(min(fields$sagbi_score), 1), "-", round(max(fields
 
 
 # ==============================================================================
-# SECTION 4: Extract PET values per field
+# STEP 4: Extract PET values per field
 # ==============================================================================
 
 # ensure fields are in the same CRS as the PET rasters
 fields_pet_crs <- st_transform(fields, crs(pet_base))
 
-cat("Extracting baseline PET per field...\n")
+# extract baseline PET per field
 fields$pet_baseline_mm <- terra::extract(pet_base, vect(fields_pet_crs),
                                          fun = mean, na.rm = TRUE)[, 2]
 
-cat("Extracting future PET per field (4 scenarios)...\n")
+# extract future PET per field (4 scenarios)
 for (scenario_name in names(pet_futures)) {
   col_name <- paste0("pet_", scenario_name, "_mm")
   fields[[col_name]] <- terra::extract(pet_futures[[scenario_name]],
@@ -198,12 +197,12 @@ if (na_pet > 0) {
 
 
 # ==============================================================================
-# SECTION 5: Compute baseline IE AND S_net
+# STEP 5: Compute baseline IE AND S_net
 # ==============================================================================
 
 cat("Computing baseline irrigation efficiency and S_net...\n")
 
-# Recharge fraction function from SAGBI score (0-100)
+# recharge fraction function from SAGBI score (0-100)
 calc_RF <- function(sagbi_score) {
   rf <- 0.05 + (sagbi_score / 100) * 0.75
   return(pmin(pmax(rf, 0.05), 0.80))
@@ -216,13 +215,13 @@ fields <- fields %>%
     # IE > 1 means ETc > AW (deficit irrigation or precip contribution) — cap at 1.0
     IE = pmin(waterUseETc / waterUseAW, 1.0),
     
-    # Recharge fraction from SAGBI
+    # recharge fraction from SAGBI
     RF = calc_RF(sagbi_score),
     
     # --- Baseline S_net ---
-    # Non-consumptive = AW - ETc (floored at 0 for fields where ETc > AW)
+    # non-consumptive = AW - ETc (floored at 0 for fields where ETc > AW)
     NC_baseline = pmax(waterUseAW - waterUseETc, 0),
-    # For fields where ETc > AW, use AW as the consumptive portion
+    # for fields where ETc > AW, use AW as the consumptive portion
     ETc_baseline_capped = pmin(waterUseETc, waterUseAW),
     Snet_baseline_AF_ac = ETc_baseline_capped + (NC_baseline * (1 - RF)),
     Snet_baseline_AF    = Snet_baseline_AF_ac * acres
@@ -240,8 +239,11 @@ cat("  Baseline AW summary (AF/ac):\n")
 print(summary(fields$waterUseAW))
 
 # ==============================================================================
-# SECTION 6: Compute future S_net — PATH A (Mechanistic ETc)
+# STEP 6: Compute future S_net (Mechanistic ETc)
 # ==============================================================================
+# NOTE: 'IE' here is the same as 'R' in the paper. IE is not technically 
+#        accurate; we just use this for simplicity sake in the code calculations
+
 
 cat("Computing future S_net for all scenarios...\n")
 
@@ -254,16 +256,16 @@ for (scen in scenarios) {
   ratio_col <- paste0("PET_ratio_", scen)
   fields[[ratio_col]] <- fields[[pet_col]] / fields$pet_baseline_mm
   
-  # Future ETc = baseline ETc scaled by PET change
+  # future ETc = baseline ETc scaled by PET change
   etc_col <- paste0("ETc_", scen)
   fields[[etc_col]] <- fields$waterUseETc * fields[[ratio_col]]
   
-  # Future AW = ETc / IE
-  # This amplifies AW for inefficient irrigators (low IE = high AW per unit ETc)
+  # future AW = ETc / IE
+  # this amplifies AW for inefficient irrigators (low IE = high AW per unit ETc)
   aw_col <- paste0("AW_", scen)
   fields[[aw_col]] <- fields[[etc_col]] / fields$IE
   
-  # Non-consumptive water (losses)
+  # non-consumptive water (losses)
   nc_col <- paste0("NC_", scen)
   fields[[nc_col]] <- fields[[aw_col]] - fields[[etc_col]]
   
@@ -275,7 +277,7 @@ for (scen in scenarios) {
   snet_total_col <- paste0("Snet_", scen, "_AF")
   fields[[snet_total_col]] <- fields[[snet_col]] * fields$acres
   
-  # Delta S_net vs baseline (AF/ac)
+  # delta S_net vs baseline (AF/ac)
   delta_col <- paste0("Snet_delta_", scen, "_AF_ac")
   fields[[delta_col]] <- fields[[snet_col]] - fields$Snet_baseline_AF_ac
   
@@ -289,13 +291,13 @@ for (scen in scenarios) {
 
 
 # ==============================================================================
-# SECTION 7: QC diagnostics
+# STEP 7: QC diagnostics
 # ==============================================================================
 
 cat("\n--- QC SUMMARY ---\n")
 cat("Total fields:", nrow(fields), "\n")
 
-# Critical check: S_net <= AW for all scenarios
+# critical check: S_net <= AW for all scenarios
 cat("\nS_net <= AW check:\n")
 cat("  baseline:", sum(fields$Snet_baseline_AF_ac > fields$waterUseAW + 0.001, na.rm = TRUE),
     "violations\n")
@@ -356,36 +358,10 @@ fields_AW <- fields %>%
 
 
 # ==============================================================================
-# SECTION 8: Export for prioritizr
+# STEP 8: Export for prioritizr
 # ==============================================================================
 
 cat("\nExporting for prioritizr...\n")
-
-# prioritizr_water_final <- fields %>% 
-#   select(
-#     # identifiers
-#     id, comm, county, acres, fallow, retired,
-#     # cost column & sagbi
-#     revenue, sagbi_score, 
-#     # irrigation efficiency & recharge fraction (for QC/decomposition)
-#     IE, RF,
-#     # PET values (raw climate signal)
-#     pet_baseline_mm, pet_RCP45_near_mm, pet_RCP85_near_mm,
-#     # PET ratios
-#     starts_with("PET_ratio_"),
-#     # baseline water use components
-#     waterUseAW, waterAW,           # DWR applied water (per-acre and total)
-#     ETc_baseline_capped,           # baseline consumptive use
-#     NC_baseline,                   # baseline non-consumptive
-#     # future AW (for computing demand increase -> target adjustment)
-#     AW_RCP45_near, AW_RCP85_near,
-#     # future ETc (for decomposition/QC)
-#     ETc_RCP45_near, ETc_RCP85_near,
-#     # S_net baseline (AF)
-#     Snet_baseline_AF,
-#     # S_net future scenarios (AF)
-#     starts_with("Snet_") & ends_with("_AF"),
-#   )
 
 # final data for water only prioritizr runs
 prioritizr_water_final <- fields_AW %>% 
@@ -423,8 +399,8 @@ cat("\n=== S_net ESTIMATION COMPLETE ===\n")
 
 # combine water prioritizr data with habitat extraction data ------------------
 
-# load habitat extraction GPKG from 7_habitatExtraction.R
-habitat_field_data <- read_sf(here("data/intermediate/7_habitatExtraction/sjvHabitatExtractions/sjvHabitatExtractions.gpkg")) %>% 
+# load habitat extraction GPKG from 7_habitat_extraction.R
+habitat_field_data <- read_sf(here("data/intermediate/7_habitat_extraction/sjvHabitatExtractions/sjvHabitatExtractions.gpkg")) %>% 
   # keep only id & habitat columns for joining
   dplyr::select(id, 19:48)
 
@@ -437,9 +413,6 @@ combined_field_data <- prioritizr_water_final %>%
 # save the combined data
 comb_output_path <- file.path(output_dir, "prioritizr_water_habitat/fields_water_habitat_combined.gpkg")
 st_write(combined_field_data, comb_output_path, delete_dsn = TRUE)
-
-
-# save a sample
 
 
 

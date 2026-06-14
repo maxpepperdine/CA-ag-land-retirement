@@ -25,9 +25,9 @@ library(gt)
 # STEP 1: Load SJV fields and baseline habitat rasters
 # =============================================================================
 
-# Read in Extract layer from 6_estimateFallowing_median.R
+# Read in Extract layer from 6_estimate_fallowing_median.R
 # SJV fields with revenue and water data, fully estimated
-field_data <- read_sf(here("data/intermediate/6_estimateFallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.gpkg"))
+field_data <- read_sf(here("data/intermediate/6_estimate_fallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.gpkg"))
 crs(field_data) # make sure EPSG:3310
 
 
@@ -486,13 +486,20 @@ field_data$sjkf_rcp85_2069_hq <- (sjkf_rcp85_2069_hq_areas * cell_area_m2) / 404
 # Export ------------------------------------------------------------------
 
 # save as a geopackage to preserve column names
-write_sf(field_data, here("data/intermediate/7_habitatExtraction/sjvHabitatExtractions/sjvHabitatExtractions.gpkg"), 
+write_sf(field_data, here("data/intermediate/7_habitat_extraction/sjvHabitatExtractions/sjvHabitatExtractions.gpkg"), 
          append = FALSE)
 
 
 
 # ==============================================================================
-# Step 8: Summary table
+# The rest of this script includes a summary table and some plots visualizing 
+# the results of the habitat extraction. It does not need to be run to move 
+# forward with the rest of the analysis. 
+# ==============================================================================
+
+
+# ==============================================================================
+# Summary table
 # ==============================================================================
 
 # --- Suitable Habitat Summary Table ---
@@ -595,7 +602,7 @@ summary_table_hq %>%
 
 
 # =============================================================================
-# STEP 7: Choropleth plots
+# Choropleth plots
 # =============================================================================
 
 # # What proportion of fields have any habitat at all?

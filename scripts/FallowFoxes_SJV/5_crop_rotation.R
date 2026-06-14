@@ -1,3 +1,13 @@
+# =============================================================================
+# ACCOUNTING FOR CROP ROTATIONS
+# =============================================================================
+# Purpose: 
+#         (1) Process fields with multiple crop rotations within the water year
+#         (2) Calculate combined revenue and water use for annual crops with rotations
+#         (3) Select the most valuable crop (annual or perennial) for each field
+#         (4) Create final field-level dataset with rotation-adjusted values
+# =============================================================================
+
 # clear environment
 rm(list=ls())
 
@@ -19,7 +29,7 @@ library(janitor)
 source(here("scripts/FallowFoxes_SJV/0_startup/functions.R"))
 
 
-# read in the .shp just created in 4_revenueEstimation 
+# read in the .shp just created in 4_revenue_estimation.R 
 sjv <- read_sf(here("data/intermediate/4_revenue_estimation/sjv_landIQ_fullCrosswalk/sjv_landIQ_fullCrosswalk.gpkg")) %>% 
   clean_names()
 
@@ -82,8 +92,7 @@ endCropKey <- sjv2022Group %>%
 
 # Create double cultivated vector 
 # These are crops that can be cultivated twice within one year according 
-# to Kern Ag Reports
-
+# to USDA NASS ag Reports
 doubleCult <- sjv2022Group %>% 
   pull(comm) %>% 
   unique() %>% 
@@ -91,11 +100,8 @@ doubleCult <- sjv2022Group %>%
   str_subset("Lettuce/Leafy Greens") %>% 
   c("Potatoes", "Carrots", "Broccoli")
 
-
-
 # Drop records of more than 3 crops, and then drop any duplicated
 # COMMs except for those in the double Cult list. 
-
 dropDuplicates <- annual %>% 
   left_join(endCropKey, by = "geo_grp") %>% 
   group_by(geo_grp, endCrop, comm) %>%
@@ -106,11 +112,10 @@ dropDuplicates <- annual %>%
   filter(duplicated(comm) == FALSE | comm %in% doubleCult)
 
 
+
 # Summarize Annual Rotations by Plot --------------------------------------
 
-
 # Find Annual Value for each plot
-
 
 # Summarize to get key of average rev and water use rates by ending crops
 # This summarizes revenue rates for rotated crops to get a fields total annual price/acre
@@ -137,7 +142,6 @@ joinAnnualKey <- dropDuplicates %>%
 
 # Join Crop rotation table and clean --------------------------------------
 
-
 # Join annual rates with endDate table and update rates of annuals
 cropRotationRaw <- endDate %>% 
   left_join(joinAnnualKey, by = c("geo_grp",
@@ -157,11 +161,9 @@ cropRotationRaw <- endDate %>%
 
 
 
-
 # Summarize for each field ------------------------------------------------ 
 
 # SJV Geometry with ID
-
 sjvGeo <- sjv %>% 
   select(geo_grp) %>%
   filter(duplicated(geo_grp) == FALSE)

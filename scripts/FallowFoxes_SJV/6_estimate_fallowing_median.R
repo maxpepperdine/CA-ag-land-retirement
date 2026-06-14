@@ -1,12 +1,12 @@
 # =============================================================================
-# Estimating Crop Revenue and Water Use for Fallowed Fields in the SJV
+# ESTIMATING CROP REVENUE AND WATER USE FOR FALLOWED FIELDS IN THE SJV
 # =============================================================================
 # Purpose: For fields classified as idle or fallow in the SJV dataset, estimate
 #          their crop revenue and water use based on the median values from all
 #          idle/fallow fields with last cultivated info. If there's a last 
-#          cultivated crop as identified in `1_lastCultivatedLandIQ_2022.R`, 
+#          cultivated crop as identified in `1_last_cultivated_LandIQ_2022.R`, 
 #          we'll use that crop's values for estimation as calculated in 
-#          2_lastCultivatedRevWater.R`.
+#          2_last_cultivated_rev_water.R`.
 # =============================================================================
 
 
@@ -29,7 +29,7 @@ library(nngeo)
 # Load in Data ------------------------------------------------------------
 
 # sjv Year Data with last cultivated revenue and water info (from 2_lastCultivatedRevWater.R)
-sjv <- read_sf(here("data/intermediate/misc/LandIQ_processing/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.gpkg"))
+sjv <- read_sf(here("data/intermediate/misc/LandIQ_processing/2_last_cultivated_rev_water/sjvLastCultivatedRevWater.gpkg"))
 # ensure CRS is CA Albers (EPSG:3310)
 st_crs(sjv)
 
@@ -77,9 +77,10 @@ print(paste0("Proportion of fallowed land in the SJV: ", round(propFallow * 100,
 
 
 # =============================================================================
-# STEP 2: Split SJV into (1) cultivated land AND fallow/idle land WITH last 
-#         cultivated crop info (2) fallow/idle land WITHOUT last cultivated 
-#         crop info
+# STEP 2: Split SJV into:
+#               (1) cultivated land AND fallow/idle land WITH last cultivated 
+#                   crop info 
+#               (2) fallow/idle land WITHOUT last cultivated crop info
 # =============================================================================
 
 # (1) cultivated land AND fallow land WITH last cultivated crop info
@@ -239,7 +240,7 @@ print(cultivatedSummary)
 
 # Export ------------------------------------------------------------------
 
-write_sf(allsjv, here("data/intermediate/6_estimateFallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.gpkg"), 
+write_sf(allsjv, here("data/intermediate/6_estimate_fallowing_median/sjvAddFallowMedian/sjvAddFallowMedian.gpkg"), 
          append = FALSE)
 
 

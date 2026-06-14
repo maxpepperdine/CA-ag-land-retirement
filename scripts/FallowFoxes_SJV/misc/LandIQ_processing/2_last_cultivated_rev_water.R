@@ -19,11 +19,11 @@ library(here)
 # STEP 1: load data and join last cultivated crop info to sjv year data
 # =============================================================================
 
-# sjv plots processed through crop rotation script (5_cropRotation.R)
-sjv <- read_sf(here("data/intermediate/5_cropRotation/sjvYearRotation/sjvYearRotation.gpkg"))
+# sjv plots processed through crop rotation script (5_crop_rotation.R)
+sjv <- read_sf(here("data/intermediate/5_crop_rotation/sjvYearRotation/sjvYearRotation.gpkg"))
 
 # LandIQ plots with last cultivated crop info (from 1_lastCultivatedLandIQ_2022.R)
-sjv_lastCult <- read_sf(here("data/intermediate/misc/LandIQ_processing/1_lastCultivatedLandIQ_2022/landiq_2022_lastCultivated.shp")) %>% 
+sjv_lastCult <- read_sf(here("data/intermediate/misc/LandIQ_processing/1_last_cultivated_LandIQ_2022/landiq_2022_lastCultivated.shp")) %>% 
   select(uniqu_d, comm, last_comm, everything())
 
 # join last cultivated crop info to sjv year data
@@ -182,7 +182,7 @@ update_summary_test <- sjv_final %>%
 
 # export data
 write_sf(sjv_final, 
-         here("data/intermediate/misc/LandIQ_processing/2_lastCultivatedRevWater/sjvLastCultivatedRevWater.gpkg"), 
+         here("data/intermediate/misc/LandIQ_processing/2_last_cultivated_rev_water/sjvLastCultivatedRevWater.gpkg"), 
          append = FALSE)
 
 

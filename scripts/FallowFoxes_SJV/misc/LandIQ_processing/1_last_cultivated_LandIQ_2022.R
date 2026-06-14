@@ -20,7 +20,7 @@ library(here)
 
 
 # define file paths to cleaned LandIQ plots
-path_2022 <- here("data/intermediate/5_cropRotation/sjvYearRotation/sjvYearRotation.shp")
+path_2022 <- here("data/intermediate/5_crop_rotation/sjvYearRotation/sjvYearRotation.shp")
 path_2021 <- here("data/intermediate/misc/LandIQ_processing/2021/5_cropRotation_2021/sjvYearRotation/sjvYearRotation_2021.shp")
 path_2020 <- here("data/intermediate/misc/LandIQ_processing/2020/5_cropRotation_2020/sjvYearRotation/sjvYearRotation_2020.shp")
 path_2019 <- here("data/intermediate/misc/LandIQ_processing/2019/5_cropRotation_2019/sjvYearRotation/sjvYearRotation_2019.shp")
@@ -238,7 +238,7 @@ idle_summary_pretty <- idle_summary %>%
 # =============================================================================
 
 write_sf(landiq_2022_final, 
-         here("data/intermediate/misc/LandIQ_processing/1_lastCultivatedLandIQ_2022/landiq_2022_lastCultivated.shp"), 
+         here("data/intermediate/misc/LandIQ_processing/1_last_cultivated_LandIQ_2022/landiq_2022_lastCultivated.shp"), 
          append = FALSE)
 
 
