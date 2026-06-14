@@ -1,3 +1,16 @@
+# =============================================================================
+# MASTER CROSSWALK
+# =============================================================================
+# Purpose: 
+#         (1) Create comprehensive crosswalk between different agricultural data 
+#             classification systems 
+#         (2) Join LandIQ crop types to:
+#                   - CADWR water use categories
+#                   - USDA NASS revenue categories
+#                   - Annual/Perennial classification
+#         (3) Integrate water use and revenue data with spatial plot data
+# =============================================================================
+
 # clear environment
 rm(list=ls())
 
@@ -119,12 +132,12 @@ annualCross <- enframe(commAP, name = NULL, value = "COMM") %>%
 # Revenue Crosswalk + Values ----------------------------------------------
 
 
-# Read in table of crops with revenue $ / acre created in the cropRevenueCrosswalk.R script. 
+# Read in table of crops with revenue $ / acre created in the 1_crop_revenue_crosswalk.R script. 
 # The crosswalk joins revenue crop categories to LandIQ field crop categories
 
 
 #Read in revenue table 
-revenueRaw <- read_csv(here("data/intermediate/1_cropRevenueCrosswalk/final_revenue_sjv.csv"))
+revenueRaw <- read_csv(here("data/intermediate/1_crop_revenue_crosswalk/final_revenue_sjv.csv"))
 
 revenue <- revenueRaw %>%
   dplyr::select(crop, county, price_per_acre) %>% 
@@ -135,12 +148,12 @@ revenue <- revenueRaw %>%
 
 
 
-
 # Water Crosswalk + Values ------------------------------------------------
 
 
 # Read in table of crops with water use from CADWR
-# Counties of interest were selected from the full water use dataset
+# Counties of interest were selected from the full water use dataset, linked
+# here: https://data.ca.gov/dataset/statewide-agricultural-water-use-data-2016-2020 
 # The crosswalk joins water use crop categories to LandIQ field crop categories
 
 # --- Read and fill Applied Water (AW) ---
@@ -196,24 +209,22 @@ water <- waterAW %>%
 
 
 
-
-
 # Join All Crosswalks -----------------------------------------------------
 
 masterPre <- annualCross %>% 
   left_join(revCross, by = "COMM") %>% 
   left_join(waterCross, by = "COMM")
 
-# # save the masterPre crosswalk
-# write_csv(masterPre, 
-#           here("data/intermediate/3_masterCrosswalk/sjv_masterPre_crosswalk.csv"))
+# save the masterPre crosswalk (only annual, rev, and water)
+write_csv(masterPre,
+          here("data/intermediate/3_master_crosswalk/sjv_masterPre_crosswalk.csv"))
 
 
 
 # Join crosswalk data with LandIQ plots ---------------------------------------
 
 # LandIQ spatial data
-SJV_plots <- read_sf(here("data/intermediate/2_cleanPlotsLandIQ/SJVID/SJVID.shp"))
+SJV_plots <- read_sf(here("data/intermediate/2_clean_plots_LandIQ/SJVID/SJVID.shp"))
 
 # join to master crosswalk and add revenue and water use values
 master_SJV_plots <- SJV_plots %>% 
@@ -222,9 +233,9 @@ master_SJV_plots <- SJV_plots %>%
   left_join(water, by = c("Crop" = "Crop", "county" = "County"))
 
 # save the SJV plots with crosswalk info
-# we'll combine this with estimated revenue values is 4_revenueEstimation.R
+# we'll combine this with estimated revenue values is 4_revenue_estimation.R
 write_sf(master_SJV_plots, 
-         here("data/intermediate/3_masterCrosswalk/sjv_crosswalkPlots_na/sjv_crosswalkPlots_na.gpkg"), 
+         here("data/intermediate/3_master_crosswalk/sjv_crosswalkPlots_na/sjv_crosswalkPlots_na.gpkg"), 
          append = FALSE)
 
 
@@ -240,14 +251,14 @@ missing_crops_landIQ <- master_SJV_plots %>%
   arrange(county, crp_ty_)
 
 
-# # find all unqiue crop type/county combos
-# crops_county <- master_SJV_plots %>%
-#   distinct(crp_ty_, county) %>%
-#   arrange(county, crp_ty_) %>% 
-#   rename(comm = crp_ty_)
-# 
-# # save this for later reference
-# write_csv(crops_county, here("data/intermediate/3_masterCrosswalk/sjv_cropCountyCombos.csv"))
+# find all unqiue crop type/county combos
+crops_county <- master_SJV_plots %>%
+  distinct(crp_ty_, county) %>%
+  arrange(county, crp_ty_) %>%
+  rename(comm = crp_ty_)
+
+# save this for later reference 
+write_csv(crops_county, here("data/intermediate/3_master_crosswalk/sjv_cropCountyCombos.csv"))
 
 
 # NASS crop types missing revenue values
@@ -256,7 +267,7 @@ missing_crops_nass_county <- master_SJV_plots %>%
   filter(is.na(price_per_acre)) %>%
   distinct(NASS, county) %>%
   arrange(county, NASS)
-# these are the crops we need to estimate revenue for in 4_revenueEstimation.R
+# these are the crops we need to estimate revenue for in 4_revenue_estimation.R
 missing_crops_nass_sjv <- master_SJV_plots %>%
   filter(is.na(price_per_acre)) %>%
   distinct(NASS) %>%

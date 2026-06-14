@@ -1,8 +1,16 @@
+# =============================================================================
+# CLEANING DWR/LAND IQ CROP MAPPING DATA
+# =============================================================================
+# Purpose: 
+#         (1) Clean and process LandIQ 2022 spatial data for San Joaquin Valley 
+#         (2) Handle crop rotation dates and multiple cropping seasons
+#         (3) Create unique plot identifiers based on geometry
+#         (4) Remove problematic crop types from analysis
+#         (5) Examine comm codes from LandIQ data to crosswalk with other data
+# =============================================================================
+
 # clear environment
 rm(list = ls())
-
-# purpose: clean LandIQ fields and examine comm codes from LandIQ data for SJV
-# we'll use these to crosswalk with crop revenue and DWR data later 
 
 # load packages
 library(tidyverse)
@@ -86,7 +94,7 @@ SJV_clean_2022 <- SJV2022Raw %>%
 
 # final cleaning
 SJV_clean_final <- SJV_clean_2022 %>%
-  # pivot longer to have one crop type per row (i.e., one crop occurrence for each field)
+  # pivot longer to have one crop type per row (i.e., one crop occ for each field)
   pivot_longer(
     # select all columns for each crop type and their corresponding dates
     cols = matches("croptyp[1-4]|date_active[1-4]|date_inactive[1-4]"),
@@ -97,8 +105,12 @@ SJV_clean_final <- SJV_clean_2022 %>%
   # remove placeholder and missing crops
   filter(croptyp != "****" & !is.na(croptyp)) %>%  
   mutate(
-    date_active = if_else(is.na(date_active), as.Date("2021-10-01"), date_active),
-    date_inactive = if_else(is.na(date_inactive), as.Date("2022-09-30"), date_inactive),
+    date_active = if_else(is.na(date_active), 
+                          as.Date("2021-10-01"), 
+                          date_active),
+    date_inactive = if_else(is.na(date_inactive), 
+                            as.Date("2022-09-30"), 
+                            date_inactive),
     croptype_category = paste0("croptyp", season)
   ) %>%
   select(unique_id, acres, county, region, croptype_category, croptyp, date_active, 
@@ -120,10 +132,8 @@ SJV_Geo <- SJV_clean_final %>%
 SJV2022 <- SJV_clean_final %>% 
   st_join(SJV_Geo, join = st_equals)
 
-
-# load the matching sheet
+# load the matching sheet (links index, crop code, crop name)
 matching <- read_csv(here("data/intermediate/0_input/matchingSheet.csv"))
-
 
 # join to get full crop names and clean column names
 SJV2022 <- SJV2022 %>%
@@ -137,10 +147,14 @@ st_crs(SJV2022)
 SJV2022_2D <- st_zm(SJV2022)
 
 
-################################################################################
-# we're thinking of dropping the following LandIQ crop types:
-# "Eucalyptus", "Miscellaneous Deciduous", "Mixed Pasture", "Turf Farms", "Flowers, Nursery and Christmas Tree Farms", "Miscellaneous Truck Crops", "Greenhouse"
-# first, let's see how many acres they represent in the SJV for 2022
+# ==============================================================================
+# Due to inconsistent crosswalking between the DWR/LandIQ/USDA NASS crop classes, 
+# we're dropping the following LandIQ crop types:
+#       "Eucalyptus", "Miscellaneous Deciduous", "Mixed Pasture", 
+#       "Turf Farms", "Flowers, Nursery and Christmas Tree Farms", 
+#       "Miscellaneous Truck Crops", "Greenhouse"
+#
+# Let's see how many acres they represent in the SJV for 2022
 
 # acres we'd be dropping
 acres_to_drop <- SJV2022_2D %>%
@@ -158,9 +172,9 @@ total_acres <- SJV2022_2D %>%
 # calculate percentage of acres to drop
 percentage_dropped <- (acres_to_drop$drop_acres / total_acres$total_acres) * 100
 
-# we're only losing about 2.3% of total acres, so dropping these crop types seems reasonable
-
-################################################################################
+# we're only losing about 2.3% of total acres, so dropping these crop types 
+# seems reasonable
+# ==============================================================================
 
 # drop the crop types from the data
 SJV2022_final <- SJV2022_2D %>%
@@ -173,15 +187,14 @@ SJV2022_final <- SJV2022_2D %>%
 
 
 # write to shapefile
-write_sf(SJV2022_final, here("data/intermediate/2_cleanPlotsLandIQ/SJVID/SJVID.shp"), 
+write_sf(SJV2022_final, here("data/intermediate/2_clean_plots_LandIQ/SJVID/SJVID.shp"), 
          append = FALSE)
 
-
-################################################################################
-
+# ==============================================================================
 
 # examine all distinct crop types in the SJV for 2022 LandIQ data
-# this will inform the crosswalk with crop revenue, water use, and annual/perennial data in 3_masterCrosswalk.R
+# this will inform the crosswalk with crop revenue, water use, and 
+# annual/perennial data in 3_masterCrosswalk.R
 distinct_crops_2022 <- SJV2022_final %>%
   st_drop_geometry() %>%
   distinct(croptyp, crop_type_name) %>%

@@ -1,3 +1,14 @@
+# =============================================================================
+# ESTIMATING REVENUE FOR LANDIQ CROPS MISSING IN USDA NASS DATA
+# =============================================================================
+# Purpose: 
+#         (1) Estimate revenue values for LandIQ crops not in the USDA NASS 
+#             county data
+#         (2) Process multi-year USDA data (2021-2022) to create robust estimates
+#         (3) Adjust values for inflation using Consumer Price Index
+#         (4) Fill/add missing revenue values in LandIQ crosswalk data
+# =============================================================================
+
 # clear environment
 rm(list = ls())
 
@@ -5,13 +16,13 @@ library(tidyverse)
 library(janitor)
 library(here)
 
-################################################################################
+# =============================================================================
 
 # load the USDA NASS data for 2021-2022
 usda_2021 <- read_csv(here("data/raw/USDA_NASS/CAC_2021_data_by_commodity_20240417.csv"))
 usda_2022 <- read_csv(here("data/raw/USDA_NASS/County_Ag_Commissioner_Report_2022_data_by_commodity.csv"))
 
-################################################################################
+# =============================================================================
 
 # the USDA crop name and commodity codes changed after 2020
 # attach the old names and codes to the new ones
@@ -136,7 +147,7 @@ usda_2022_averages <- crop_averages_2022 %>%
          price_per_unit_stateTotal)
 
 
-################################################################################
+# =============================================================================
 
 
 ### USDA 2021 ####
@@ -162,12 +173,12 @@ usda_2021_filter <- usda_2021_clean %>%
                      "Ryegrass", "Safflower", "Sugar Beets", "Sweet Potatoes", 
                      "Tomatoes, Processing", "Wheat, Grain"))
 
-# # for all observations where crop == "Berries, Strawberries, All", assign the "legacy_item_name" values as "Berries, Strawberries, Fresh Market"
-# # we only need an extra step for this crop type because the NASS data changed the naming convention
-# usda_2021_filter <- usda_2021_filter %>%
-#   mutate(legacy_item_name = if_else(crop == "Berries, Strawberries, All", 
-#                                     "Berries, Strawberries, Fresh Market", 
-#                                     legacy_item_name))
+# for all observations where crop == "Berries, Strawberries, All", assign the "legacy_item_name" values as "Berries, Strawberries, Fresh Market"
+# we only need an extra step for this crop type because the NASS data changed the naming convention
+usda_2021_filter <- usda_2021_filter %>%
+  mutate(legacy_item_name = if_else(crop == "Berries, Strawberries, All",
+                                    "Berries, Strawberries, Fresh Market",
+                                    legacy_item_name))
 
 # QC: count number of distinct obsv in legacy item name 
 # should be the # of crops you want to estimate revenue for (i.e., 35 crops here)
@@ -262,10 +273,10 @@ usda_2021_averages <- crop_averages_2021 %>%
          price_per_unit_stateTotal)
 
 
-################################################################################
+# =============================================================================
 
 
-################################################################################
+# =============================================================================
 
 # now that we have averages for 2021 & 2022 we can combine them into one table
 
@@ -329,23 +340,23 @@ usda_final_averages_CPI <- usda_all_years_CPI_adj %>%
 
 # export the final revenue estimation table
 write_csv(usda_final_averages_CPI, 
-          here("data/intermediate/4_revenueEstimation/nass_cropRevenueEstimates_2022.csv"))
+          here("data/intermediate/4_revenue_estimation/nass_cropRevenueEstimates_2022.csv"))
 
 
 
-################################################################################
+# =============================================================================
 
 
-################################################################################
+# =============================================================================
 
 
 # Add estimated values to the LandIQ SJV data ---------------------------------
 
 # now that we have the revenue estimates per crop, we can join them to the LandIQ SJV data
-# this is the sjv_crosswalkPlots_na.shp data from the 3_masterCrosswalk.R script
+# this is the sjv_crosswalkPlots_na.shp data from the 3_master_crosswalk.R script
 
 # load the LandIQ SJV data with crop crosswalk info
-SJV_landIQ_na_crosswalk <- read_sf(here("data/intermediate/3_masterCrosswalk/sjv_crosswalkPlots_na/sjv_crosswalkPlots_na.gpkg"))
+SJV_landIQ_na_crosswalk <- read_sf(here("data/intermediate/3_master_crosswalk/sjv_crosswalkPlots_na/sjv_crosswalkPlots_na.gpkg"))
 crs(SJV_landIQ_na_crosswalk) # QC (EPSG: 3310)
 
 # join the estimated data to the LandIQ plot crosswalk
@@ -371,7 +382,7 @@ missing_crops_test <- SJV_landIQ_full_crosswalk %>%
 
 # export the LandIQ plots with all crosswalk info and revenue estimates
 write_sf(SJV_landIQ_full_crosswalk, 
-         here("data/intermediate/4_revenueEstimation/sjv_landIQ_fullCrosswalk/sjv_landIQ_fullCrosswalk.gpkg"), 
+         here("data/intermediate/4_revenue_estimation/sjv_landIQ_fullCrosswalk/sjv_landIQ_fullCrosswalk.gpkg"), 
          append = FALSE)
 
 

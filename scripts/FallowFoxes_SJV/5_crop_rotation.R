@@ -20,7 +20,7 @@ source(here("scripts/FallowFoxes_SJV/0_startup/functions.R"))
 
 
 # read in the .shp just created in 4_revenueEstimation 
-sjv <- read_sf(here("data/intermediate/4_revenueEstimation/sjv_landIQ_fullCrosswalk/sjv_landIQ_fullCrosswalk.gpkg")) %>% 
+sjv <- read_sf(here("data/intermediate/4_revenue_estimation/sjv_landIQ_fullCrosswalk/sjv_landIQ_fullCrosswalk.gpkg")) %>% 
   clean_names()
 
 
@@ -203,7 +203,7 @@ metrics(cropRotation$waterPerAcreETc)
 
 # Export
 write_sf(cropRotation, 
-         here("data/intermediate/5_cropRotation/sjvYearRotation/sjvYearRotation.gpkg"), 
+         here("data/intermediate/5_crop_rotation/sjvYearRotation/sjvYearRotation.gpkg"), 
          append = FALSE)
 
 
