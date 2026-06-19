@@ -47,10 +47,10 @@ library(kableExtra)
 # file paths ------------------------------------------------------
 
 # Prioritizr output directory
-prioritizr_dir <- here("data/intermediate/misc/snet_prioritizr_formulation/9_2_prioritizr_water_only/")
+prioritizr_dir <- here("data/intermediate/misc/snet_prioritizr_formulation/9_2_prioritizr_water_only_snet/")
 
 # Figure output directory
-fig_dir <- here("data/intermediate/misc/snet_prioritizr_formulation/10_2_prioritizr_water_only_figures/")
+fig_dir <- here("data/intermediate/misc/snet_prioritizr_formulation/10_2_prioritizr_water_only_snet_figures/")
 
 # Basin boundaries
 basins_path <- here("data/raw/i08_B118_CA_GroundwaterBasins/i08_B118_CA_GroundwaterBasins.shp")
@@ -1068,7 +1068,7 @@ if (exists("make_scenario_map") && exists("selection_data") && exists("map_frequ
   cat("Creating Figure 3 (metric)...\n")
   
   scenario_map_labels_m <- c(
-    "selected_baseline" = "A: Baseline (target: 2.28 km³)",
+    "selected_baseline" = "A: Baseline (target: ~2.28 km³)",
     "selected_rcp45"    = "B: RCP 4.5 (target: ~2.43 km³)",
     "selected_rcp85"    = "C: RCP 8.5 (target: ~2.53 km³)"
   )

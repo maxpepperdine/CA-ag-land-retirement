@@ -51,7 +51,7 @@ options(scipen = 999)
 
 
 # Output directory
-fig_dir <- here("data/intermediate/misc/snet_prioritizr_formulation/10_3_prioritizr_combined_PAs_figures/")
+fig_dir <- here("data/intermediate/misc/snet_prioritizr_formulation/10_3_prioritizr_combined_snet_PAs_figures/")
 
 
 # =============================================================================
@@ -59,7 +59,7 @@ fig_dir <- here("data/intermediate/misc/snet_prioritizr_formulation/10_3_priorit
 # =============================================================================
 
 # --- Combined results (with PAs) ---
-load(here("data/intermediate/misc/snet_prioritizr_formulation/9_3_prioritizr_combined_PAs/prioritizr_combined_PAs_results.RData"))
+load(here("data/intermediate/misc/snet_prioritizr_formulation/9_3_prioritizr_combined_snet_PAs/prioritizr_combined_PAs_results.RData"))
 
 
 # --- Extract cleaned PA layer from the saved `pu` object so the figures show

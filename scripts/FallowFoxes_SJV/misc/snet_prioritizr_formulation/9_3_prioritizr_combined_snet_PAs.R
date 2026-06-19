@@ -835,7 +835,7 @@ print(target_detail, n = Inf)
 # SECTION 9: Export Results
 # =============================================================================
 
-output_dir <- here("data/intermediate/misc/snet_prioritizr_formulation/9_3_prioritizr_combined_PAs/")
+output_dir <- here("data/intermediate/misc/snet_prioritizr_formulation/9_3_prioritizr_combined_snet_PAs/")
 
 # --- Save all objects for figures ---
 save(
