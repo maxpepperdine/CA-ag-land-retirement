@@ -104,20 +104,6 @@ cont_diff_rcp45_2069 <- bnll_rcp45_2069 - bnll_baseline
 cont_diff_rcp85_2049 <- bnll_rcp85_2049 - bnll_baseline
 cont_diff_rcp85_2069 <- bnll_rcp85_2069 - bnll_baseline
 
-# # clip to SJV boundary
-# cont_diff_rcp45_2049_sjv <- cont_diff_rcp45_2049 %>% 
-#   mask(sjv_vect) %>% 
-#   crop(sjv_vect)
-# cont_diff_rcp45_2069_sjv <- cont_diff_rcp45_2069 %>% 
-#   mask(sjv_vect) %>% 
-#   crop(sjv_vect)
-# cont_diff_rcp85_2049_sjv <- cont_diff_rcp85_2049 %>% 
-#   mask(sjv_vect) %>% 
-#   crop(sjv_vect)
-# cont_diff_rcp85_2069_sjv <- cont_diff_rcp85_2069 %>% 
-#   mask(sjv_vect) %>% 
-#   crop(sjv_vect)
-
 # clip to basin boundary
 cont_diff_rcp45_2049_basin <- cont_diff_rcp45_2049 %>% 
   mask(basins_union_vect) %>% 

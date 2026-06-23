@@ -1,6 +1,5 @@
 ---
 title: "BNLL MaxEnt prediction generation"
-author: "Maxwell Pepperdine"
 format: html
 editor: visual
 date: last-modified

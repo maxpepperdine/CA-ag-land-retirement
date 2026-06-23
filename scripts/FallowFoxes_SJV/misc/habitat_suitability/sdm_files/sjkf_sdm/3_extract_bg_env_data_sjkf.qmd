@@ -1,6 +1,5 @@
 ---
 title: "Extract env data to SJKF background points"
-author: "Stella Wing"
 format: html
 editor: visual
 date: last-modified

@@ -1,6 +1,5 @@
 ---
 title: "GKR MaxEnt prediction generation"
-author: "Maxwell Pepperdine"
 format: html
 editor: visual
 date: last-modified
@@ -169,18 +168,6 @@ evalplot.stats(e = max.eval.gkr,
                x.var = "rm", 
                color = "fc", 
                error.bars = FALSE)
-
-# # removing delta.AICc for plotting because it gets included with AIC by default
-# max.eval.filtered <- max.eval.gkr
-# max.eval.filtered@results <- max.eval.gkr@results[, !colnames(max.eval.gkr@results) %in% "delta.AICc"]
-# 
-# evalplot.stats(e = max.eval.filtered,
-#                stats = c("AICc", "auc.train"),
-#                facet.labels = c("AICc" = "AIC", 
-#                                 "auc.train" = "AUC (train)"), 
-#                x.var = "rm",
-#                color = "fc",
-#                error.bars = FALSE)
 
 
 #==============================================================================

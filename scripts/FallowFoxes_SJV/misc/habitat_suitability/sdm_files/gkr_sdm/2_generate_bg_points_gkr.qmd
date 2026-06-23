@@ -1,6 +1,5 @@
 ---
 title: "Generate GKR background points"
-author: "Maxwell Pepperdine"
 format: html
 editor: visual
 date: last-modified
@@ -68,9 +67,9 @@ nchar(buffer_simplify_wkt)  # check length of WKT string
 
 ```{r}
 # set up GBIF credentials (one-time setup)
-options(gbif_user = "mpepperdine")
-options(gbif_pwd = " ")
-options(gbif_email = " ")
+options(gbif_user = " ") # username
+options(gbif_pwd = " ") # password
+options(gbif_email = " ") # email
 
 # use rgbif::occ_download to acquire background points
 download_key <- occ_download(

@@ -3,6 +3,10 @@ title: "0_occurrence_data_processing"
 format: html
 ---
 
+## Purpose
+
+Combine the BNLL GBIF occ data with the 7 additional records from [Stewart et al. (2019)](https://doi.org/10.1371/journal.pone.0210766).
+
 ```{r}
 # clear workspace
 rm(list = ls())
@@ -86,7 +90,7 @@ bnll_occur_combined <- bind_rows(bnll_occur_wallace, bnll_stewart)
 # export clean data as csv
 # this is the occurrence data to use in Wallace!
 write_csv(bnll_occur_combined, 
-          here("data/raw/occurrence_points/bnll/wallace/bnll_occur_wallace.csv"))
+          here("data/raw/occurrence_points/bnll/bnll_occur.csv"))
 ```
 
 

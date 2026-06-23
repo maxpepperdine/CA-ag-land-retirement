@@ -1,6 +1,5 @@
 ---
 title: "Generate SJKF background points"
-author: "Stella Wing"
 format: html
 editor: visual
 date: last-modified
@@ -71,9 +70,9 @@ nchar(buffer_simplify_wkt)  # check length of WKT string
 
 ```{r}
 # set up GBIF credentials (one-time setup)
-options(gbif_user = "mpepperdine")
-options(gbif_pwd = " ")
-options(gbif_email = " ")
+options(gbif_user = " ") # username
+options(gbif_pwd = " ") # password
+options(gbif_email = " ") # email
 
 # use rgbif::occ_download to acquire background points
 download_key <- occ_download(
@@ -127,42 +126,6 @@ background_df <- vertebrate_coords %>%
   dplyr::select(gbifID, institutionCode, year, basisOfRecord, 
                 scientificName, class, classKey, species,
                 longitude, latitude)
-```
-
-```{r}
-# # checking bg points locations 
-# 
-# library(terra)
-# 
-# env_rasters <- rast(list.files(here("data/baseline/sjkf"), 
-#                                pattern = ".tif$", 
-#                                full.names = TRUE))
-# # fix names
-# names(env_rasters) <- c("aet1991_2020_ave", "clay_pct_0_10cm", "cwd1991_2020_ave", 
-#                         "ec_dS_m_0_10cm", "pH_0_10cm", "ppt1991_2020_ave", 
-#                         "sand_pct_0_10cm", "silt_pct_0_10cm", "slope", 
-#                         "tmn1991_2020_ave", "tmx1991_2020_ave")
-# 
-# # Select precipitation raster
-# r <- env_rasters[["ppt1991_2020_ave"]]
-# 
-# # Convert background_df to SpatVector
-# bg_vect <- vect(background_df,
-#                 geom = c("longitude", "latitude"),
-#                 crs = "EPSG:4326")
-# 
-# # Reproject to match raster CRS
-# bg_vect <- project(bg_vect, crs(r))
-# 
-# # Plot raster
-# plot(r,
-#      main = "Background Points on Mean Annual Precipitation")
-# 
-# # Add background points
-# points(bg_vect,
-#        pch = 16,
-#        col = "red",
-#        cex = 0.4)
 ```
 
 Save the data
